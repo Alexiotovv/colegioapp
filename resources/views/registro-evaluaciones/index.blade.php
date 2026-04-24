@@ -264,10 +264,78 @@
             transform: translateY(0);
         }
     }
+    /* Progress Bar - Estilo limpio */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: #28a745;
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #888;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
 </style>
 @endsection
 
 @section('content')
+@include('partials.toast')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>
@@ -317,6 +385,8 @@
         </div>
     </div>
     
+    @include('partials.progress-bar')
+
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
@@ -380,12 +450,39 @@ $(document).ready(function() {
     let registrosHabilitados = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
     
-    const valoraciones = {
-        'SIEMPRE' : 'Siempre',
-        'CASI SIEMPRE' : 'Casi Siempre',
-        'ALGUNAS VECES' : 'Algunas Veces',
-        'NUNCA' : 'Nunca',
-    };
+    // Valoraciones - cargadas dinámicamente
+    let valoraciones = {};
+
+    // Función para cargar valoraciones desde el servidor
+    function cargarValoraciones() {
+        $.ajax({
+            url: '{{ route("admin.registro-evaluaciones.opciones") }}',
+            method: 'GET',
+            async: false,
+            success: function(response) {
+                if (response && response.length > 0) {
+                    valoraciones = {};
+                    for (let item of response) {
+                        valoraciones[item.codigo] = item.nombre;
+                    }
+                    console.log('Valoraciones cargadas:', valoraciones);
+                }
+            },
+            error: function(xhr) {
+                console.error('Error al cargar valoraciones:', xhr);
+                // Valoraciones por defecto
+                valoraciones = {
+                    'SIEMPRE': 'Siempre',
+                    'CASI SIEMPRE': 'Casi Siempre',
+                    'ALGUNAS VECES': 'Algunas Veces',
+                    'NUNCA': 'Nunca'
+                };
+            }
+        });
+    }
+
+    // Cargar valoraciones al inicio
+    cargarValoraciones();
     
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
@@ -437,6 +534,7 @@ $(document).ready(function() {
                 $('#infoPeriodo').show();
                 
                 renderTabla();
+                progressBar.show().update();
                 $('#tablaContainer').show();
             },
             error: function(xhr) {
@@ -450,51 +548,63 @@ $(document).ready(function() {
         });
     });
     
-    function renderTabla() {
+    // Inicializar Progress Bar
+    progressBar
+        .init('progressContainer', '.valoracion-select')
+        .show()
+        .bindToChanges()
+        .onComplete(function() {
+            toast.success('¡Todos los registros completados!');
+        })
+        .onUpdate(function(porcentaje, completados, total) {
+            console.log(`Progreso: ${porcentaje}% (${completados}/${total})`);
+        });
 
-        
+    function renderTabla() {
         if (!matriculasData || matriculasData.length === 0) {
             $('#tablaBody').html(`
                 <tr>
-                    <td colspan="3" class="text-center text-danger">
+                    <td colspan="4" class="text-center text-danger">
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         No hay estudiantes matriculados en esta aula.
                     </td>
                 </tr>
             `);
+            $('#progressContainer').hide();
             return;
         }
         
         if (!evaluacionesData || evaluacionesData.length === 0) {
             $('#tablaBody').html(`
                 <tr>
-                    <td colspan="3" class="text-center text-warning">
+                    <td colspan="4" class="text-center text-warning">
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         No hay evaluaciones registradas.
                     </td>
                 </tr>
             `);
+            $('#progressContainer').hide();
             return;
         }
         
-        // Renderizar header
+        $('#progressContainer').show();
+        
+        // Header
         let headerHtml = `
             <tr>
                 <th style="min-width: 60px;">N°</th>
                 <th style="min-width: 150px;">Código</th>
                 <th style="min-width: 250px;">Alumno</th>
         `;
-
-
+        
         for (let evaluacion of evaluacionesData) {
-            headerHtml += `<th style="min-width: 180px;">${evaluacion.nombre}<br><small class="text-muted">${evaluacion.nivel ? evaluacion.nivel.nombre : ''}</small></th>`;
+            headerHtml += `<th colspan="1">${evaluacion.nombre}<br><small class="text-muted">${evaluacion.nivel ? evaluacion.nivel.nombre : ''}</small></th>`;
         }
-        headerHtml += `<th style="min-width: 250px;">Comentario General</th>`;
         headerHtml += `</tr>`;
         
         $('#tablaHeader').html(headerHtml);
         
-        // Renderizar body
+        // Body
         let bodyHtml = '';
         let contador = 1;
         
@@ -507,66 +617,49 @@ $(document).ready(function() {
                 <td style="text-align: left;">
                     <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
                     <small>${matricula.alumno.nombres || ''}</small>
-                  </td>`;
+                </td>`;
             
             for (let evaluacion of evaluacionesData) {
                 let registro = registrosAlumno[evaluacion.id];
                 let valoracionValue = registro ? registro.valoracion : '';
                 
                 bodyHtml += `
-                    <td style="text-align: center; width: 110px;">
-                        <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 100px; margin: 0 auto; font-size: 12px;">
+                    <td style="text-align: center;">
+                        <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 110px; margin: 0 auto;">
                             <option value="">Seleccionar</option>
                             ${Object.keys(valoraciones).map(key => `<option value="${key}" ${valoracionValue === key ? 'selected' : ''}>${valoraciones[key]}</option>`).join('')}
                         </select>
                     </td>
                 `;
             }
-            
-            bodyHtml += `
-                <td>
-                    <input type="text" class="form-control comentario-input" data-matricula="${matricula.id}" placeholder="Comentario general..." ${!registrosHabilitados ? 'disabled' : ''}>
-                </td>
-            `;
             bodyHtml += `</tr>`;
             contador++;
         }
         
         $('#tablaBody').html(bodyHtml);
         
-        // Cargar comentarios existentes
-        for (let matricula of matriculasData) {
-            let registrosAlumno = registrosData[matricula.id] || {};
-            // Buscar comentario (puede venir de cualquier evaluación, lo guardamos por separado)
-            let comentario = '';
-            for (let evId in registrosAlumno) {
-                if (registrosAlumno[evId].comentario) {
-                    comentario = registrosAlumno[evId].comentario;
-                    break;
-                }
-            }
-            if (comentario) {
-                $(`.comentario-input[data-matricula="${matricula.id}"]`).val(comentario);
-                $(`.comentario-input[data-matricula="${matricula.id}"]`).addClass('registro-guardado');
-            }
-        }
-        
-        // Marcar selects que tienen valor seleccionado
+        // Marcar selects guardados
         $('.valoracion-select').each(function() {
             if ($(this).val()) {
                 $(this).addClass('registro-guardado');
             }
         });
         
-        // Evento para marcar cuando se selecciona una valoración
+        // Evento change
         $('.valoracion-select').on('change', function() {
             if ($(this).val()) {
                 $(this).addClass('registro-guardado');
             } else {
                 $(this).removeClass('registro-guardado');
             }
+            progressBar.update();
         });
+
         
+        $(document).on('change', '.valoracion-select', function() {
+            progressBar.update();
+        });
+
         // Evento para comentario
         $('.comentario-input').on('input', function() {
             if ($(this).val()) {
@@ -694,6 +787,39 @@ $(document).ready(function() {
         $('#fabMenu').removeClass('show');
     }
     
+    // function actualizarProgreso() {
+    //     let totalInputs = 0;
+    //     let completados = 0;
+        
+    //     $('.nota-valor').each(function() {
+    //         totalInputs++;
+            
+    //         let valor = $(this).val();
+
+    //         // DEBUG (opcional)
+    //         // console.log('Valor:', valor);
+
+    //         if (valor !== null && valor !== undefined && valor.trim() !== '') {
+    //             completados++;
+    //         }
+    //     });
+
+    //     let porcentaje = totalInputs > 0 ? Math.round((completados / totalInputs) * 100) : 0;
+
+    //     $('#totalCount').text(totalInputs);
+    //     $('#completedCount').text(completados);
+    //     $('#pendingCount').text(totalInputs - completados);
+    //     $('#progressPercentage').text(porcentaje + '%');
+    //     $('#progressBarFill').css('width', porcentaje + '%');
+
+    //     if (porcentaje === 100) {
+    //         $('#btnGuardarTodas').prop('disabled', false);
+    //     } else {
+    //         $('#btnGuardarTodas').prop('disabled', true);
+    //     }
+    // }
+
+
     $('#btnGuardarTodas').on('click', guardarTodasLasEvaluaciones);
     $('#btnImprimirTodo').on('click', imprimirReporte);
     

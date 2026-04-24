@@ -28,6 +28,10 @@ use App\Http\Controllers\TipoOtraEvaluacionJerarquicoController;
 use App\Http\Controllers\RegistroOtraEvaluacionController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\LibretaController;
+use App\Http\Controllers\CompetenciaTransversalJerarquicoController;
+use App\Http\Controllers\RegistroCompetenciaTransversalController;
+use App\Http\Controllers\ConfiguracionNotasController;
+
 
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
@@ -234,9 +238,26 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/libretas/exportar-aula', [LibretaController::class, 'exportarAula'])->name('libretas.exportar-aula');
         Route::post('/libretas/exportar-alumno', [LibretaController::class, 'exportarAlumno'])->name('libretas.exportar-alumno');
         Route::get('/libretas/previsualizar', [LibretaController::class, 'previsualizar'])->name('libretas.previsualizar');
+        
+        // Competencias Transversales Jerárquicas
+        Route::get('/competencias-transversales-jerarquico', [CompetenciaTransversalJerarquicoController::class, 'index'])->name('competencias-transversales-jerarquico.index');
+        Route::post('/competencias-transversales-jerarquico/competencia', [CompetenciaTransversalJerarquicoController::class, 'storeCompetencia'])->name('competencias-transversales-jerarquico.store');
+        Route::put('/competencias-transversales-jerarquico/competencia/{competenciasTransversale}', [CompetenciaTransversalJerarquicoController::class, 'updateCompetencia'])->name('competencias-transversales-jerarquico.update');
+        Route::delete('/competencias-transversales-jerarquico/competencia/{competenciasTransversale}', [CompetenciaTransversalJerarquicoController::class, 'destroyCompetencia'])->name('competencias-transversales-jerarquico.destroy');
+        Route::patch('/competencias-transversales-jerarquico/competencia/{competenciasTransversale}/toggle', [CompetenciaTransversalJerarquicoController::class, 'toggleActive'])->name('competencias-transversales-jerarquico.toggle');
+        Route::get('/competencias-transversales-jerarquico/competencia/{competenciasTransversale}', [CompetenciaTransversalJerarquicoController::class, 'getCompetencia'])->name('competencias-transversales-jerarquico.get');
 
     });
 
+    Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/libretas', [LibretaController::class, 'index'])->name('libretas.index');
+        Route::get('/libretas/alumnos-by-aula', [LibretaController::class, 'getAlumnosByAula'])->name('libretas.alumnos-by-aula');
+        Route::post('/libretas/exportar-aula', [LibretaController::class, 'exportarAula'])->name('libretas.exportar-aula');
+        Route::post('/libretas/exportar-alumno', [LibretaController::class, 'exportarAlumno'])->name('libretas.exportar-alumno');
+        Route::get('/libretas/previsualizar', [LibretaController::class, 'previsualizar'])->name('libretas.previsualizar');
+        Route::get('/libretas/previsualizar-aula', [LibretaController::class, 'previsualizarAula'])->name('libretas.previsualizar-aula');
+    });
+    
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::post('/registro-evaluaciones/toggle-habilitacion', [RegistroEvaluacionController::class, 'toggleHabilitacion'])->name('registro-evaluaciones.toggle-habilitacion');
     });
@@ -279,7 +300,34 @@ Route::middleware(['auth'])->group(function () {
     //End Registro de Otras Evaluaciones
 
 
+    // Registro de Competencias Transversales
+    Route::middleware(['role:admin,tutor'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/registro-competencias-transversales', [RegistroCompetenciaTransversalController::class, 'index'])->name('registro-competencias-transversales.index');
+        Route::get('/registro-competencias-transversales/get-data', [RegistroCompetenciaTransversalController::class, 'getDataForRegistro'])->name('registro-competencias-transversales.get-data');
+        Route::post('/registro-competencias-transversales/save', [RegistroCompetenciaTransversalController::class, 'saveRegistros'])->name('registro-competencias-transversales.save');
+        Route::post('/registro-competencias-transversales/save-conclusion', [RegistroCompetenciaTransversalController::class, 'saveConclusion'])->name('registro-competencias-transversales.save-conclusion');
+    });
 
+    Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::post('/registro-competencias-transversales/toggle-habilitacion', [RegistroCompetenciaTransversalController::class, 'toggleHabilitacion'])->name('registro-competencias-transversales.toggle-habilitacion');
+    });
+
+    Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/configuracion-notas', [ConfiguracionNotasController::class, 'index'])->name('configuracion-notas.index');
+        Route::get('/configuracion-notas/tipo-nota/{tiposNota}', [ConfiguracionNotasController::class, 'getTipoNota'])->name('configuracion-notas.tipo-nota.show');
+        Route::post('/configuracion-notas/tipo-nota', [ConfiguracionNotasController::class, 'storeTipoNota'])->name('configuracion-notas.tipo-nota.store');
+        Route::put('/configuracion-notas/tipo-nota/{tiposNota}', [ConfiguracionNotasController::class, 'updateTipoNota'])->name('configuracion-notas.tipo-nota.update');
+        Route::delete('/configuracion-notas/tipo-nota/{tiposNota}', [ConfiguracionNotasController::class, 'destroyTipoNota'])->name('configuracion-notas.tipo-nota.destroy');
+        Route::patch('/configuracion-notas/tipo-nota/{tiposNota}/toggle', [ConfiguracionNotasController::class, 'toggleTipoNota'])->name('configuracion-notas.tipo-nota.toggle');
+        Route::get('/configuracion-notas/tipos-by-modulo', [ConfiguracionNotasController::class, 'getTiposNotasByModulo'])->name('configuracion-notas.tipos-by-modulo');
+        Route::get('/configuracion-notas/tipos-nota-todos', [ConfiguracionNotasController::class, 'getAllTiposNotas'])->name('configuracion-notas.tipos-nota-todos');
+        Route::post('/configuracion-notas/asignar', [ConfiguracionNotasController::class, 'asignarNotasModulo'])->name('configuracion-notas.asignar');
+        
+        // Notas - Agregar ruta para opciones
+        Route::get('/notas/opciones', [NotaController::class, 'getOpcionesNotas'])->name('notas.opciones');
+        Route::get('/registro-competencias-transversales/opciones', [RegistroCompetenciaTransversalController::class, 'getOpcionesNotas'])->name('registro-competencias-transversales.opciones');
+        Route::get('/registro-evaluaciones/opciones', [RegistroEvaluacionController::class, 'getOpcionesValoraciones'])->name('registro-evaluaciones.opciones');
+    });
 
 
     //Se puso afuera porque requiere autenticación pero no es exclusivo de admin.

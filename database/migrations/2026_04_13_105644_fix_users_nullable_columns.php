@@ -13,9 +13,7 @@ return new class extends Migration
             // Modificar columnas para que acepten NULL
             DB::statement('ALTER TABLE users MODIFY userable_type VARCHAR(255) NULL');
             DB::statement('ALTER TABLE users MODIFY userable_id BIGINT UNSIGNED NULL');
-            // DB::statement('ALTER TABLE users MODIFY docente_id BIGINT UNSIGNED NULL');
-            // DB::statement('ALTER TABLE users MODIFY alumno_id BIGINT UNSIGNED NULL');
-            // DB::statement('ALTER TABLE users MODIFY apoderado_id BIGINT UNSIGNED NULL');
+
         });
     }
 
@@ -24,9 +22,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             DB::statement('ALTER TABLE users MODIFY userable_type VARCHAR(255) NOT NULL');
             DB::statement('ALTER TABLE users MODIFY userable_id BIGINT UNSIGNED NOT NULL');
-            // DB::statement('ALTER TABLE users MODIFY docente_id BIGINT UNSIGNED NOT NULL');
-            // DB::statement('ALTER TABLE users MODIFY alumno_id BIGINT UNSIGNED NOT NULL');
-            // DB::statement('ALTER TABLE users MODIFY apoderado_id BIGINT UNSIGNED NOT NULL');
+
         });
     }
 };

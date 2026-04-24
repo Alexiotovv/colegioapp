@@ -15,6 +15,7 @@ use App\Models\Competencia;
 use App\Models\ConclusionDescriptiva;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\ModuloRegistro;//Probablemente se vaya
 
 class NotaController extends Controller
 {
@@ -114,12 +115,7 @@ class NotaController extends Controller
                 return response()->json(['error' => 'No tienes acceso a este aula'], 403);
             }
         }
-        
-        // Obtener alumnos matriculados en el aula
-        // $matriculas = Matricula::with(['alumno'])
-        //     ->where('aula_id', $aulaId)
-        //     ->where('estado', 'activa')
-        //     ->get();
+
         $matriculas = Matricula::with(['alumno'])
         ->where('aula_id', $aulaId)
         ->where('estado', 'activa')
@@ -314,6 +310,22 @@ class NotaController extends Controller
             'message' => 'Conclusión guardada exitosamente',
             'conclusion' => $conclusion
         ]);
+    }
+
+
+    //Probablemente se vaya esta función, pero por ahora la dejo aquí para que el frontend pueda obtener las opciones de notas según la configuración
+    public function getOpcionesNotas()
+    {
+        $modulo = ModuloRegistro::where('codigo', 'notas')->first();
+        
+        if (!$modulo) {
+            return response()->json(['AD', 'A', 'B', 'C', 'CND', 'EXO']);
+        }
+        
+        $tiposNotas = $modulo->getTiposNotasOptions();
+        $opciones = $tiposNotas->pluck('codigo')->toArray();
+        
+        return response()->json($opciones);
     }
 
 

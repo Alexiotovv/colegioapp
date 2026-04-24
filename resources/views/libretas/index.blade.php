@@ -1,4 +1,4 @@
-
+{{-- resources/views/libretas/index.blade.php --}}
 @extends('layouts.app')
 
 @section('title', 'Exportar Libretas')
@@ -34,6 +34,19 @@
         transform: translateX(5px);
     }
     
+    .student-number {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 30px;
+        font-weight: bold;
+        margin-right: 12px;
+    }
+    
     .loading-spinner {
         display: inline-block;
         width: 20px;
@@ -47,6 +60,23 @@
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+    }
+    
+    .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .total-alumnos {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    
+    .total-alumnos strong {
+        color: var(--primary-color);
+        font-size: 18px;
     }
 </style>
 @endsection
@@ -92,18 +122,27 @@
                 <button class="btn btn-primary" id="btnCargarAlumnos">
                     <i class="fas fa-search me-2"></i> Cargar Alumnos
                 </button>
-                <button class="btn btn-success" id="btnExportarAula" style="display: none;">
+                {{-- <button class="btn btn-success" id="btnExportarAula" style="display: none;">
                     <i class="fas fa-download me-2"></i> Exportar Todo el Aula
+                </button> --}}
+                <button class="btn btn-info" id="btnPrevisualizarAula" style="display: none;">
+                    <i class="fas fa-eye me-2"></i> Previsualizar Todo el Aula
                 </button>
             </div>
         </div>
     </div>
     
     <div class="students-list" id="studentsList" style="display: none;">
-        <h5 class="mb-3">
-            <i class="fas fa-users me-2"></i>
-            Alumnos del Aula
-        </h5>
+        <div class="header-actions">
+            <h5 class="mb-0">
+                <i class="fas fa-users me-2"></i>
+                Alumnos del Aula
+            </h5>
+            <div class="total-alumnos" id="totalAlumnos">
+                <i class="fas fa-chalkboard-user me-1"></i>
+                Total: <strong id="totalCount">0</strong> alumnos
+            </div>
+        </div>
         <div id="studentsContainer"></div>
     </div>
 </div>
@@ -130,29 +169,44 @@ $(document).ready(function() {
             data: { aula_id: aulaId },
             success: function(response) {
                 let html = '';
-                for (let matricula of response) {
+                let total = response.length;
+                
+                for (let i = 0; i < response.length; i++) {
+                    let matricula = response[i];
+                    let numero = i + 1;
                     html += `
                         <div class="student-card">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <strong>${matricula.alumno.codigo_estudiante}</strong><br>
-                                    <span>${matricula.alumno.apellido_paterno} ${matricula.alumno.apellido_materno}, ${matricula.alumno.nombres}</span>
+                                    <div class="d-flex align-items-center">
+                                        <span class="student-number">${numero}</span>
+                                        <div>
+                                            <strong>${matricula.alumno.codigo_estudiante}</strong><br>
+                                            <span>${matricula.alumno.apellido_paterno} ${matricula.alumno.apellido_materno}, ${matricula.alumno.nombres}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <button class="btn btn-sm btn-info" onclick="previsualizar(${matricula.id})">
                                         <i class="fas fa-eye me-1"></i> Previsualizar
                                     </button>
-                                    <button class="btn btn-sm btn-success" onclick="exportarAlumno(${matricula.id})">
-                                        <i class="fas fa-download me-1"></i> Exportar PDF
-                                    </button>
+                                    
                                 </div>
                             </div>
                         </div>
                     `;
                 }
+                
+                //Este bloque estabadespues de Previsualizar, lo moví porque aun no está funcionanado:
+                // <button class="btn btn-sm btn-success" onclick="exportarAlumno(${matricula.id})">
+                //     <i class="fas fa-download me-1"></i> Exportar PDF
+                // </button>
+
                 $('#studentsContainer').html(html);
+                $('#totalCount').text(total);
                 $('#studentsList').show();
                 $('#btnExportarAula').show().data('aula-id', aulaId).data('periodo-id', periodoId);
+                $('#btnPrevisualizarAula').show().data('aula-id', aulaId).data('periodo-id', periodoId);
             },
             error: function() {
                 Swal.fire('Error', 'Error al cargar alumnos', 'error');
@@ -188,6 +242,12 @@ $(document).ready(function() {
         $('body').append(form);
         form.submit();
         form.remove();
+    });
+    
+    $('#btnPrevisualizarAula').on('click', function() {
+        let aulaId = $(this).data('aula-id');
+        let periodoId = $(this).data('periodo-id');
+        window.open('/admin/libretas/previsualizar-aula?aula_id=' + aulaId + '&periodo_id=' + periodoId, '_blank');
     });
 });
 

@@ -200,6 +200,75 @@
             transform: translateY(0);
         }
     }
+
+    /* Progress Bar - Estilo limpio */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: #28a745;
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #888;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
+
 </style>
 @endsection
 
@@ -254,6 +323,8 @@
         </div>
     </div>
     
+    @include('partials.progress-bar')
+
     <!-- Tabla de Apreciaciones -->
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -463,6 +534,8 @@ $(document).ready(function() {
                 $(this).addClass('apreciacion-guardada');
             }
         });
+
+        progressBar.update();
     }
     
     // Guardar todas las apreciaciones
@@ -578,6 +651,17 @@ $(document).ready(function() {
                 $('#toggleHabilitacion').prop('checked', !habilitado);
             }
         });
+    });
+
+    progressBar
+    .init('progressContainer', '.apreciacion-textarea')
+    .show()
+    .onUpdate(function(p, c, t) {
+        console.log(`Progreso: ${p}%`);
+    });
+
+    $(document).on('input', '.apreciacion-textarea', function() {
+        progressBar.update();
     });
 });
 </script>

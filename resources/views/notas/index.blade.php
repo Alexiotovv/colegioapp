@@ -267,10 +267,82 @@
     .table-container {
         overflow: visible !important;
     }
+
+    /* Progress Bar - Estilo limpio */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: var(--primary-color);
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #888;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
 </style>
 @endsection
 
 @section('content')
+
+@include('partials.toast')
+
+
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>
@@ -326,7 +398,7 @@
             </div>
         </div>
     </div>
-    
+    @include('partials.progress-bar')
     <!-- Tabla de Notas -->
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -416,6 +488,10 @@
 @section('scripts')
 <script>
 $(document).ready(function() {
+
+    // Llamar a la función al inicio
+    cargarOpcionesNotas();
+
     let cursosData = [];
     let matriculasData = [];
     let competenciasData = [];
@@ -423,9 +499,27 @@ $(document).ready(function() {
     let notasHabilitadas = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
     
-    // Opciones de notas
-    const opcionesNotas = ['AD', 'A', 'B', 'C', 'CND', 'EXO'];
-    
+     // Opciones de notas - valor por defecto mientras se cargan
+    // let opcionesNotas = ['AD', 'A', 'B', 'C', 'CND', 'EXO'];
+
+        function cargarOpcionesNotas() {
+        // Ya no declaras opcionesNotas aquí, solo la modificas
+        $.ajax({
+            url: '{{ route("admin.notas.opciones") }}',
+            method: 'GET',
+            async: false,
+            success: function(response) {
+                if (response && response.length > 0) {
+                    opcionesNotas = response; // ← ahora modifica la del scope externo
+                    console.log('Opciones de notas cargadas:', opcionesNotas);
+                }
+            },
+            error: function(xhr) {
+                console.error('Error al cargar opciones de notas:', xhr);
+            }
+        });
+    }
+
     // Toggle botón flotante
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
@@ -501,7 +595,6 @@ $(document).ready(function() {
                 periodo_id: periodoId
             },
             success: function(response) {
-                console.log('Respuesta:', response);
                 
                 matriculasData = response.matriculas || [];
                 competenciasData = response.competencias || [];
@@ -531,6 +624,15 @@ $(document).ready(function() {
         });
     });
     
+    // Inicializar Progress Bar
+    progressBar.init('progressContainer', '.nota-valor')
+        .onComplete(function() {
+            toast.success('¡Todos los registros completados!');
+        })
+        .onUpdate(function(porcentaje, completados, total) {
+            console.log(`Progreso: ${porcentaje}% (${completados}/${total})`);
+        });
+
     function renderTabla() {
         if (!matriculasData || matriculasData.length === 0) {
             $('#tablaBody').html(`
@@ -621,6 +723,8 @@ $(document).ready(function() {
             }
             bodyHtml += `</tr>`;
             contador++;
+
+
         }
         
         $('#tablaBody').html(bodyHtml);
@@ -660,14 +764,23 @@ $(document).ready(function() {
             } else {
                 boton.removeClass('nota-guardada');
             }
+
+            progressBar.update();
         });
 
-     
+        // Mostrar y actualizar progress bar
+        progressBar.show().update();
 
     }
     
     // Guardar todas las notas
     function guardarTodasLasNotas() {
+
+        // if (!progressBar.isComplete()) {
+        //     toast.warning(`Complete todas las notas antes de guardar. Faltan ${progressBar.totalCount - progressBar.completedCount} registro(s).`);
+        //     return;
+        // }
+
         if (!notasHabilitadas) {
             Swal.fire('Error', 'El registro de notas no está habilitado', 'error');
             return;
@@ -756,6 +869,39 @@ $(document).ready(function() {
         $('#modalConclusion').modal('show');
     }
     
+    // function actualizarProgreso() {
+    //     let totalInputs = 0;
+    //     let completados = 0;
+        
+    //     $('.nota-valor').each(function() {
+    //         totalInputs++;
+            
+    //         let valor = $(this).val();
+
+    //         // DEBUG (opcional)
+    //         // console.log('Valor:', valor);
+
+    //         if (valor !== null && valor !== undefined && valor.trim() !== '') {
+    //             completados++;
+    //         }
+    //     });
+
+    //     let porcentaje = totalInputs > 0 ? Math.round((completados / totalInputs) * 100) : 0;
+
+    //     $('#totalCount').text(totalInputs);
+    //     $('#completedCount').text(completados);
+    //     $('#pendingCount').text(totalInputs - completados);
+    //     $('#progressPercentage').text(porcentaje + '%');
+    //     $('#progressBarFill').css('width', porcentaje + '%');
+
+    //     if (porcentaje === 100) {
+    //         $('#btnGuardarTodas').prop('disabled', false);
+    //     } else {
+    //         $('#btnGuardarTodas').prop('disabled', true);
+    //     }
+    // }
+
+
     // Guardar conclusión
     $('#btnGuardarConclusion').on('click', function() {
         let notaId = $('#conclusion_nota_id').val();
@@ -776,7 +922,8 @@ $(document).ready(function() {
             },
             success: function(response) {
                 if (response.success) {
-                    Swal.fire('Éxito', response.message, 'success');
+                    // Swal.fire('Éxito', response.message, 'success');
+                    toast.success(response.message);
                     $('#modalConclusion').modal('hide');
                     
                     // Cambiar el color del icono a verde

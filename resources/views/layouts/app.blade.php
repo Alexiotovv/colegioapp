@@ -167,6 +167,69 @@
             background: #55555594;
         }
     </style>
+    {{-- Incluir estilos CSS del progress bar --}}
+    @push('styles')
+    <style>
+        .progress-container {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #555;
+        }
+        .progress-title {
+            font-weight: 500;
+        }
+        .progress-percentage {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .progress-bar-container {
+            background-color: #e9ecef;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            background-color: var(--primary-color);
+            width: 0%;
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 10px;
+            color: #888;
+        }
+        .progress-stats span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .progress-stats i {
+            font-size: 10px;
+        }
+        .progress-stats .completed {
+            color: #28a745;
+        }
+        .progress-stats .pending {
+            color: #dc3545;
+        }
+    </style>
+    @endpush
+
+
 </head>
 <body>
 
@@ -266,7 +329,6 @@
                             <a href="{{ route('admin.anios.index') }}" class="nav-link small">📅 Gestionar Años</a>
                             <a href="{{ route('admin.configuracion-academica.index') }}" class="nav-link small">📚 Conf. Académica</a>
                             <a href="{{ route('admin.aulas.index') }}" class="nav-link small">📚 Aulas</a>
-                            <a href="{{ route('admin.cursos-jerarquico.index') }}" class="nav-link small">📚 Cursos</a>
                             <a href="{{ route('admin.matriculas.index') }}" class="nav-link small">📚 Matrículas</a>
                             <a href="{{ route('admin.carga-horaria.index') }}" class="nav-link small">📝 Carga Horaria</a>
                         </div>
@@ -299,12 +361,45 @@
                             </a>
                         </div>
                         <a href="#menuMatriculas" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-address-card"></i> Notas <i class="fas fa-chevron-down float-end"></i>
+                            <i class="fas fa-address-card"></i>Registro Notas <i class="fas fa-chevron-down float-end"></i>
                         </a>
                         <div class="collapse ps-3" id="menuMatriculas">
-                            <a href="{{route('admin.notas.index')}}" class="nav-link small">📋 Registro de Notas</a>
+                            <a href="{{route('admin.notas.index')}}" class="nav-link small">📋 Notas de Libreta</a>
+                            <a href="{{ route('admin.registro-competencias-transversales.index') }}" class="nav-link small">📋 Comp. Transls.</a>
+                            <a href="{{ route('admin.apreciaciones.index') }}" class="nav-link small">📋 Aprec. del Tutor</a>
+                            <a href="{{ route('admin.registro-evaluaciones.index') }}" class="nav-link small">📋 Eval. PP.FF.</a>
+                            <a href="{{ route('admin.registro-asistencias.index') }}" class="nav-link small">📋 Asistencias
+                            <a href="{{ route('admin.registro-otras-evaluaciones.index') }}" class="nav-link small">📋 Comporta. y Otros</a>
+                        </a>
                         </div>
                         
+                        <!-- Evaluaciones -->
+                        <a href="#menuEvaluaciones" data-bs-toggle="collapse" class="nav-link">
+                            <i class="fas fa-clipboard-list"></i> Gestión Notas<i class="fas fa-chevron-down float-end"></i>
+                        </a>
+                        <div class="collapse ps-3" id="menuEvaluaciones">
+                            <a href="{{ route('admin.cursos-jerarquico.index') }}" class="nav-link small">
+                                <i class="fas fa-plus me-1"></i>Libretas(Cursos)</a>
+                            <a href="{{ route('admin.competencias-transversales-jerarquico.index') }}" class="nav-link small">
+                                <i class="fas fa-plus me-1"></i> Comport. Transv.
+                            </a>
+                            <a href="{{ route('admin.evaluaciones-jerarquico.index') }}" class="nav-link small">
+                                <i class="fas fa-plus me-1"></i>Eval PP.FF.
+                            </a>
+                            <a href="{{ route('admin.tipos-inasistencia-jerarquico.index') }}" class="nav-link small">
+                                <i class="fas fa-plus me-1"></i> Asistencia
+                            </a>
+                            <a href="{{ route('admin.tipos-otras-evaluaciones-jerarquico.index') }}" class="nav-link small">
+                                <i class="fas fa-plus me-1"></i> Comport. y Otros
+                            </a>
+                            <a href="{{ route('admin.configuracion-notas.index') }}" class="nav-link small">
+                                <i class="fas fa-cog me-1"></i> Tipos de Notas
+                            </a>
+                        </div>
+
+
+
+
                         <a href="#menuPagos" data-bs-toggle="collapse" class="nav-link">
                             <i class="fas fa-dollar-sign"></i> Pagos <i class="fas fa-chevron-down float-end"></i>
                         </a>
@@ -313,44 +408,9 @@
                             <a href="#" class="nav-link small">📊 Reportes</a>
                         </div>
                     </div>
-                    <!-- Evaluaciones -->
-                    <a href="#menuEvaluaciones" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-clipboard-list"></i> Eval. PP.FF.<i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuEvaluaciones">
-                        <a href="{{ route('admin.evaluaciones-jerarquico.index') }}" class="nav-link small">
-                            <i class="fas fa-plus me-1"></i> Gestionar Evaluaciones
-                        </a>
-                        <a href="{{ route('admin.registro-evaluaciones.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Evaluaciones
-                        </a>
-                    </div>
+                    
 
-                    <!-- Asistencias -->
-                    <a href="#menuAsistencias" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-calendar-check"></i> Asistencias <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuAsistencias">
-                        <a href="{{ route('admin.tipos-inasistencia-jerarquico.index') }}" class="nav-link small">
-                            <i class="fas fa-plus me-1"></i> Gestionar Tipos
-                        </a>
-                        <a href="{{ route('admin.registro-asistencias.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Asistencias
-                        </a>
-                    </div>
 
-                    <!-- Otras Evaluaciones -->
-                    <a href="#menuOtrasEvaluaciones" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-clipboard-list"></i> Otras Evals. <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuOtrasEvaluaciones">
-                        <a href="{{ route('admin.tipos-otras-evaluaciones-jerarquico.index') }}" class="nav-link small">
-                            <i class="fas fa-plus me-1"></i> Gestionar Tipos
-                        </a>
-                        <a href="{{ route('admin.registro-otras-evaluaciones.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Evaluaciones
-                        </a>
-                    </div>
 
                     <!-- Configuración -->
                     <a href="#menuConfiguracion" data-bs-toggle="collapse" class="nav-link">
@@ -370,15 +430,14 @@
                             <i class="fas fa-print me-1"></i> Exportar Libretas
                         </a>
                     </div>
+
                 @elseif(Auth::user()->isDocente())
                     <!-- Menú Docente -->
                     <div class="mb-2">
                         <a href="{{ route('dashboard') }}" class="nav-link">
                             <i class="fas fa-home"></i> Dashboard
                         </a>
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-chalkboard-teacher"></i> Mis Cursos
-                        </a>
+
                         <div class="nav-link">
                             <a href="{{route('admin.notas.index')}}" class="nav-link small">📋 Registro de Notas</a>
                         </div>
@@ -419,7 +478,15 @@
                             <i class="fas fa-edit me-1"></i> Registrar Evaluaciones
                         </a>
                     </div>
-
+                    <!-- Competencias Transversales -->
+                    <a href="#menuCompTransversales" data-bs-toggle="collapse" class="nav-link">
+                        <i class="fas fa-exchange-alt"></i> Comp. Transversales <i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <div class="collapse ps-3" id="menuCompTransversales">
+                        <a href="{{ route('admin.registro-competencias-transversales.index') }}" class="nav-link small">
+                            <i class="fas fa-edit me-1"></i> Registrar Competencias
+                        </a>
+                    </div>
 
                 @elseif(Auth::user()->isApoderado())
                     <!-- Menú Apoderado -->

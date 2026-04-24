@@ -81,7 +81,7 @@
     
     /* Inputs de cantidad */
     .cantidad-input {
-        width: 80px;
+        width: 70px;
         padding: 6px;
         text-align: center;
         border-radius: 6px;
@@ -207,6 +207,74 @@
             transform: translateY(0);
         }
     }
+
+    /* Progress Bar - Estilo limpio */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: var(--primary-color);
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #888;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
 </style>
 @endsection
 
@@ -260,6 +328,9 @@
         </div>
     </div>
     
+    @include('partials.progress-bar')
+
+
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
@@ -415,7 +486,7 @@ $(document).ready(function() {
         for (let tipo of tiposData) {
             headerHtml += `<th style="min-width: 100px;">${tipo.nombre}<br><small class="text-muted">${tipo.nivel ? tipo.nivel.nombre : ''}</small></th>`;
         }
-        headerHtml += `<th style="min-width: 200px;">Observación</th>`;
+        // headerHtml += `<th style="min-width: 200px;">Observación</th>`;
         headerHtml += `</tr>`;
         
         $('#tablaHeader').html(headerHtml);
@@ -447,12 +518,12 @@ $(document).ready(function() {
             }
             
             // Observación general
-            let observacionValue = '';
-            bodyHtml += `
-                <td>
-                    <input type="text" class="form-control observacion-input" data-matricula="${matricula.id}" value="${observacionValue.replace(/"/g, '&quot;')}" placeholder="Observación..." ${!registrosHabilitados ? 'disabled' : ''}>
-                </td>
-            `;
+            // let observacionValue = '';
+            // bodyHtml += `
+            //     <td>
+            //         <input type="text" class="form-control observacion-input" data-matricula="${matricula.id}" value="${observacionValue.replace(/"/g, '&quot;')}" placeholder="Observación..." ${!registrosHabilitados ? 'disabled' : ''}>
+            //     </td>
+            // `;
             bodyHtml += `</tr>`;
             contador++;
         }
@@ -477,7 +548,7 @@ $(document).ready(function() {
         
         // Marcar inputs que tienen valor
         $('.cantidad-input').each(function() {
-            if ($(this).val() !== '' && $(this).val() !== '0') {
+            if ($(this).val() !== '') {
                 $(this).addClass('registro-guardado');
             }
         });
@@ -490,7 +561,7 @@ $(document).ready(function() {
         
         // Eventos
         $('.cantidad-input').on('input', function() {
-            if ($(this).val() && $(this).val() !== '0') {
+            if ($(this).val() !== '') {
                 $(this).addClass('registro-guardado');
             } else {
                 $(this).removeClass('registro-guardado');
@@ -504,8 +575,14 @@ $(document).ready(function() {
                 $(this).removeClass('registro-guardado');
             }
         });
+
+        progressBar.update();
     }
-    
+
+    $(document).on('input', '.cantidad-input', function() {
+        progressBar.update();
+    });
+
     function guardarTodosLosRegistros() {
         if (!registrosHabilitados) {
             Swal.fire('Error', 'El registro de asistencias no está habilitado', 'error');
@@ -521,11 +598,11 @@ $(document).ready(function() {
             let tipoId = $(this).data('tipo');
             let observacion = $(this).closest('tr').find('.observacion-input').val();
             
-            if (cantidad && cantidad !== '0') {
+            if (cantidad !== '' && cantidad !== null) {
                 registros.push({
                     matricula_id: matriculaId,
                     tipo_inasistencia_id: tipoId,
-                    cantidad: parseInt(cantidad),
+                    cantidad: parseInt(cantidad), // aquí 0 ya entra normal
                     observacion: observacion || ''
                 });
             }
@@ -652,6 +729,14 @@ $(document).ready(function() {
             }
         });
     });
+
+    progressBar
+    .init('progressContainer', '.cantidad-input')
+    .show()
+    .onUpdate(function(p, c, t) {
+        console.log(`Progreso: ${p}%`);
+    });
+
 });
 </script>
 @endsection

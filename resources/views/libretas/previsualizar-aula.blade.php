@@ -1,10 +1,9 @@
+{{-- resources/views/libretas/previsualizar-aula.blade.php --}}
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
-    <title>Previsualizar Libreta</title>
-
+    <title>Previsualizar Libretas - Aula {{ $aula->nombre }}</title>
     <style>
         * {
             margin: 0;
@@ -239,14 +238,6 @@
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            /* .tabla-notas th:first-child {
-                width: 20%;
-            }
-
-            .tabla-notas th:nth-child(2) {
-                width: 30%;
-            } */
-           
         }
 
         /* Estilos para la tabla mejorada */
@@ -267,7 +258,6 @@
 
         .tabla-notas th {
             background-color: #c9c9c9;
-            /* font-weight: bold; */
             text-align: center;
         }
 
@@ -290,100 +280,103 @@
         .fila-promedio-general {
             background-color: #e8f0fe;
         }
+        
+        .libreta-content {
+            page-break-after: always;
+        }
+
+        .libreta-content:last-child {
+            page-break-after: auto;
+        }
     </style>
 </head>
-
 <body>
-
     <div class="container">
-
         <div class="toolbar">
-            <div>Previsualización</div>
             <div>
-                <button class="btn btn-print" onclick="window.print()">Imprimir</button>
-                <button class="btn btn-back" onclick="window.close()">Cerrar</button>
+                <strong>Previsualización de Libretas</strong> - Aula: {{ $aula->nombre }} - Total: {{ $matriculas->count() }} alumnos
+            </div>
+            <div>
+                <button class="btn btn-print" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i> Imprimir Todo
+                </button>
+                <button class="btn btn-back" onclick="window.close()">
+                    <i class="fas fa-times me-2"></i> Cerrar
+                </button>
             </div>
         </div>
-
         <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - 2025</h1>
+        
+        @foreach($matriculas as $index => $matricula)
+            <div class="header-box">
 
-        <div class="libreta-content">
+                <div class="logo-side">
+                    <img src="{{ Storage::url($configLibreta->logo_pais) }}" class="logo_encabezados" alt="Logo País">
+                </div>
 
-            @if ($matricula)
+                <div class="center-box">
 
-                <div class="header-box">
+                    <table class="info-top">
+                        <tr>
+                            <td class="label">DRE:</td>
+                            <td>{{ $configLibreta->dre }}</td>
+                            <td class="label">UGEL:</td>
+                            <td>{{ $configLibreta->ugel }}</td>
+                        </tr>
 
-                    <div class="logo-side">
-                        <img src="{{ Storage::url($configLibreta->logo_pais) }}" class="logo_encabezados" alt="Logo País">
-                    </div>
+                        
+                        <tr>
+                            <td class="label">Institución educativa:</td>
+                            <td>{{ $configInstitucion->nombre ?? '' }}</td>
+                            <td class="label">Nivel:</td>
+                            <td>{{ $matricula->aula->grado->nivel->nombre ?? '' }}</td>
+                        </tr>
 
-                    <div class="center-box">
+                        <tr>
+                            <td class="label">Grado:</td>
+                            <td>{{ $matricula->aula->grado->nombre ?? '' }}</td>
+                            <td class="label">Sección:</td>
+                            <td>{{ $matricula->aula->seccion->nombre ?? '' }}</td>
+                        </tr>
 
-                        <table class="info-top">
-                            <tr>
-                                <td class="label">DRE:</td>
-                                <td>{{ $configLibreta->dre }}</td>
-                                <td class="label">UGEL:</td>
-                                <td>{{ $configLibreta->ugel }}</td>
-                            </tr>
+                        <tr>
+                            <td class="label">Apellidos y nombres del estudiante:</td>
+                            <td colspan="3">
+                                {{ $matricula->alumno->apellido_paterno }}
+                                {{ $matricula->alumno->apellido_materno }},
+                                {{ $matricula->alumno->nombres }}
+                            </td>
+                        </tr>
 
-                            
-                            <tr>
-                                <td class="label">Institución educativa:</td>
-                                <td>{{ $configInstitucion->nombre ?? '' }}</td>
-                                <td class="label">Nivel:</td>
-                                <td>{{ $matricula->aula->grado->nivel->nombre ?? '' }}</td>
-                            </tr>
+                        <tr>
+                            <td class="label">Código del estudiante:</td>
+                            <td>{{ $matricula->alumno->codigo_estudiante }}</td>
+                            <td class="label">DNI:</td>
+                            <td>{{ $matricula->alumno->dni }}</td>
+                        </tr>
 
-                            <tr>
-                                <td class="label">Grado:</td>
-                                <td>{{ $matricula->aula->grado->nombre ?? '' }}</td>
-                                <td class="label">Sección:</td>
-                                <td>{{ $matricula->aula->seccion->nombre ?? '' }}</td>
-                            </tr>
-
-                            <tr>
-                                <td class="label">Apellidos y nombres del estudiante:</td>
-                                <td colspan="3">
-                                    {{ $matricula->alumno->apellido_paterno }}
-                                    {{ $matricula->alumno->apellido_materno }},
-                                    {{ $matricula->alumno->nombres }}
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td class="label">Código del estudiante:</td>
-                                <td>{{ $matricula->alumno->codigo_estudiante }}</td>
-                                <td class="label">DNI:</td>
-                                <td>{{ $matricula->alumno->dni }}</td>
-                            </tr>
-
-                            <tr>
-                                <td class="label">Docente o tutor:</td>
-                                <td colspan="3">{{ $matricula->aula->docente->name ?? '' }}</td>
-                            </tr>
-                        </table>
-
-                    </div>
-
-                    <div class="logo-side">
-                            <img class="logo_encabezados" src="{{ Storage::url($configLibreta->logo_institucion) }}"">
-                    </div>
+                        <tr>
+                            <td class="label">Docente o tutor:</td>
+                            <td colspan="3">{{ $matricula->aula->docente->name ?? '' }}</td>
+                        </tr>
+                    </table>
 
                 </div>
 
+                <div class="logo-side">
+                        <img class="logo_encabezados" src="{{ Storage::url($configLibreta->logo_institucion) }}"">
+                </div>
+
+            </div>
+            <div class="libreta-content">
                 @include('libretas.partials.libreta-alumno', [
                     'matricula' => $matricula,
                     'periodos' => $periodos,
                     'configLibreta' => $configLibreta,
-                    'configInstitucion' => $configInstitucion,
+                    'configInstitucion' => $configInstitucion
                 ])
-
-            @endif
-
-        </div>
+            </div>
+        @endforeach
     </div>
-
 </body>
-
 </html>

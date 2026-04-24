@@ -1,11 +1,11 @@
 <?php
-// app/Http/Controllers/RegistroEvaluacionController.php
-//Evaluacion del padre de familia
+// app/Http/Controllers/RegistroCompetenciaTransversalController.php
+
 namespace App\Http\Controllers;
 
-use App\Models\RegistroEvaluacion;
+use App\Models\RegistroCompetenciaTransversal;
 use App\Models\Aula;
-use App\Models\Evaluacion;
+use App\Models\CompetenciaTransversal;
 use App\Models\Periodo;
 use App\Models\Matricula;
 use App\Models\AnioAcademico;
@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\ModuloRegistro;
 
-class RegistroEvaluacionController extends Controller
+class RegistroCompetenciaTransversalController extends Controller
 {
     public function index()
     {
@@ -21,8 +21,8 @@ class RegistroEvaluacionController extends Controller
         $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
-        // Roles permitidos: admin, tutor, auxiliar
-        if (!in_array($rol, ['admin', 'tutor', 'auxiliar'])) {
+        // Roles permitidos: admin, tutor
+        if (!in_array($rol, ['admin', 'tutor'])) {
             abort(403, 'No tienes permiso para acceder a esta sección.');
         }
         
@@ -40,8 +40,8 @@ class RegistroEvaluacionController extends Controller
                 ->get();
         }
         
-        // 🔥 Obtener todas las evaluaciones activas
-        $evaluaciones = Evaluacion::with('nivel')
+        // Obtener todas las competencias transversales activas
+        $competencias = CompetenciaTransversal::with('nivel')
             ->where('activo', true)
             ->orderBy('orden')
             ->get();
@@ -52,7 +52,7 @@ class RegistroEvaluacionController extends Controller
         
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
-        return view('registro-evaluaciones.index', compact('aulas', 'evaluaciones', 'periodos', 'anioActivo'));
+        return view('registro-competencias-transversales.index', compact('aulas', 'competencias', 'periodos', 'anioActivo'));
     }
     
     public function getDataForRegistro(Request $request)
@@ -77,41 +77,33 @@ class RegistroEvaluacionController extends Controller
         }
         
         // Obtener alumnos matriculados en el aula
-        // $matriculas = Matricula::with(['alumno'])
-        //     ->where('aula_id', $aulaId)
-        //     ->where('estado', 'activa')
-        //     ->get();
         $matriculas = Matricula::with(['alumno'])
-        ->where('aula_id', $aulaId)
-        ->where('estado', 'activa')
-        ->orderBy(
-            DB::raw('CONCAT(
-                (SELECT apellido_paterno FROM alumnos WHERE alumnos.id = matriculas.alumno_id), 
-                " ", 
-                (SELECT apellido_materno FROM alumnos WHERE alumnos.id = matriculas.alumno_id), 
-                " ", 
-                (SELECT nombres FROM alumnos WHERE alumnos.id = matriculas.alumno_id)
-            )')
-        )
-        ->get();
+            ->select('matriculas.*')
+            ->where('matriculas.aula_id', $aulaId)
+            ->where('matriculas.estado', 'activa')
+            ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
+            ->orderBy('alumnos.apellido_paterno', 'ASC')
+            ->orderBy('alumnos.apellido_materno', 'ASC')
+            ->orderBy('alumnos.nombres', 'ASC')
+            ->get();
         
-        // 🔥 Obtener todas las evaluaciones activas
-        $evaluaciones = Evaluacion::with('nivel')
+        // Obtener todas las competencias transversales activas
+        $competencias = CompetenciaTransversal::with('nivel')
             ->where('activo', true)
             ->orderBy('orden')
             ->get();
         
         // Obtener registros existentes
         $matriculaIds = $matriculas->pluck('id')->toArray();
-        $evaluacionIds = $evaluaciones->pluck('id')->toArray();
+        $competenciaIds = $competencias->pluck('id')->toArray();
         
-        $registros = RegistroEvaluacion::where('periodo_id', $periodoId)
+        $registros = RegistroCompetenciaTransversal::where('periodo_id', $periodoId)
             ->whereIn('matricula_id', $matriculaIds)
-            ->whereIn('evaluacion_id', $evaluacionIds)
+            ->whereIn('competencia_transversal_id', $competenciaIds)
             ->get()
             ->groupBy('matricula_id')
             ->map(function($items) {
-                return $items->keyBy('evaluacion_id');
+                return $items->keyBy('competencia_transversal_id');
             });
         
         $periodo = Periodo::find($periodoId);
@@ -119,7 +111,7 @@ class RegistroEvaluacionController extends Controller
         
         return response()->json([
             'matriculas' => $matriculas,
-            'evaluaciones' => $evaluaciones,  // 🔥 Asegurar que se envía 'evaluaciones'
+            'competencias' => $competencias,
             'registros' => $registros,
             'registros_habilitados' => $registrosHabilitados,
         ]);
@@ -130,7 +122,7 @@ class RegistroEvaluacionController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if (!in_array($rol, ['admin', 'tutor', 'auxiliar'])) {
+        if (!in_array($rol, ['admin', 'tutor'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para realizar esta acción'
@@ -146,7 +138,7 @@ class RegistroEvaluacionController extends Controller
         if (!$periodo || !$periodo->activo) {
             return response()->json([
                 'success' => false,
-                'message' => 'El periodo no está habilitado para registrar evaluaciones.'
+                'message' => 'El periodo no está habilitado para registrar competencias transversales.'
             ], 422);
         }
         
@@ -155,23 +147,24 @@ class RegistroEvaluacionController extends Controller
         DB::beginTransaction();
         
         try {
-            $valoracionesPermitidas = ['SIEMPRE', 'CASI SIEMPRE', 'ALGUNAS VECES', 'NUNCA'];
+            $notasPermitidas = ['AD', 'A', 'B', 'C', 'CND', 'ND'];
             
             foreach ($request->registros as $item) {
-                if (!in_array($item['valoracion'], $valoracionesPermitidas)) {
-                    throw new \Exception("Valoración no válida: " . $item['valoracion']);
+                if (!in_array($item['nota'], $notasPermitidas)) {
+                    throw new \Exception("Nota no válida: " . $item['nota']);
                 }
                 
-                RegistroEvaluacion::updateOrCreate(
+                RegistroCompetenciaTransversal::updateOrCreate(
                     [
                         'matricula_id' => $item['matricula_id'],
-                        'evaluacion_id' => $item['evaluacion_id'],
+                        'competencia_transversal_id' => $item['competencia_transversal_id'],
                         'periodo_id' => $request->periodo_id,
                     ],
                     [
                         'docente_id' => $docenteId,
-                        'valoracion' => $item['valoracion'],
-                        'comentario' => $item['comentario'] ?? null,
+                        'nota' => $item['nota'],
+                        'tipo_calificacion' => 'LITERAL',
+                        // 'conclusion' => $item['conclusion'] ?? null,
                         'fecha_registro' => now(),
                     ]
                 );
@@ -181,7 +174,7 @@ class RegistroEvaluacionController extends Controller
             
             return response()->json([
                 'success' => true,
-                'message' => 'Evaluaciones guardadas exitosamente'
+                'message' => 'Competencias transversales guardadas exitosamente'
             ]);
             
         } catch (\Exception $e) {
@@ -189,7 +182,7 @@ class RegistroEvaluacionController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => 'Error al guardar las evaluaciones: ' . $e->getMessage()
+                'message' => 'Error al guardar las competencias: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -219,23 +212,66 @@ class RegistroEvaluacionController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => $periodo->activo ? 'Registro de evaluaciones habilitado' : 'Registro de evaluaciones deshabilitado',
+            'message' => $periodo->activo ? 'Registro de competencias transversales habilitado' : 'Registro de competencias transversales deshabilitado',
             'habilitado' => $periodo->activo
         ]);
     }
 
-    public function getOpcionesValoraciones()
+
+    public function saveConclusion(Request $request)
     {
-        $modulo = ModuloRegistro::where('codigo', 'evaluaciones_padre')->first();
+        $request->validate([
+            'matricula_id' => 'required|exists:matriculas,id',
+            'competencia_id' => 'required|exists:competencias_transversales,id',
+            'periodo_id' => 'required|exists:periodos,id',
+            'conclusion' => 'required|string',
+        ]);
+        
+        $user = auth()->user();
+        $rol = $user->role->nombre ?? $user->rol;
+        
+        if (!in_array($rol, ['admin', 'tutor'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para realizar esta acción'
+            ], 403);
+        }
+        
+        $periodo = Periodo::find($request->periodo_id);
+        if (!$periodo || !$periodo->activo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El periodo no está habilitado para registrar conclusiones.'
+            ], 422);
+        }
+        
+        $registro = RegistroCompetenciaTransversal::updateOrCreate(
+            [
+                'matricula_id' => $request->matricula_id,
+                'competencia_transversal_id' => $request->competencia_id,
+                'periodo_id' => $request->periodo_id,
+            ],
+            [
+                'docente_id' => auth()->id(),
+                'conclusion' => $request->conclusion,
+                'fecha_registro' => now(),
+            ]
+        );
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Conclusión guardada exitosamente',
+            'registro_id' => $registro->id
+        ]);
+    }
+
+    public function getOpcionesNotas()
+    {
+        $modulo = ModuloRegistro::where('codigo', 'competencias_transversales')->first();
         
         if (!$modulo) {
             // Si no hay configuración, devolver opciones por defecto
-            return response()->json([
-                ['codigo' => 'SIEMPRE', 'nombre' => 'Siempre'],
-                ['codigo' => 'CASI SIEMPRE', 'nombre' => 'Casi Siempre'],
-                ['codigo' => 'ALGUNAS VECES', 'nombre' => 'Algunas Veces'],
-                ['codigo' => 'NUNCA', 'nombre' => 'Nunca']
-            ]);
+            return response()->json(['AD', 'A', 'B', 'C', 'CND', 'ND']);
         }
         
         $tiposNotas = $modulo->tiposNotas()
@@ -243,13 +279,9 @@ class RegistroEvaluacionController extends Controller
             ->orderBy('orden')
             ->get();
         
-        $opciones = $tiposNotas->map(function($item) {
-            return [
-                'codigo' => $item->codigo,
-                'nombre' => $item->nombre
-            ];
-        })->toArray();
+        $opciones = $tiposNotas->pluck('codigo')->toArray();
         
         return response()->json($opciones);
     }
+
 }

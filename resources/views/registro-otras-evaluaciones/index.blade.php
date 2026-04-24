@@ -206,6 +206,74 @@
         font-size: 13px;       /* letra más pequeña */
         height: 30px;          /* altura más compacta */
     }
+
+     /* Progress Bar - Estilo limpio */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: var(--primary-color);
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 10px;
+        color: #888;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
 </style>
 @endsection
 
@@ -214,7 +282,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>
             <i class="fas fa-clipboard-list me-2" style="color: var(--primary-color);"></i>
-            Registro de Otras Evaluaciones
+            Registro Comportamiento y Otras Evaluaciones
         </h4>
     </div>
     
@@ -278,6 +346,9 @@
             <span id="infoPeriodoText"></span>
         </div>
         
+        @include('partials.progress-bar')
+
+
         <div class="table-responsive">
             <table class="table table-bordered table-evaluaciones" id="tablaEvaluaciones">
                 <thead id="tablaHeader">
@@ -416,7 +487,7 @@ $(document).ready(function() {
         for (let tipo of tiposData) {
             headerHtml += `<th style="min-width: 120px;">${tipo.nombre}<br><small class="text-muted">${tipo.nivel ? tipo.nivel.nombre : ''}</small></th>`;
         }
-        headerHtml += `<th style="min-width: 200px;">Observación</th>`;
+        // headerHtml += `<th style="min-width: 200px;">Observación</th>`;
         headerHtml += `<tr>`;
         
         $('#tablaHeader').html(headerHtml);
@@ -465,12 +536,12 @@ $(document).ready(function() {
             }
             
             // Observación general
-            let observacionValue = '';
-            bodyHtml += `
-                <td>
-                    <input type="text" class="form-control observacion-input" data-matricula="${matricula.id}" value="${observacionValue.replace(/"/g, '&quot;')}" placeholder="Observación..." ${!registrosHabilitados ? 'disabled' : ''}>
-                </td>
-            `;
+            // let observacionValue = '';
+            // bodyHtml += `
+            //     <td>
+            //         <input type="text" class="form-control observacion-input" data-matricula="${matricula.id}" value="${observacionValue.replace(/"/g, '&quot;')}" placeholder="Observación..." ${!registrosHabilitados ? 'disabled' : ''}>
+            //     </td>
+            // `;
             bodyHtml += `</tr>`;
             contador++;
         }
@@ -522,8 +593,14 @@ $(document).ready(function() {
                 $(this).removeClass('registro-guardado');
             }
         });
+
+        progressBar.update();
     }
     
+    $(document).on('input', '.valor-select', function() {
+        progressBar.update();
+    });
+
     function guardarTodosLosRegistros() {
         if (!registrosHabilitados) {
             Swal.fire('Error', 'El registro de evaluaciones no está habilitado', 'error');
@@ -671,6 +748,15 @@ $(document).ready(function() {
             }
         });
     });
+
+    progressBar
+    .init('progressContainer', '.valor-select')
+    .show()
+    .onUpdate(function(p, c, t) {
+        console.log(`Progreso: ${p}%`);
+    });
+
+
 });
 </script>
 @endsection

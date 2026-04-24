@@ -168,4 +168,32 @@ class LibretaController extends Controller
         
         return view('libretas.previsualizar', compact('aula', 'matricula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta'));
     }
+
+    public function previsualizarAula(Request $request)
+    {
+        $aulaId = $request->aula_id;
+        $periodoId = $request->periodo_id;
+        
+        $aula = Aula::with(['grado.nivel', 'seccion', 'anioAcademico', 'docente'])
+            ->find($aulaId);
+        
+        $periodos = Periodo::with('anioAcademico')
+            ->orderBy('orden')
+            ->get();
+        
+        $matriculas = Matricula::with(['alumno'])
+            ->select('matriculas.*')
+            ->where('matriculas.aula_id', $aulaId)
+            ->where('matriculas.estado', 'activa')
+            ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
+            ->orderBy('alumnos.apellido_paterno', 'ASC')
+            ->orderBy('alumnos.apellido_materno', 'ASC')
+            ->orderBy('alumnos.nombres', 'ASC')
+            ->get();
+        
+        $configInstitucion = ConfiguracionInstitucion::getConfig();
+        $configLibreta = ConfiguracionLibreta::getConfig();
+        
+        return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta'));
+    }
 }
