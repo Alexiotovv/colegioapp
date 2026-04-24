@@ -31,8 +31,8 @@ use App\Http\Controllers\LibretaController;
 use App\Http\Controllers\CompetenciaTransversalJerarquicoController;
 use App\Http\Controllers\RegistroCompetenciaTransversalController;
 use App\Http\Controllers\ConfiguracionNotasController;
-
-
+use App\Http\Controllers\PermisoController;
+use App\Http\Controllers\ModuloController;
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -257,7 +257,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/libretas/previsualizar', [LibretaController::class, 'previsualizar'])->name('libretas.previsualizar');
         Route::get('/libretas/previsualizar-aula', [LibretaController::class, 'previsualizarAula'])->name('libretas.previsualizar-aula');
     });
-    
+
+    //Modulos y roles
+    Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        // Módulos
+        Route::resource('modulos', ModuloController::class);
+        Route::patch('/modulos/{modulo}/toggle', [ModuloController::class, 'toggleActive'])->name('modulos.toggle');
+
+        // Permisos
+        Route::get('/permisos/asignar-roles', [PermisoController::class, 'asignarModulosRol'])->name('permisos.asignar-roles');
+        Route::post('/permisos/guardar-rol', [PermisoController::class, 'guardarAsignacionModulosRol'])->name('permisos.guardar-rol');
+        Route::get('/permisos/asignar-usuarios', [PermisoController::class, 'asignarModulosUsuario'])->name('permisos.asignar-usuarios');
+        Route::post('/permisos/guardar-usuario', [PermisoController::class, 'guardarAsignacionModulosUsuario'])->name('permisos.guardar-usuario');
+        Route::get('/permisos/rol/{role}/modulos', [PermisoController::class, 'getModulosByRol'])->name('permisos.rol-modulos');
+        Route::get('/permisos/usuario/{user}/modulos-extra', [PermisoController::class, 'getModulosExtraByUser'])->name('permisos.usuario-modulos-extra');
+    });
+
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::post('/registro-evaluaciones/toggle-habilitacion', [RegistroEvaluacionController::class, 'toggleHabilitacion'])->name('registro-evaluaciones.toggle-habilitacion');
     });

@@ -5,6 +5,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends Model
 {
@@ -36,5 +37,18 @@ class Role extends Model
     public function isApoderado(): bool
     {
         return $this->nombre === 'apoderado';
+    }
+    
+
+    public function modulos(): BelongsToMany
+    {
+        return $this->belongsToMany(Modulo::class, 'rol_modulo', 'rol_id', 'modulo_id')
+                    ->withPivot('activo')
+                    ->withTimestamps();
+    }
+
+    public function getModulosPermitidos()
+    {
+        return $this->modulos()->wherePivot('activo', true)->ordered()->get();
     }
 }

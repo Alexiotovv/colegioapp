@@ -284,7 +284,7 @@
             </div>
         </div>
         
-        <nav class="nav flex-column px-3">
+        {{-- <nav class="nav flex-column px-3">
             @auth
                 @if(Auth::user()->isAdmin())
                     <!-- Menú Admin -->
@@ -506,7 +506,61 @@
                     </div>
                 @endif
             @endauth
+        </nav> --}}
+
+        <nav class="nav flex-column px-3">
+            @auth
+                @php
+                    $modulosPermitidos = Auth::user()->getModulosPermitidos();
+                @endphp
+                
+                @foreach($modulosPermitidos as $modulo)
+                    @if($modulo->ruta)
+                        <a href="{{ route($modulo->ruta) }}" class="nav-link">
+                            <i class="fas {{ $modulo->icono ?? 'fa-cube' }}"></i> {{ $modulo->nombre }}
+                        </a>
+                    @endif
+                @endforeach
+            @endauth
         </nav>
+
+
+        <nav class="nav flex-column px-3">
+            @auth
+                @php
+                    $modulosPermitidos = Auth::user()->getModulosPermitidos();
+                    $esAdmin = Auth::user()->isAdmin();
+                @endphp
+                
+                <!-- Módulos dinámicos -->
+                @foreach($modulosPermitidos as $modulo)
+                    @if($modulo->ruta)
+                        <a href="{{ route($modulo->ruta) }}" class="nav-link">
+                            <i class="fas {{ $modulo->icono ?? 'fa-cube' }}"></i> {{ $modulo->nombre }}
+                        </a>
+                    @endif
+                @endforeach
+                
+                <!-- Menús fijos para ADMIN (si quieres mantener los submenús) -->
+                @if($esAdmin)
+                    <div class="mb-2">
+                        <div class="text-uppercase small text-white-50 mb-2">
+                            <i class="fas fa-cog me-1"></i> CONFIGURACIÓN
+                        </div>
+                        <a href="#menuConfig" data-bs-toggle="collapse" class="nav-link">
+                            <i class="fas fa-sliders-h"></i> Configuración Manual <i class="fas fa-chevron-down float-end"></i>
+                        </a>
+                        <div class="collapse ps-3" id="menuConfig">
+                            <a href="{{ route('admin.configuracion.index') }}" class="nav-link small">⚙️ Sistema</a>
+                            <a href="{{ route('admin.modulos.index') }}" class="nav-link small">📦 Módulos</a>
+                            <a href="{{ route('admin.permisos.asignar-roles') }}" class="nav-link small">🔑 Permisos Roles</a>
+                            <a href="{{ route('admin.permisos.asignar-usuarios') }}" class="nav-link small">👤 Permisos Usuarios</a>
+                        </div>
+                    </div>
+                @endif
+            @endauth
+        </nav>
+
     </div>
 
     <!-- Contenido principal -->

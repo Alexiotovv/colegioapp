@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -87,5 +88,32 @@ class User extends Authenticatable
     public function isTutor(): bool
     {
         return $this->role && $this->role->nombre === 'tutor';
+    }
+    // Relación con módulos extras
+    public function modulosExtra(): BelongsToMany
+    {
+        return $this->belongsToMany(Modulo::class, 'usuario_modulo_extra', 'usuario_id', 'modulo_id')
+                    ->withPivot('activo')
+                    ->withTimestamps();
+    }
+
+    // Obtener todos los módulos permitidos para el usuario (rol + extras)
+    public function getModulosPermitidos()
+    {
+        // Módulos del rol (si tienes la relación)
+        $modulosRol = $this->role ? $this->role->modulos()->wherePivot('activo', true)->get() : collect();
+        
+        // Módulos extras del usuario
+        $modulosExtra = $this->modulosExtra()->wherePivot('activo', true)->get();
+        
+        // Unir y eliminar duplicados
+        return $modulosRol->merge($modulosExtra)->unique('id')->sortBy('orden');
+    }
+
+    // Verificar si el usuario tiene acceso a un módulo específico
+    public function puedeAccederModulo($moduloCodigo)
+    {
+        $modulosPermitidos = $this->getModulosPermitidos();
+        return $modulosPermitidos->contains('codigo', $moduloCodigo);
     }
 }

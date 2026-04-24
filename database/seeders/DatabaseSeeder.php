@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             AnioAcademicoSeeder::class,     // 6. Años académicos
             PeriodoSeeder::class,           // 7. Periodos/Bimestres
             EscalaCalificacionSeeder::class, // 8. Escalas de calificación
+            RolModuloSeeder::class            // 9. Módulos por rol 
         ]);
 
         $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
