@@ -71,6 +71,17 @@ class EscalaCalificacionSeeder extends Seeder
                 'orden' => 5,
                 'activo' => true,
             ],
+                        [
+                'codigo' => 'ND',
+                'nombre' => 'No Desarrollada',
+                'descripcion' => 'No se ha asignado para el desarrollo de la competencia',
+                'valor_numerico_min' => null,
+                'valor_numerico_max' => null,
+                'nivel' => 'AMBOS',
+                'aprobatorio' => false,
+                'orden' => 5,
+                'activo' => true,
+            ],
         ];
 
         foreach ($escalas as $escala) {

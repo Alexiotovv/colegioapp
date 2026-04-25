@@ -18,8 +18,10 @@ class SeccionSeeder extends Seeder
         $secciones = [
             ['nombre' => 'A', 'turno' => 'MAÑANA', 'activo' => true],
             ['nombre' => 'B', 'turno' => 'MAÑANA', 'activo' => true],
-            ['nombre' => 'C', 'turno' => 'TARDE', 'activo' => true],
-            ['nombre' => 'D', 'turno' => 'TARDE', 'activo' => true],
+            ['nombre' => 'C', 'turno' => 'MAÑANA', 'activo' => true],
+            ['nombre' => 'D', 'turno' => 'MAÑANA', 'activo' => true],
+            ['nombre' => 'E', 'turno' => 'MAÑANA', 'activo' => true],
+            
         ];
 
         foreach ($secciones as $seccion) {

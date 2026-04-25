@@ -17,7 +17,7 @@ class AnioAcademicoSeeder extends Seeder
 
         $anios = [
             [
-                'anio' => '2024',
+                'anio' => '2025',
                 'fecha_inicio' => '2024-03-01',
                 'fecha_fin' => '2024-12-20',
                 'activo' => false,
@@ -25,7 +25,7 @@ class AnioAcademicoSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'anio' => '2025',
+                'anio' => '2026',
                 'fecha_inicio' => '2025-03-01',
                 'fecha_fin' => '2025-12-20',
                 'activo' => true,

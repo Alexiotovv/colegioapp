@@ -21,7 +21,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Administrador del Sistema',
                 'username' => 'admin',
-                'email' => 'admin@colcoopcv.edu.pe',
+                'email' => 'admin@gmail.com',
                 'password' => Hash::make('admin123'),
                 'role_id' => 1,
                 'activo' => true,
@@ -34,7 +34,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'María Elena Campos',
                 'username' => 'directora',
-                'email' => 'directora@colcoopcv.edu.pe',
+                'email' => 'directora@gmail.com',
                 'password' => Hash::make('director123'),
                 'role_id' => 2,
                 'activo' => true,
@@ -47,7 +47,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Carlos Alberto Mendoza',
                 'username' => 'carlos.mendoza',
-                'email' => 'carlos.mendoza@colcoopcv.edu.pe',
+                'email' => 'carlos.mendoza@gmail.com',
                 'password' => Hash::make('docente123'),
                 'role_id' => 3,
                 'activo' => true,
@@ -56,38 +56,13 @@ class UserSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-            // Docente de Comunicación
-            [
-                'name' => 'Rosa María Quispe',
-                'username' => 'rosa.quispe',
-                'email' => 'rosa.quispe@colcoopcv.edu.pe',
-                'password' => Hash::make('docente123'),
-                'role_id' => 3,
-                'activo' => true,
-                'userable_type' => null,
-                'userable_id' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            // Apoderado 1
-            [
-                'name' => 'Juan Pérez Gonzales',
-                'username' => 'juan.perez',
-                'email' => 'juan.perez@email.com',
-                'password' => Hash::make('apoderado123'),
-                'role_id' => 4,
-                'activo' => true,
-                'userable_type' => null,
-                'userable_id' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            // Apoderado 2
+            
+            // Auxiliar
             [
                 'name' => 'María López Huamán',
                 'username' => 'maria.lopez',
-                'email' => 'maria.lopez@email.com',
-                'password' => Hash::make('apoderado123'),
+                'email' => 'maria.lopez@gmail.com',
+                'password' => Hash::make('auxiliar123'),
                 'role_id' => 4,
                 'activo' => true,
                 'userable_type' => null,
@@ -105,7 +80,7 @@ class UserSeeder extends Seeder
         $this->command->info('   Admin:      admin / admin123');
         $this->command->info('   Director:   directora / director123');
         $this->command->info('   Docente:    carlos.mendoza / docente123');
-        $this->command->info('   Apoderado:  juan.perez / apoderado123');
+        $this->command->info('   Auxiliar:  maria.lopez / auxiliar123');
         $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
 }

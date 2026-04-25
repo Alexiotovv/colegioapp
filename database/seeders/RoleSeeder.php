@@ -39,8 +39,8 @@ class RoleSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'nombre' => 'apoderado',
-                'descripcion' => 'Apoderado/Padre de familia - Seguimiento de notas y pagos',
+                'nombre' => 'auxiliar',
+                'descripcion' => 'El auxiliar es el apoyo al docente, apoya a registrar comportamiento, asistencia y otras tareas administrativas relacionadas con el aula.',
                 'activo' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
