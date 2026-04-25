@@ -71,15 +71,21 @@ class CargaHoraria extends Model
     // Accessors
     public function getDiaSemanaNombreAttribute(): string
     {
-        return self::DIAS_SEMANA[$this->dia_semana] ?? $this->dia_semana;
+        return self::DIAS_SEMANA[$this->dia_semana] ?? '';
     }
     
     public function getHorarioAttribute(): string
     {
         if ($this->hora_inicio && $this->hora_fin) {
-            return \Carbon\Carbon::parse($this->hora_inicio)->format('H:i') . ' - ' . \Carbon\Carbon::parse($this->hora_fin)->format('H:i');
+            try {
+                $inicio = \Carbon\Carbon::parse($this->hora_inicio)->format('H:i');
+                $fin = \Carbon\Carbon::parse($this->hora_fin)->format('H:i');
+                return "{$inicio} - {$fin}";
+            } catch (\Exception $e) {
+                return 'Horario inválido';
+            }
         }
-        return 'Horario no definido';
+        return 'Horario flexible';
     }
     
     public function getEstadoBadgeAttribute(): string

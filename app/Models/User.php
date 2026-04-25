@@ -116,4 +116,6 @@ class User extends Authenticatable
         $modulosPermitidos = $this->getModulosPermitidos();
         return $modulosPermitidos->contains('codigo', $moduloCodigo);
     }
+
+    
 }

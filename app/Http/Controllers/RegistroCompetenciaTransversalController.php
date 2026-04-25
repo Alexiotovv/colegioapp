@@ -21,11 +21,6 @@ class RegistroCompetenciaTransversalController extends Controller
         $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
-        // Roles permitidos: admin, tutor
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            abort(403, 'No tienes permiso para acceder a esta sección.');
-        }
-        
         // Obtener aulas según el rol
         if ($rol === 'admin') {
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
@@ -122,12 +117,6 @@ class RegistroCompetenciaTransversalController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para realizar esta acción'
-            ], 403);
-        }
         
         $request->validate([
             'registros' => 'required|array',
@@ -230,12 +219,6 @@ class RegistroCompetenciaTransversalController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para realizar esta acción'
-            ], 403);
-        }
         
         $periodo = Periodo::find($request->periodo_id);
         if (!$periodo || !$periodo->activo) {

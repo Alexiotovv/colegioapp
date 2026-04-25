@@ -39,6 +39,7 @@
 @endsection
 
 @section('content')
+@include('partials.toast')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>

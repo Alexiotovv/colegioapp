@@ -1,5 +1,8 @@
 {{-- resources/views/layouts/app.blade.php --}}
 <!DOCTYPE html>
+@php
+use Illuminate\Support\Str;
+@endphp
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -166,6 +169,34 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #55555594;
         }
+        /* Estilos para grupos colapsables */
+        .grupo-titulo {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .grupo-titulo .chevron-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .grupo-titulo[aria-expanded="false"] .chevron-icon {
+            transform: rotate(-90deg);
+        }
+
+        .grupo-modulo .collapse .nav-link {
+            padding-left: 35px;
+            font-size: 0.85rem;
+        }
+
+        .grupo-modulo .collapse .nav-link i {
+            width: 20px;
+            font-size: 10px;
+        }
+
+        /* Estado guardado para grupos colapsados */
+        .grupo-modulo .collapse:not(.show) + .grupo-titulo .chevron-icon {
+            transform: rotate(-90deg);
+        }
     </style>
     {{-- Incluir estilos CSS del progress bar --}}
     @push('styles')
@@ -284,282 +315,103 @@
             </div>
         </div>
         
-        {{-- <nav class="nav flex-column px-3">
-            @auth
-                @if(Auth::user()->isAdmin())
-                    <!-- Menú Admin -->
-                    <div class="mb-2">
-                        <div class="text-uppercase small text-white-50 mb-2">
-                            <i class="fas fa-tachometer-alt me-1"></i> PRINCIPAL
-                        </div>
-                        <a href="{{ route('dashboard') }}" class="nav-link">
-                            <i class="fas fa-home"></i> Dashboard
-                        </a>
-                    </div>
-                    
-                    <div class="mb-2">
-                        <div class="text-uppercase small text-white-50 mb-2">
-                            <i class="fas fa-cog me-1"></i> ADMINISTRACIÓN
-                        </div>
-                        <a href="#menuUsuarios" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-users"></i> Usuarios <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuUsuarios">
-                            <a href="{{ route('admin.users.index') }}" class="nav-link small">📋 Listar Usuarios</a>
-                            <a href="{{ route('admin.users.create') }}" class="nav-link small">➕ Crear Usuario</a>
-                        </div>
-                        
-                        <!-- Alumnos -->
-                        <a href="#menuAlumnos" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-user-graduate"></i> Alumnos <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuAlumnos">
-                        <a href="{{ route('admin.alumnos.index') }}" class="nav-link small">
-                            <i class="fas fa-list me-1"></i> Listar Alumnos
-                        </a>
-                        <a href="{{ route('admin.alumnos.create') }}" class="nav-link small">
-                            <i class="fas fa-plus me-1"></i> Nuevo Alumno
-                        </a>
-                        </div>
-
-                        <a href="#menuAcademicos" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-calendar-alt"></i> Año Académico <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuAcademicos">
-                            <a href="{{ route('admin.anios.index') }}" class="nav-link small">📅 Gestionar Años</a>
-                            <a href="{{ route('admin.configuracion-academica.index') }}" class="nav-link small">📚 Conf. Académica</a>
-                            <a href="{{ route('admin.aulas.index') }}" class="nav-link small">📚 Aulas</a>
-                            <a href="{{ route('admin.matriculas.index') }}" class="nav-link small">📚 Matrículas</a>
-                            <a href="{{ route('admin.carga-horaria.index') }}" class="nav-link small">📝 Carga Horaria</a>
-                        </div>
-                        
-
-
-                        <!-- Apoderados -->
-                        <a href="#menuApoderados" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-users"></i> Apoderados <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuApoderados">
-                            <a href="{{ route('admin.apoderados.index') }}" class="nav-link small">
-                                <i class="fas fa-list me-1"></i> Listar Apoderados
-                            </a>
-                            <a href="{{ route('admin.apoderados.create') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i> Nuevo Apoderado
-                            </a>
-                        </div>
-                        
-                        <!-- Periodos Académicos -->
-                        <a href="#menuPeriodos" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-calendar-week"></i> Periodos <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuPeriodos">
-                            <a href="{{ route('admin.periodos.index') }}" class="nav-link small">
-                                <i class="fas fa-list me-1"></i> Listar Periodos
-                            </a>
-                            <a href="{{ route('admin.periodos.create') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i> Nuevo Periodo
-                            </a>
-                        </div>
-                        <a href="#menuMatriculas" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-address-card"></i>Registro Notas <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuMatriculas">
-                            <a href="{{route('admin.notas.index')}}" class="nav-link small">📋 Notas de Libreta</a>
-                            <a href="{{ route('admin.registro-competencias-transversales.index') }}" class="nav-link small">📋 Comp. Transls.</a>
-                            <a href="{{ route('admin.apreciaciones.index') }}" class="nav-link small">📋 Aprec. del Tutor</a>
-                            <a href="{{ route('admin.registro-evaluaciones.index') }}" class="nav-link small">📋 Eval. PP.FF.</a>
-                            <a href="{{ route('admin.registro-asistencias.index') }}" class="nav-link small">📋 Asistencias
-                            <a href="{{ route('admin.registro-otras-evaluaciones.index') }}" class="nav-link small">📋 Comporta. y Otros</a>
-                        </a>
-                        </div>
-                        
-                        <!-- Evaluaciones -->
-                        <a href="#menuEvaluaciones" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-clipboard-list"></i> Gestión Notas<i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuEvaluaciones">
-                            <a href="{{ route('admin.cursos-jerarquico.index') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i>Libretas(Cursos)</a>
-                            <a href="{{ route('admin.competencias-transversales-jerarquico.index') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i> Comport. Transv.
-                            </a>
-                            <a href="{{ route('admin.evaluaciones-jerarquico.index') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i>Eval PP.FF.
-                            </a>
-                            <a href="{{ route('admin.tipos-inasistencia-jerarquico.index') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i> Asistencia
-                            </a>
-                            <a href="{{ route('admin.tipos-otras-evaluaciones-jerarquico.index') }}" class="nav-link small">
-                                <i class="fas fa-plus me-1"></i> Comport. y Otros
-                            </a>
-                            <a href="{{ route('admin.configuracion-notas.index') }}" class="nav-link small">
-                                <i class="fas fa-cog me-1"></i> Tipos de Notas
-                            </a>
-                        </div>
-
-
-
-
-                        <a href="#menuPagos" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-dollar-sign"></i> Pagos <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuPagos">
-                            <a href="#" class="nav-link small">💰 Pensiones</a>
-                            <a href="#" class="nav-link small">📊 Reportes</a>
-                        </div>
-                    </div>
-                    
-
-
-
-                    <!-- Configuración -->
-                    <a href="#menuConfiguracion" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-cog"></i> Configuración <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuConfiguracion">
-                        <a href="{{ route('admin.configuracion.index') }}" class="nav-link small">
-                            <i class="fas fa-sliders-h me-1"></i> Configuración del Sistema
-                        </a>
-                    </div>
-                    <!-- Libretas -->
-                    <a href="#menuLibretas" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-address-book"></i> Libretas <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuLibretas">
-                        <a href="{{ route('admin.libretas.index') }}" class="nav-link small">
-                            <i class="fas fa-print me-1"></i> Exportar Libretas
-                        </a>
-                    </div>
-
-                @elseif(Auth::user()->isDocente())
-                    <!-- Menú Docente -->
-                    <div class="mb-2">
-                        <a href="{{ route('dashboard') }}" class="nav-link">
-                            <i class="fas fa-home"></i> Dashboard
-                        </a>
-
-                        <div class="nav-link">
-                            <a href="{{route('admin.notas.index')}}" class="nav-link small">📋 Registro de Notas</a>
-                        </div>
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-chart-line"></i> Mis Alumnos
-                        </a>
-                    </div>
-
-                @elseif(Auth::user()->isTutor())
-                    <div class="mb-2">
-                        <div class="nav-link">
-                            <a href="{{ route('admin.apreciaciones.index') }}" class="nav-link small">📋 Apreciaciones</a>
-                        </div>
-                    </div>
-
-                    <div class="mb-2">
-                        <div class="nav-link">
-                            <a href="{{ route('admin.registro-evaluaciones.index') }}" class="nav-link small">📋 Registrar Evaluaciones</a>
-                        </div>
-                    </div>
-
-                    <!-- Asistencias -->
-                    <a href="#menuAsistencias" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-calendar-check"></i> Asistencias <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuAsistencias">
-                        <a href="{{ route('admin.registro-asistencias.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Asistencias
-                        </a>
-                    </div>
-
-                    <!-- Otras Evaluaciones -->
-                    <a href="#menuOtrasEvaluaciones" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-clipboard-list"></i> Otras Evals. <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuOtrasEvaluaciones">
-                        <a href="{{ route('admin.registro-otras-evaluaciones.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Evaluaciones
-                        </a>
-                    </div>
-                    <!-- Competencias Transversales -->
-                    <a href="#menuCompTransversales" data-bs-toggle="collapse" class="nav-link">
-                        <i class="fas fa-exchange-alt"></i> Comp. Transversales <i class="fas fa-chevron-down float-end"></i>
-                    </a>
-                    <div class="collapse ps-3" id="menuCompTransversales">
-                        <a href="{{ route('admin.registro-competencias-transversales.index') }}" class="nav-link small">
-                            <i class="fas fa-edit me-1"></i> Registrar Competencias
-                        </a>
-                    </div>
-
-                @elseif(Auth::user()->isApoderado())
-                    <!-- Menú Apoderado -->
-                    <div class="mb-2">
-                        <a href="{{ route('dashboard') }}" class="nav-link">
-                            <i class="fas fa-home"></i> Dashboard
-                        </a>
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-child"></i> Mis Hijos
-                        </a>
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-chart-bar"></i> Ver Notas
-                        </a>
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-dollar-sign"></i> Pagos
-                        </a>
-                    </div>
-                @endif
-            @endauth
-        </nav> --}}
-
-        <nav class="nav flex-column px-3">
-            @auth
-                @php
-                    $modulosPermitidos = Auth::user()->getModulosPermitidos();
-                @endphp
-                
-                @foreach($modulosPermitidos as $modulo)
-                    @if($modulo->ruta)
-                        <a href="{{ route($modulo->ruta) }}" class="nav-link">
-                            <i class="fas {{ $modulo->icono ?? 'fa-cube' }}"></i> {{ $modulo->nombre }}
-                        </a>
-                    @endif
-                @endforeach
-            @endauth
-        </nav>
-
-
-        <nav class="nav flex-column px-3">
+        <nav class="nav flex-column px-3" id="sidebarNav">
             @auth
                 @php
                     $modulosPermitidos = Auth::user()->getModulosPermitidos();
                     $esAdmin = Auth::user()->isAdmin();
+                    
+                    // Organizar módulos por padre (agrupación dinámica)
+                    $modulosPorPadre = [];
+                    $modulosSinPadre = [];
+                    
+                    foreach ($modulosPermitidos as $modulo) {
+                        if ($modulo->padre_id && $modulo->padre_id != '') {
+                            if (!isset($modulosPorPadre[$modulo->padre_id])) {
+                                $modulosPorPadre[$modulo->padre_id] = [];
+                            }
+                            $modulosPorPadre[$modulo->padre_id][] = $modulo;
+                        } else {
+                            $modulosSinPadre[] = $modulo;
+                        }
+                    }
+                    
+                    // Ordenar módulos sin padre por orden
+                    usort($modulosSinPadre, function($a, $b) {
+                        return $a->orden <=> $b->orden;
+                    });
                 @endphp
                 
-                <!-- Módulos dinámicos -->
-                @foreach($modulosPermitidos as $modulo)
-                    @if($modulo->ruta)
-                        <a href="{{ route($modulo->ruta) }}" class="nav-link">
-                            <i class="fas {{ $modulo->icono ?? 'fa-cube' }}"></i> {{ $modulo->nombre }}
-                        </a>
+                <!-- Renderizar módulos con grupos dinámicos -->
+                @foreach($modulosSinPadre as $modulo)
+                    @php
+                        $tieneHijos = isset($modulosPorPadre[$modulo->id]) && count($modulosPorPadre[$modulo->id]) > 0;
+                        $grupoId = 'modulo_group_' . $modulo->id;
+                    @endphp
+                    
+                    @if($tieneHijos)
+                        <!-- Módulo que actúa como grupo (tiene hijos) -->
+                        <div class="mb-2 grupo-modulo" data-grupo-id="{{ $grupoId }}">
+                            <div class="nav-link grupo-titulo" data-bs-toggle="collapse" href="#{{ $grupoId }}" 
+                                role="button" aria-expanded="true" aria-controls="{{ $grupoId }}">
+                                <i class="fas {{ $modulo->icono ?? 'fa-folder' }}"></i>
+                                {{ $modulo->nombre }}
+                                <i class="fas fa-chevron-down float-end chevron-icon"></i>
+                            </div>
+                            <div class="collapse show ps-3" id="{{ $grupoId }}">
+                                @foreach($modulosPorPadre[$modulo->id] as $hijo)
+                                    @if($hijo->ruta)
+                                        <a href="{{ route($hijo->ruta) }}" class="nav-link small">
+                                            <i class="fas {{ $hijo->icono ?? 'fa-circle' }} fa-xs"></i>
+                                            {{ $hijo->nombre }}
+                                        </a>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    @else
+                        <!-- Módulo normal (sin hijos) -->
+                        @if($modulo->ruta)
+                            <a href="{{ route($modulo->ruta) }}" class="nav-link">
+                                <i class="fas {{ $modulo->icono ?? 'fa-cube' }}"></i>
+                                {{ $modulo->nombre }}
+                            </a>
+                        @endif
                     @endif
                 @endforeach
                 
-                <!-- Menús fijos para ADMIN (si quieres mantener los submenús) -->
+                <!-- Menú adicional para ADMIN -->
                 @if($esAdmin)
-                    <div class="mb-2">
+                    <div class="mt-3 pt-2 border-top border-secondary">
                         <div class="text-uppercase small text-white-50 mb-2">
-                            <i class="fas fa-cog me-1"></i> CONFIGURACIÓN
+                            <i class="fas fa-tools me-1"></i> HERRAMIENTAS
                         </div>
-                        <a href="#menuConfig" data-bs-toggle="collapse" class="nav-link">
-                            <i class="fas fa-sliders-h"></i> Configuración Manual <i class="fas fa-chevron-down float-end"></i>
-                        </a>
-                        <div class="collapse ps-3" id="menuConfig">
-                            <a href="{{ route('admin.configuracion.index') }}" class="nav-link small">⚙️ Sistema</a>
-                            <a href="{{ route('admin.modulos.index') }}" class="nav-link small">📦 Módulos</a>
-                            <a href="{{ route('admin.permisos.asignar-roles') }}" class="nav-link small">🔑 Permisos Roles</a>
-                            <a href="{{ route('admin.permisos.asignar-usuarios') }}" class="nav-link small">👤 Permisos Usuarios</a>
+                        <div class="grupo-modulo" data-grupo-id="herramientas_admin">
+                            <div class="nav-link grupo-titulo" data-bs-toggle="collapse" href="#herramientasAdmin" 
+                                role="button" aria-expanded="true" aria-controls="herramientasAdmin">
+                                <i class="fas fa-lock"></i>
+                                Gestión de Permisos
+                                <i class="fas fa-chevron-down float-end chevron-icon"></i>
+                            </div>
+                            <div class="collapse show ps-3" id="herramientasAdmin">
+                                <a href="{{ route('admin.modulos.index') }}" class="nav-link small">
+                                    <i class="fas fa-cubes me-1"></i> Módulos
+                                </a>
+                                <a href="{{ route('admin.permisos.asignar-roles') }}" class="nav-link small">
+                                    <i class="fas fa-tags me-1"></i> Permisos por Rol
+                                </a>
+                                <a href="{{ route('admin.permisos.asignar-usuarios') }}" class="nav-link small">
+                                    <i class="fas fa-user-plus me-1"></i> Permisos por Usuario
+                                </a>
+                            </div>
                         </div>
                     </div>
                 @endif
             @endauth
         </nav>
+
+
+
 
     </div>
 
@@ -663,6 +515,40 @@
         return false;
     }
 </script>
-
+<script>
+    $(document).ready(function() {
+        // Guardar estado de grupos colapsados en localStorage
+        function guardarEstadoGrupos() {
+            const gruposColapsados = [];
+            $('.grupo-modulo .collapse').each(function() {
+                const grupoId = $(this).attr('id');
+                if (grupoId && !$(this).hasClass('show')) {
+                    gruposColapsados.push(grupoId);
+                }
+            });
+            localStorage.setItem('sidebar_grupos_colapsados', JSON.stringify(gruposColapsados));
+        }
+        
+        // Restaurar estado de grupos colapsados
+        function restaurarEstadoGrupos() {
+            const gruposColapsados = JSON.parse(localStorage.getItem('sidebar_grupos_colapsados') || '[]');
+            gruposColapsados.forEach(function(grupoId) {
+                const $collapse = $('#' + grupoId);
+                if ($collapse.length) {
+                    $collapse.removeClass('show');
+                    $collapse.parent().find('.grupo-titulo').attr('aria-expanded', 'false');
+                }
+            });
+        }
+        
+        // Evento cuando se colapsa/expande un grupo
+        $(document).on('hidden.bs.collapse shown.bs.collapse', '.grupo-modulo .collapse', function() {
+            guardarEstadoGrupos();
+        });
+        
+        // Restaurar estado al cargar
+        restaurarEstadoGrupos();
+    });
+</script>
 </body>
 </html>

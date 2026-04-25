@@ -10,6 +10,7 @@ use App\Models\Aula;
 use App\Models\AnioAcademico;
 use Illuminate\Http\Request;
 use DB;
+
 class CargaHorariaController extends Controller
 {
     public function index(Request $request)
@@ -24,42 +25,38 @@ class CargaHorariaController extends Controller
             $query->where('curso_id', $request->curso_id);
         }
         
+        if ($request->filled('aula_id')) {
+            $query->where('aula_id', $request->aula_id);
+        }
+        
         $cargas = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
         
-        // 🔥 Obtener docentes usando role_id
+        // Obtener docentes usando role_id
         $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
         $docentes = User::where('role_id', $rolDocenteId)
                         ->where('activo', true)
                         ->orderBy('name')
-                        ->get();
+                        ->get(['id', 'name', 'email']);
         
         $cursos = Curso::with('nivel')->where('activo', true)->ordered()->get();
+        $aulas = Aula::with(['grado.nivel', 'seccion'])->where('activo', true)->get();
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
-        return view('carga-horaria.index', compact('cargas', 'docentes', 'cursos', 'anioActivo'));
+        return view('carga-horaria.index', compact('cargas', 'docentes', 'cursos', 'aulas', 'anioActivo'));
     }
 
     public function create()
     {
-        // 🔥 Obtener docentes de la tabla users con rol = 'docente'
         $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
-
         $docentes = User::where('role_id', $rolDocenteId)
                         ->where('activo', true)
                         ->orderBy('name')
-                        ->get();
-        
-        // Depuración: ver cuántos docentes se encontraron
-        \Log::info('Docentes encontrados: ' . $docentes->count());
+                        ->get(['id', 'name', 'email']);
         
         $cursos = Curso::with('nivel')->where('activo', true)->ordered()->get();
-        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                    ->where('activo', true)
-                    ->orderBy('nombre')
-                    ->get();
         $diasSemana = CargaHoraria::DIAS_SEMANA;
         
-        return view('carga-horaria.create', compact('docentes', 'cursos', 'aulas', 'diasSemana'));
+        return view('carga-horaria.create', compact('docentes', 'cursos', 'diasSemana'));
     }
     
     public function store(Request $request)
@@ -74,10 +71,24 @@ class CargaHorariaController extends Controller
             'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
         ]);
         
+        // 🔥 VALIDACIÓN: Verificar si ya existe la misma asignación
+        $existeAsignacion = CargaHoraria::where('docente_id', $request->docente_id)
+            ->where('curso_id', $request->curso_id)
+            ->where('aula_id', $request->aula_id)
+            ->exists();
+        
+        if ($existeAsignacion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ya existe una asignación para este docente, curso y aula.'
+            ], 422);
+        }
+        
         // Verificar conflicto de horario para el mismo docente
         if ($request->dia_semana && $request->hora_inicio && $request->hora_fin) {
             $conflicto = CargaHoraria::where('docente_id', $request->docente_id)
                 ->where('dia_semana', $request->dia_semana)
+                ->where('estado', 'activo')
                 ->where(function($q) use ($request) {
                     $q->whereBetween('hora_inicio', [$request->hora_inicio, $request->hora_fin])
                       ->orWhereBetween('hora_fin', [$request->hora_inicio, $request->hora_fin])
@@ -108,32 +119,23 @@ class CargaHorariaController extends Controller
             'observaciones' => $request->observaciones,
         ]);
         
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Carga horaria asignada exitosamente',
-                'data' => $carga->load(['docente', 'curso', 'aula'])
-            ]);
-        }
-        
-        return redirect()->route('admin.carga-horaria.index')
-            ->with('success', 'Carga horaria asignada exitosamente');
+        return response()->json([
+            'success' => true,
+            'message' => 'Carga horaria asignada exitosamente',
+            'data' => $carga->load(['docente', 'curso', 'aula'])
+        ]);
     }
     
     public function edit(CargaHoraria $cargaHorarium)
     {
-        // 🔥 Obtener docentes usando role_id
         $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
         $docentes = User::where('role_id', $rolDocenteId)
                         ->where('activo', true)
                         ->orderBy('name')
-                        ->get();
+                        ->get(['id', 'name', 'email']);
         
         $cursos = Curso::with('nivel')->where('activo', true)->ordered()->get();
-        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                    ->where('activo', true)
-                    ->orderBy('nombre')
-                    ->get();
+        $aulas = Aula::with(['grado.nivel', 'seccion'])->where('activo', true)->get();
         $diasSemana = CargaHoraria::DIAS_SEMANA;
         
         return view('carga-horaria.edit', compact('cargaHorarium', 'docentes', 'cursos', 'aulas', 'diasSemana'));
@@ -151,10 +153,25 @@ class CargaHorariaController extends Controller
             'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
         ]);
         
+        // Verificar duplicado excluyendo el registro actual
+        $existeAsignacion = CargaHoraria::where('docente_id', $request->docente_id)
+            ->where('curso_id', $request->curso_id)
+            ->where('aula_id', $request->aula_id)
+            ->where('id', '!=', $cargaHorarium->id)
+            ->exists();
+        
+        if ($existeAsignacion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ya existe una asignación para este docente, curso y aula.'
+            ], 422);
+        }
+        
         // Verificar conflicto excluyendo el registro actual
         if ($request->dia_semana && $request->hora_inicio && $request->hora_fin) {
             $conflicto = CargaHoraria::where('docente_id', $request->docente_id)
                 ->where('dia_semana', $request->dia_semana)
+                ->where('estado', 'activo')
                 ->where('id', '!=', $cargaHorarium->id)
                 ->where(function($q) use ($request) {
                     $q->whereBetween('hora_inicio', [$request->hora_inicio, $request->hora_fin])
@@ -186,16 +203,11 @@ class CargaHorariaController extends Controller
             'observaciones' => $request->observaciones,
         ]);
         
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Carga horaria actualizada exitosamente',
-                'data' => $cargaHorarium->load(['docente', 'curso', 'aula'])
-            ]);
-        }
-        
-        return redirect()->route('admin.carga-horaria.index')
-            ->with('success', 'Carga horaria actualizada exitosamente');
+        return response()->json([
+            'success' => true,
+            'message' => 'Carga horaria actualizada exitosamente',
+            'data' => $cargaHorarium->load(['docente', 'curso', 'aula'])
+        ]);
     }
     
     public function destroy(CargaHoraria $cargaHorarium)
@@ -219,44 +231,106 @@ class CargaHorariaController extends Controller
         ]);
     }
     
-    // Métodos para AJAX
+    // app/Http/Controllers/CargaHorariaController.php
+
     public function getCursosByDocente(Request $request)
     {
-        $cursos = Curso::with('nivel')
-            ->where('activo', true)
-            ->ordered()
+        $request->validate([
+            'docente_id' => 'required|exists:users,id'
+        ]);
+        
+        $cursosAsignados = CargaHoraria::where('docente_id', $request->docente_id)
+            ->where('estado', 'activo')
+            ->with(['curso' => function($q) {
+                $q->with('nivel');
+            }, 'aula'])
             ->get();
         
-        return response()->json($cursos);
+        // Verificar si hay resultados
+        if ($cursosAsignados->isEmpty()) {
+            return response()->json([]); // Array vacío está bien
+        }
+        
+        // Mapear asegurando que todas las propiedades existan
+        $resultado = $cursosAsignados->map(function($carga) {
+            return [
+                'id' => $carga->curso->id ?? null,
+                'nombre' => $carga->curso->nombre ?? 'Curso no disponible',
+                'nivel' => $carga->curso->nivel->nombre ?? 'Sin nivel',
+                'aula' => $carga->aula->nombre ?? 'Aula no asignada',
+                'horas_semanales' => $carga->horas_semanales ?? 0,
+                'dia_semana' => $carga->dia_semana_nombre ?? null,
+                'horario' => $carga->horario ?? null
+            ];
+        });
+        
+        // Depuración: Log para ver qué se está enviando
+        \Log::info('Cursos asignados al docente', [
+            'docente_id' => $request->docente_id,
+            'cantidad' => $resultado->count(),
+            'data' => $resultado->toArray()
+        ]);
+        
+        return response()->json($resultado);
     }
     
     public function getAulasByCurso(Request $request)
     {
+        $request->validate([
+            'curso_id' => 'required|exists:cursos,id'
+        ]);
+        
         $curso = Curso::find($request->curso_id);
         
         if (!$curso) {
             return response()->json([]);
         }
         
-        // Buscar aulas que tengan el mismo nivel que el curso
-        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+        $aulas = Aula::with(['grado.nivel', 'seccion'])
             ->where('nivel_id', $curso->nivel_id)
             ->where('activo', true)
             ->orderBy('nombre')
-            ->get(['id', 'nombre', 'grado_id', 'seccion_id', 'turno']);
+            ->get();
         
-        // Formatear respuesta
         $result = $aulas->map(function($aula) {
             return [
                 'id' => $aula->id,
                 'nombre' => $aula->nombre,
-                'grado' => $aula->grado ? ['nombre' => $aula->grado->nombre] : null,
-                'seccion' => $aula->seccion ? ['nombre' => $aula->seccion->nombre] : null,
+                'grado' => $aula->grado ? $aula->grado->nombre : null,
+                'seccion' => $aula->seccion ? $aula->seccion->nombre : null,
                 'turno_nombre' => $aula->turno_nombre,
                 'turno' => $aula->turno
             ];
         });
         
         return response()->json($result);
+    }
+
+    public function verificarDuplicado(Request $request)
+    {
+        $existe = CargaHoraria::where('docente_id', $request->docente_id)
+            ->where('curso_id', $request->curso_id)
+            ->where('aula_id', $request->aula_id)
+            ->exists();
+        
+        return response()->json(['existe' => $existe]);
+    }
+
+    public function getAllCursos()
+    {
+        $cursos = Curso::with('nivel')
+            ->where('activo', true)
+            ->ordered()
+            ->get()
+            ->map(function($curso) {
+                return [
+                    'id' => $curso->id,
+                    'nombre' => $curso->nombre,
+                    'nivel' => $curso->nivel->nombre ?? 'Sin nivel',
+                    'codigo' => $curso->codigo
+                ];
+            });
+        
+        return response()->json($cursos);
     }
 }

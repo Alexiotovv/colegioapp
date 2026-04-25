@@ -24,10 +24,6 @@ class LibretaController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if ($rol !== 'admin') {
-            abort(403, 'No tienes permiso para acceder a esta sección.');
-        }
-        
         $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
             ->where('activo', true)
             ->orderBy('nombre')

@@ -16,14 +16,7 @@ class NivelSeeder extends Seeder
         Schema::enableForeignKeyConstraints();
 
         $niveles = [
-            [
-                'nombre' => 'Inicial',
-                'descripcion' => 'Educación Inicial - 3 a 5 años',
-                'orden' => 1,
-                'activo' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+
             [
                 'nombre' => 'Primaria',
                 'descripcion' => 'Educación Primaria - 1ro a 6to grado',

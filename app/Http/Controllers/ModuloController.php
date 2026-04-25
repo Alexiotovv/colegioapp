@@ -51,7 +51,9 @@ class ModuloController extends Controller
     public function edit(Modulo $modulo)
     {
         $modulos = Modulo::ordered()->get();
-        return view('modulos.edit', compact('modulo', 'modulos'));
+        // Obtener todas las rutas registradas en Laravel
+        $rutasDisponibles = $this->getAllRouteNames();
+        return view('modulos.edit', compact('modulo', 'modulos', 'rutasDisponibles'));
     }
     
     public function update(Request $request, Modulo $modulo)

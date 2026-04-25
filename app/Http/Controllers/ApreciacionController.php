@@ -17,28 +17,24 @@ class ApreciacionController extends Controller
 {
     public function index()
     {
-        // Verificar si el usuario tiene rol tutor o admin
+        // Obtener rol del usuario para determinar qué aulas ver
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            abort(403, 'No tienes permiso para acceder a esta sección.');
-        }
-        
         $docenteId = auth()->id();
         
-        // Si es tutor, solo ver sus aulas asignadas (campo docente_id en aulas)
+        // Si es docente/tutor, solo ver sus aulas asignadas (campo docente_id en aulas)
         // Si es admin, puede ver todas las aulas
-        if ($rol === 'tutor') {
-            // 🔥 CORREGIDO: Usar el campo docente_id de la tabla aulas
+        if ($rol === 'admin') {
+            // Admin puede ver todas las aulas
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('docente_id', $docenteId)
                 ->where('activo', true)
                 ->orderBy('nombre')
                 ->get();
         } else {
-            // Admin puede ver todas las aulas
+            // Docente/Tutor: solo sus aulas asignadas
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+                ->where('docente_id', $docenteId)
                 ->where('activo', true)
                 ->orderBy('nombre')
                 ->get();
@@ -62,10 +58,7 @@ class ApreciacionController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        // Verificar permisos
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            return response()->json(['error' => 'No tienes permisos'], 403);
-        }
+
         
         // Si es tutor, verificar que el aula le pertenece (campo docente_id)
         if ($rol === 'tutor') {
@@ -125,12 +118,6 @@ class ApreciacionController extends Controller
         $user = auth()->user();
         $rol = $user->role->nombre ?? $user->rol;
         
-        if (!in_array($rol, ['admin', 'tutor'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para realizar esta acción'
-            ], 403);
-        }
         
         $request->validate([
             'apreciaciones' => 'required|array',

@@ -24,9 +24,10 @@ class RolModuloSeeder extends Seeder
         $docente = Role::where('nombre', 'docente')->first();
         if ($docente) {
             $docenteModulos = [
-                'dashboard', 'cursos', 'carga-horaria', 'notas',
-                'competencias-transversales', 'apreciaciones', 'evaluaciones-padre',
-                'otras-evaluaciones', 'inasistencias'
+                'dashboard', 'carga-horaria', 'notas',
+                'apreciaciones', 'registro-evaluaciones',
+                'registro-otras-evaluaciones', 'registro-asistencias',
+                'registro-competencias-transversales'
             ];
             $ids = $modulos->whereIn('codigo', $docenteModulos)->pluck('id')->toArray();
             $docente->modulos()->sync($ids);
@@ -46,7 +47,7 @@ class RolModuloSeeder extends Seeder
         // APODERADO
         $apoderado = Role::where('nombre', 'apoderado')->first();
         if ($apoderado) {
-            $apoderadoModulos = ['dashboard', 'notas', 'evaluaciones-padre', 'inasistencias'];
+            $apoderadoModulos = ['dashboard', 'notas', 'registro-evaluaciones', 'registro-asistencias'];
             $ids = $modulos->whereIn('codigo', $apoderadoModulos)->pluck('id')->toArray();
             $apoderado->modulos()->sync($ids);
         }

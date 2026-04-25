@@ -88,7 +88,7 @@ class UserController extends Controller
             $user->update(['password' => Hash::make($request->password)]);
         }
         
-        return redirect()->route('users.index')->with('success', 'Usuario actualizado exitosamente');
+        return redirect()->route('admin.users.index')->with('success', 'Usuario actualizado exitosamente');
     }
     
     public function destroy(User $user)

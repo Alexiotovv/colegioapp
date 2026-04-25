@@ -481,46 +481,47 @@
 </div>
 
 
-
-
 @endsection
 
 @section('scripts')
 <script>
 $(document).ready(function() {
 
-    // Llamar a la función al inicio
-    cargarOpcionesNotas();
-
+    // ==================== VARIABLES GLOBALES ====================
     let cursosData = [];
     let matriculasData = [];
     let competenciasData = [];
     let notasData = {};
     let notasHabilitadas = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
-    
-     // Opciones de notas - valor por defecto mientras se cargan
-    // let opcionesNotas = ['AD', 'A', 'B', 'C', 'CND', 'EXO'];
+    let opcionesNotas = ['AD', 'A', 'B', 'C']; // Valor por defecto mientras se cargan
 
-        function cargarOpcionesNotas() {
-        // Ya no declaras opcionesNotas aquí, solo la modificas
-        $.ajax({
+    // ==================== CARGAR OPCIONES DE NOTAS ====================
+    function cargarOpcionesNotas() {
+        return $.ajax({
             url: '{{ route("admin.notas.opciones") }}',
             method: 'GET',
-            async: false,
+            async: true,  // ← Cambiado a true (recomendado)
             success: function(response) {
                 if (response && response.length > 0) {
-                    opcionesNotas = response; // ← ahora modifica la del scope externo
+                    opcionesNotas = response;
                     console.log('Opciones de notas cargadas:', opcionesNotas);
                 }
             },
             error: function(xhr) {
                 console.error('Error al cargar opciones de notas:', xhr);
+                // Mantener valores por defecto
             }
         });
     }
 
-    // Toggle botón flotante
+    // ==================== INICIALIZACIÓN ASÍNCRONA ====================
+    // Cargar opciones y luego continuar
+    cargarOpcionesNotas().always(function() {
+        console.log('Inicialización completada');
+    });
+
+    // ==================== TOGGLE BOTÓN FLOTANTE ====================
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
         $('#fabMenu').toggleClass('show');
@@ -534,7 +535,7 @@ $(document).ready(function() {
         e.stopPropagation();
     });
     
-    // Cargar cursos según el aula seleccionada
+    // ==================== CARGAR CURSOS POR AULA ====================
     $('#aula_id').on('change', function() {
         let aulaId = $(this).val();
         let cursoSelect = $('#curso_id');
@@ -572,7 +573,7 @@ $(document).ready(function() {
         }
     });
     
-    // Cargar datos para el registro de notas
+    // ==================== CARGAR NOTAS ====================
     $('#btnCargarNotas').on('click', function() {
         let aulaId = $('#aula_id').val();
         let cursoId = $('#curso_id').val();
@@ -583,8 +584,9 @@ $(document).ready(function() {
             return;
         }
         
-        $('#btnCargarNotas').prop('disabled', true);
-        $('#btnCargarNotas').html('<span class="loading-spinner me-2"></span> Cargando...');
+        const $btn = $('#btnCargarNotas');
+        $btn.prop('disabled', true);
+        $btn.html('<span class="loading-spinner me-2"></span> Cargando...');
         
         $.ajax({
             url: '{{ route("admin.notas.get-data") }}',
@@ -595,7 +597,6 @@ $(document).ready(function() {
                 periodo_id: periodoId
             },
             success: function(response) {
-                
                 matriculasData = response.matriculas || [];
                 competenciasData = response.competencias || [];
                 notasData = response.notas || {};
@@ -615,24 +616,18 @@ $(document).ready(function() {
                 $('#tablaContainer').show();
             },
             error: function(xhr) {
-                Swal.fire('Error', xhr.responseJSON?.message || 'Error al cargar datos', 'error');
+                console.error('Error detallado:', xhr);
+                let errorMsg = xhr.responseJSON?.message || 'Error al cargar datos';
+                Swal.fire('Error', errorMsg, 'error');
             },
             complete: function() {
-                $('#btnCargarNotas').prop('disabled', false);
-                $('#btnCargarNotas').html('<i class="fas fa-search me-2"></i> Cargar Notas');
+                $btn.prop('disabled', false);
+                $btn.html('<i class="fas fa-search me-2"></i> Cargar Notas');
             }
         });
     });
     
-    // Inicializar Progress Bar
-    progressBar.init('progressContainer', '.nota-valor')
-        .onComplete(function() {
-            toast.success('¡Todos los registros completados!');
-        })
-        .onUpdate(function(porcentaje, completados, total) {
-            console.log(`Progreso: ${porcentaje}% (${completados}/${total})`);
-        });
-
+    // ==================== RENDER TABLA ====================
     function renderTabla() {
         if (!matriculasData || matriculasData.length === 0) {
             $('#tablaBody').html(`
@@ -718,19 +713,38 @@ $(document).ready(function() {
                                 style="background: none; border: none; cursor: pointer; margin-left: 5px;">
                             <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
                         </button>
-                    </td>
+                     </td>
                 `;
             }
             bodyHtml += `</tr>`;
             contador++;
-
-
         }
         
         $('#tablaBody').html(bodyHtml);
         
-        // Configurar eventos de los botones de mensaje
-        $('.btn-message').on('click', function() {
+        // Configurar eventos después de renderizar
+        configurarEventosTabla();
+        
+        // Inicializar progress bar después de renderizar
+        if (typeof progressBar !== 'undefined') {
+            progressBar.init('progressContainer', '.nota-valor')
+                .show()
+                .update()
+                .onComplete(function() {
+                    if (typeof toast !== 'undefined') {
+                        toast.success('¡Todos los registros completados!');
+                    }
+                })
+                .onUpdate(function(porcentaje, completados, total) {
+                    console.log(`Progreso: ${porcentaje}% (${completados}/${total})`);
+                });
+        }
+    }
+    
+    // ==================== CONFIGURAR EVENTOS DE LA TABLA ====================
+    function configurarEventosTabla() {
+        // Eventos de los botones de mensaje
+        $('.btn-message').off('click').on('click', function() {
             let btn = $(this);
             let notaId = btn.data('nota-id');
             let alumnoNombre = btn.data('alumno');
@@ -745,42 +759,33 @@ $(document).ready(function() {
             abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor);
         });
         
-        // Configurar eventos de los dropdowns
-        $('.dropdown-menu .dropdown-item').on('click', function(e) {
+        // Eventos de los dropdowns
+        $('.dropdown-menu .dropdown-item').off('click').on('click', function(e) {
             e.preventDefault();
             let valor = $(this).data('valor');
-            let boton = $(this).closest('td').find('.dropdown-toggle');
-            let hiddenInput = $(this).closest('td').find('.nota-valor');
-            let btnMensaje = $(this).closest('td').find('.btn-message');
+            let $boton = $(this).closest('td').find('.dropdown-toggle');
+            let $hiddenInput = $(this).closest('td').find('.nota-valor');
+            let $btnMensaje = $(this).closest('td').find('.btn-message');
             
-            boton.text(valor);
-            hiddenInput.val(valor);
-            
-            // Actualizar data-nota del botón mensaje
-            btnMensaje.data('nota', valor);
+            $boton.text(valor);
+            $hiddenInput.val(valor);
+            $btnMensaje.data('nota', valor);
             
             if (valor) {
-                boton.addClass('nota-guardada');
+                $boton.addClass('nota-guardada');
             } else {
-                boton.removeClass('nota-guardada');
+                $boton.removeClass('nota-guardada');
             }
-
-            progressBar.update();
+            
+            // Actualizar progress bar si existe
+            if (typeof progressBar !== 'undefined') {
+                progressBar.update();
+            }
         });
-
-        // Mostrar y actualizar progress bar
-        progressBar.show().update();
-
     }
     
-    // Guardar todas las notas
+    // ==================== GUARDAR NOTAS ====================
     function guardarTodasLasNotas() {
-
-        // if (!progressBar.isComplete()) {
-        //     toast.warning(`Complete todas las notas antes de guardar. Faltan ${progressBar.totalCount - progressBar.completedCount} registro(s).`);
-        //     return;
-        // }
-
         if (!notasHabilitadas) {
             Swal.fire('Error', 'El registro de notas no está habilitado', 'error');
             return;
@@ -791,7 +796,7 @@ $(document).ready(function() {
         
         $('.nota-valor').each(function() {
             let nota = $(this).val();
-            if (nota) {
+            if (nota && nota.trim() !== '') {
                 notas.push({
                     matricula_id: $(this).data('matricula'),
                     competencia_id: $(this).data('competencia'),
@@ -837,12 +842,13 @@ $(document).ready(function() {
         });
     }
     
-    // Imprimir reporte
+    // ==================== IMPRIMIR ====================
     function imprimirReporte() {
         Swal.fire('Información', 'Funcionalidad de impresión en desarrollo', 'info');
         $('#fabMenu').removeClass('show');
     }
     
+    // ==================== MODAL CONCLUSIÓN ====================
     function abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor) {
         $('#modalConclusionLabel').text(`Conclusión Descriptiva`);
         $('#conclusion_info').html(`
@@ -869,40 +875,7 @@ $(document).ready(function() {
         $('#modalConclusion').modal('show');
     }
     
-    // function actualizarProgreso() {
-    //     let totalInputs = 0;
-    //     let completados = 0;
-        
-    //     $('.nota-valor').each(function() {
-    //         totalInputs++;
-            
-    //         let valor = $(this).val();
-
-    //         // DEBUG (opcional)
-    //         // console.log('Valor:', valor);
-
-    //         if (valor !== null && valor !== undefined && valor.trim() !== '') {
-    //             completados++;
-    //         }
-    //     });
-
-    //     let porcentaje = totalInputs > 0 ? Math.round((completados / totalInputs) * 100) : 0;
-
-    //     $('#totalCount').text(totalInputs);
-    //     $('#completedCount').text(completados);
-    //     $('#pendingCount').text(totalInputs - completados);
-    //     $('#progressPercentage').text(porcentaje + '%');
-    //     $('#progressBarFill').css('width', porcentaje + '%');
-
-    //     if (porcentaje === 100) {
-    //         $('#btnGuardarTodas').prop('disabled', false);
-    //     } else {
-    //         $('#btnGuardarTodas').prop('disabled', true);
-    //     }
-    // }
-
-
-    // Guardar conclusión
+    // ==================== GUARDAR CONCLUSIÓN ====================
     $('#btnGuardarConclusion').on('click', function() {
         let notaId = $('#conclusion_nota_id').val();
         let conclusion = $('#conclusion_texto').val();
@@ -922,11 +895,8 @@ $(document).ready(function() {
             },
             success: function(response) {
                 if (response.success) {
-                    // Swal.fire('Éxito', response.message, 'success');
                     toast.success(response.message);
                     $('#modalConclusion').modal('hide');
-                    
-                    // Cambiar el color del icono a verde
                     $(`.btn-message[data-nota-id="${notaId}"] i`).css('color', '#28a745');
                 }
             },
@@ -936,11 +906,11 @@ $(document).ready(function() {
         });
     });
     
-    // Asignar eventos a los botones del menú flotante
+    // ==================== ASIGNAR EVENTOS ====================
     $('#btnGuardarTodas').on('click', guardarTodasLasNotas);
     $('#btnImprimirTodo').on('click', imprimirReporte);
     
-    // Cambiar habilitación del registro de notas (solo admin)
+    // ==================== TOGGLE HABILITACIÓN (SOLO ADMIN) ====================
     $('#toggleHabilitacion').on('change', function() {
         if (!esAdmin) {
             Swal.fire('Error', 'No tienes permisos para realizar esta acción', 'error');
