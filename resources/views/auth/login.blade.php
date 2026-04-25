@@ -367,9 +367,9 @@
                     <span class="badge bg-light text-dark me-2">
                         <i class="fas fa-chart-line"></i> Notas en línea
                     </span>
-                    <span class="badge bg-light text-dark me-2">
-                        <i class="fas fa-dollar-sign"></i> Pagos digitales
-                    </span>
+                        {{-- <span class="badge bg-light text-dark me-2">
+                            <i class="fas fa-dollar-sign"></i> Pagos digitales
+                        </span> --}}
                     <span class="badge bg-light text-dark">
                         <i class="fas fa-users"></i> Comunicación directa
                     </span>

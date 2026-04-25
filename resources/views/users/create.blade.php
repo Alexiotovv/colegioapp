@@ -100,6 +100,12 @@
             </div>
             
             <div class="row">
+                <div class="col-md-12 mb-2">
+                    <button type="button" class="btn btn-sm btn-secondary" id="btnGenerarContrasena">
+                        <i class="fas fa-key me-1"></i> Generar Contraseña Segura
+                    </button>
+                </div>
+
                 <div class="col-md-6 mb-3">
                     <label for="password" class="form-label required-field">Contraseña</label>
                     <div class="input-group">
@@ -182,6 +188,52 @@
             $('#submitBtn').prop('disabled', true);
             $('#submitBtn').html('<i class="fas fa-spinner fa-spin me-2"></i> Guardando...');
         });
+
+        // Generar contraseña aleatoria
+$('#btnGenerarContrasena').on('click', function() {
+    const length = 10;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    $('#password').val(password);
+    $('#password_confirmation').val(password);
+    
+    // Mostrar opción para copiar
+    Swal.fire({
+        icon: 'success',
+        title: 'Contraseña generada',
+        html: `
+            <div class="input-group mt-3">
+                <input type="text" class="form-control" id="contrasenaGenerada" value="${password}" readonly>
+                <button class="btn btn-primary" id="btnCopiarContrasena" onclick="copiarContrasena()">
+                    <i class="fas fa-copy"></i> Copiar
+                </button>
+            </div>
+        `,
+        showConfirmButton: true,
+        confirmButtonText: 'Cerrar',
+        didOpen: () => {
+            // Función para copiar
+            window.copiarContrasena = function() {
+                const input = document.getElementById('contrasenaGenerada');
+                input.select();
+                document.execCommand('copy');
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Copiado!',
+                    text: 'Contraseña copiada al portapapeles',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            }
+        }
+    });
+});
+
     });
 </script>
 @endsection

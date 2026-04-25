@@ -101,6 +101,11 @@
             </div>
             
             <div class="row">
+                <div class="col-md-12 mb-2">
+                    <button type="button" class="btn btn-sm btn-secondary" id="btnGenerarContrasena">
+                        <i class="fas fa-key me-1"></i> Generar Contraseña Segura
+                    </button>
+                </div>
                 <div class="col-md-6 mb-3">
                     <label for="password" class="form-label">Nueva Contraseña</label>
                     <div class="input-group">
@@ -131,6 +136,7 @@
                     </div>
                 </div>
             </div>
+            
             
             <div class="row">
                 <div class="col-md-12 mb-3">
@@ -178,6 +184,28 @@
         $('#userForm').on('submit', function() {
             $('#submitBtn').prop('disabled', true);
             $('#submitBtn').html('<i class="fas fa-spinner fa-spin me-2"></i> Actualizando...');
+        });
+
+        $('#btnGenerarContrasena').on('click', function() {
+            const length = 10;
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+            let password = "";
+            for (let i = 0; i < length; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            $('#password').val(password);
+            $('#password_confirmation').val(password);
+            
+            // Opcional: mostrar toast de confirmación
+            Swal.fire({
+                icon: 'success',
+                title: 'Contraseña generada',
+                text: 'Se ha generado una contraseña segura',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000
+            });
         });
     });
 </script>
