@@ -202,7 +202,7 @@ $(document).ready(function() {
     // ========== FUNCIONES DE TOGGLE ==========
     window.toggleChildren = function(element) {
         let parent = $(element).closest('.tree-item');
-        let children = parent.siblings('.tree-children');
+        let children = parent.find('.tree-children').first(); // Buscar dentro del tree-item, no como hermano
         let icon = $(element).find('.toggle-icon');
         
         children.toggleClass('show');
