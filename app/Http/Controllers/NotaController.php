@@ -13,6 +13,7 @@ use App\Models\CargaHoraria;
 use App\Models\AnioAcademico;
 use App\Models\Competencia;
 use App\Models\ConclusionDescriptiva;
+use App\Models\Configuracion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\ModuloRegistro;//Probablemente se vaya
@@ -98,6 +99,7 @@ class NotaController extends Controller
     public function getDataForNotas(Request $request)
     {
         $aulaId = $request->aula_id;
+        $aula = Aula::with(['grado.nivel'])->find($aulaId);
         $cursoId = $request->curso_id;
         $periodoId = $request->periodo_id;
         $user = auth()->user();
@@ -160,12 +162,27 @@ class NotaController extends Controller
         
         $periodo = Periodo::find($periodoId);
         $notasHabilitadas = $periodo ? $periodo->activo : false;
+
+        $esPrimaria = false;
+        $esSecundaria = false;
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelNombre = $aula->grado->nivel->nombre;
+            $esPrimaria = stripos($nivelNombre, 'primaria') !== false;
+            $esSecundaria = stripos($nivelNombre, 'secundaria') !== false;
+        }
+
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
         
         return response()->json([
             'matriculas' => $matriculas,
             'competencias' => $competencias,
             'notas' => $notas,
             'notas_habilitadas' => $notasHabilitadas,
+            'aula_es_primaria' => $esPrimaria,
+            'aula_es_secundaria' => $esSecundaria,
+            'requerir_conclusion_bc_primaria' => $requiereConclusionBCPrimaria,
+            'requerir_conclusion_b_secundaria' => $requiereConclusionBSecundaria,
         ]);
     }
     
@@ -174,7 +191,12 @@ class NotaController extends Controller
     {
         $request->validate([
             'notas' => 'required|array',
+            'aula_id' => 'required|exists:aulas,id',
             'periodo_id' => 'required|exists:periodos,id',
+            'conclusiones' => 'array',
+            'conclusiones.*.matricula_id' => 'required|exists:matriculas,id',
+            'conclusiones.*.competencia_id' => 'required|exists:competencias,id',
+            'conclusiones.*.conclusion' => 'required|string',
         ]);
         
         $periodo = Periodo::find($request->periodo_id);
@@ -184,6 +206,34 @@ class NotaController extends Controller
                 'message' => 'El periodo no está habilitado para registrar notas.'
             ], 422);
         }
+
+        $aula = Aula::with(['grado.nivel'])->find($request->aula_id);
+        $esPrimaria = false;
+        $esSecundaria = false;
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelNombre = $aula->grado->nivel->nombre;
+            $esPrimaria = stripos($nivelNombre, 'primaria') !== false;
+            $esSecundaria = stripos($nivelNombre, 'secundaria') !== false;
+        }
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
+
+        $conclusionesMap = [];
+        foreach ($request->conclusiones ?? [] as $conclusion) {
+            $key = $conclusion['matricula_id'].'_'.$conclusion['competencia_id'];
+            $conclusionesMap[$key] = trim($conclusion['conclusion']);
+        }
+
+        $matriculaIds = collect($request->notas)->pluck('matricula_id')->unique()->toArray();
+        $competenciaIds = collect($request->notas)->pluck('competencia_id')->unique()->toArray();
+        $existingNotas = Nota::with('conclusionDescriptiva')
+            ->where('periodo_id', $request->periodo_id)
+            ->whereIn('matricula_id', $matriculaIds)
+            ->whereIn('competencia_id', $competenciaIds)
+            ->get()
+            ->keyBy(function ($nota) {
+                return $nota->matricula_id.'_'.$nota->competencia_id;
+            });
         
         $docenteId = auth()->id();
         
@@ -191,8 +241,33 @@ class NotaController extends Controller
         
         try {
             foreach ($request->notas as $item) {
+                $notaValor = strtoupper(trim($item['nota']));
+                $key = $item['matricula_id'].'_'.$item['competencia_id'];
+                $tieneConclusion = isset($conclusionesMap[$key]) && $conclusionesMap[$key] !== '';
+                $existingNota = $existingNotas[$key] ?? null;
+                $existingConclusion = $existingNota && $existingNota->conclusionDescriptiva ? true : false;
+
+                if ($requiereConclusionBCPrimaria && $esPrimaria && in_array($notaValor, ['B', 'C'])) {
+                    if (!$tieneConclusion && !$existingConclusion) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Las notas B/C en aulas de Primaria requieren una conclusión descriptiva. Por favor registre la conclusión en el icono de comentario antes de guardar.'
+                        ], 422);
+                    }
+                }
+
+                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'B') {
+                    if (!$tieneConclusion && !$existingConclusion) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'La nota B en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión en el icono de comentario antes de guardar.'
+                        ], 422);
+                    }
+                }
                 // 🔥 Usar updateOrCreate con los tres campos clave
-                Nota::updateOrCreate(
+                $notaModel = Nota::updateOrCreate(
                     [
                         'matricula_id' => $item['matricula_id'],
                         'competencia_id' => $item['competencia_id'],
@@ -206,6 +281,14 @@ class NotaController extends Controller
                         'observacion' => $item['observacion'] ?? null,
                     ]
                 );
+                if (isset($conclusionesMap[$key]) && $conclusionesMap[$key] !== '') {
+                    if ($notaModel) {
+                        ConclusionDescriptiva::updateOrCreate(
+                            ['nota_id' => $notaModel->id],
+                            ['conclusion' => $conclusionesMap[$key]]
+                        );
+                    }
+                }
             }
             
             DB::commit();

@@ -104,6 +104,22 @@
         outline: none;
         box-shadow: 0 0 0 2px rgba(26, 71, 42, 0.25);
     }
+    .valoracion-select.modified {
+        position: relative;
+    }
+
+    .select-wrapper.modified::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+    }
+    
     .comentario-input {
         width: 200px;
         padding: 6px;
@@ -331,6 +347,24 @@
     .progress-stats .pending {
         color: #dc3545;
     }
+    .select-wrapper {
+        position: relative;
+        display: inline-block;
+        z-index: 20; /* 👈 clave */
+    }
+
+    .select-wrapper.modified::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+        z-index: 30; /* 👈 MÁS alto que la tabla */
+    }
 </style>
 @endsection
 
@@ -552,7 +586,6 @@ $(document).ready(function() {
     progressBar
         .init('progressContainer', '.valoracion-select')
         .show()
-        .bindToChanges()
         .onComplete(function() {
             toast.success('¡Todos los registros completados!');
         })
@@ -625,10 +658,12 @@ $(document).ready(function() {
                 
                 bodyHtml += `
                     <td style="text-align: center;">
-                        <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 110px; margin: 0 auto;">
-                            <option value="">Seleccionar</option>
-                            ${Object.keys(valoraciones).map(key => `<option value="${key}" ${valoracionValue === key ? 'selected' : ''}>${valoraciones[key]}</option>`).join('')}
-                        </select>
+                        <div class="select-wrapper">
+                            <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 110px; margin: 0 auto;">
+                                <option value="">Seleccionar</option>
+                                ${Object.keys(valoraciones).map(key => `<option value="${key}" ${valoracionValue === key ? 'selected' : ''}>${valoraciones[key]}</option>`).join('')}
+                            </select>
+                        </div>
                     </td>
                 `;
             }
@@ -643,20 +678,30 @@ $(document).ready(function() {
             if ($(this).val()) {
                 $(this).addClass('registro-guardado');
             }
+            $(this).data('initial', $(this).val() || '');
         });
         
-        // Evento change
-        $('.valoracion-select').on('change', function() {
-            if ($(this).val()) {
-                $(this).addClass('registro-guardado');
+        // Evento change único
+        $('.valoracion-select').off('change').on('change', function() {
+            let $select = $(this);
+            let valor = $select.val();
+            
+            if (valor) {
+                $select.addClass('registro-guardado');
             } else {
-                $(this).removeClass('registro-guardado');
+                $select.removeClass('registro-guardado');
             }
-            progressBar.update();
-        });
+            
+            // Marcar como modificado
+            let inicial = $select.data('initial') || '';
+            let wrapper = $select.closest('.select-wrapper');
 
-        
-        $(document).on('change', '.valoracion-select', function() {
+            if (valor !== inicial) {
+                wrapper.addClass('modified');
+            } else {
+                wrapper.removeClass('modified');
+            }
+            
             progressBar.update();
         });
 

@@ -93,6 +93,23 @@
         outline: none;
         box-shadow: 0 0 0 2px rgba(26, 71, 42, 0.25);
     }
+
+    .input-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .input-wrapper.modified::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+    }
     
     .registro-guardado {
         background-color: #d4edda;
@@ -512,7 +529,9 @@ $(document).ready(function() {
                 
                 bodyHtml += `
                     <td>
-                        <input type="number" class="form-control cantidad-input" data-matricula="${matricula.id}" data-tipo="${tipo.id}" value="${cantidadValue}" min="0" ${!registrosHabilitados ? 'disabled' : ''} style="width: 80px; margin: 0 auto; text-align: center;">
+                        <div class="input-wrapper">
+                            <input type="number" class="form-control cantidad-input" data-matricula="${matricula.id}" data-tipo="${tipo.id}" value="${cantidadValue}" min="0" ${!registrosHabilitados ? 'disabled' : ''} style="width: 80px; margin: 0 auto; text-align: center;">
+                        </div>
                     </td>
                 `;
             }
@@ -551,6 +570,10 @@ $(document).ready(function() {
             if ($(this).val() !== '') {
                 $(this).addClass('registro-guardado');
             }
+            $(this).data('initial', $(this).val() || '');
+            if ($(this).val() !== $(this).data('initial')) {
+                $(this).closest('.input-wrapper').addClass('modified');
+            }
         });
         
         $('.observacion-input').each(function() {
@@ -561,10 +584,21 @@ $(document).ready(function() {
         
         // Eventos
         $('.cantidad-input').on('input', function() {
-            if ($(this).val() !== '') {
-                $(this).addClass('registro-guardado');
+            let $input = $(this);
+            let $wrapper = $input.closest('.input-wrapper');
+            let valor = $input.val() || '';
+            let inicial = $input.data('initial') || '';
+
+            if (valor !== '') {
+                $input.addClass('registro-guardado');
             } else {
-                $(this).removeClass('registro-guardado');
+                $input.removeClass('registro-guardado');
+            }
+
+            if (valor !== inicial) {
+                $wrapper.addClass('modified');
+            } else {
+                $wrapper.removeClass('modified');
             }
         });
         

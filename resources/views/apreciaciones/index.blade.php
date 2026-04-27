@@ -63,6 +63,25 @@
         resize: vertical;
         font-size: 12px;
     }
+
+    .apreciacion-wrapper {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+    }
+
+    .apreciacion-wrapper.modified::after {
+        content: '';
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+        z-index: 10;
+    }
     
     .apreciacion-textarea:focus {
         border-color: var(--primary-color);
@@ -489,12 +508,14 @@ $(document).ready(function() {
                         <small>${matricula.alumno.nombres || ''}</small>
                      </td>
                     <td style="text-align: left;">
-                        <textarea class="apreciacion-textarea" 
-                                  data-matricula="${matricula.id}"
-                                  rows="3"
-                                  maxlength="${maxCaracteres}"
-                                  ${!apreciacionesHabilitadas ? 'disabled' : ''}
-                                  placeholder="Escriba aquí la apreciación del tutor...">${apreciacionValue}</textarea>
+                        <div class="apreciacion-wrapper">
+                            <textarea class="apreciacion-textarea" 
+                                      data-matricula="${matricula.id}"
+                                      rows="3"
+                                      maxlength="${maxCaracteres}"
+                                      ${!apreciacionesHabilitadas ? 'disabled' : ''}
+                                      placeholder="Escriba aquí la apreciación del tutor...">${apreciacionValue}</textarea>
+                        </div>
                         <div class="char-counter ${caracteresRestantes < 50 ? (caracteresRestantes < 10 ? 'danger' : 'warning') : ''}">
                             ${caracteresRestantes} caracteres restantes
                         </div>
@@ -510,7 +531,8 @@ $(document).ready(function() {
         $('.apreciacion-textarea').on('input', function() {
             let valor = $(this).val();
             let caracteresRestantes = maxCaracteres - valor.length;
-            let counterDiv = $(this).siblings('.char-counter');
+            let wrapper = $(this).closest('.apreciacion-wrapper');
+            let counterDiv = wrapper.next('.char-counter');
             
             counterDiv.text(caracteresRestantes + ' caracteres restantes');
             counterDiv.removeClass('warning danger');
@@ -526,6 +548,12 @@ $(document).ready(function() {
             } else {
                 $(this).removeClass('apreciacion-guardada');
             }
+            let inicial = $(this).data('initial') || '';
+            if (valor !== inicial) {
+                wrapper.addClass('modified');
+            } else {
+                wrapper.removeClass('modified');
+            }
         });
         
         // Marcar textareas con contenido guardado
@@ -533,6 +561,7 @@ $(document).ready(function() {
             if ($(this).val()) {
                 $(this).addClass('apreciacion-guardada');
             }
+            $(this).data('initial', $(this).val() || '');
         });
 
         progressBar.update();
@@ -548,10 +577,19 @@ $(document).ready(function() {
         let apreciaciones = [];
         let periodoId = $('#periodo_id').val();
         let error = false;
+        let emptyError = false;
         
         $('.apreciacion-textarea').each(function() {
             let apreciacion = $(this).val();
             let matriculaId = $(this).data('matricula');
+            let apreciacionTrim = apreciacion ? apreciacion.trim() : '';
+            
+            if (!apreciacionTrim) {
+                emptyError = true;
+                $(this).addClass('is-invalid');
+            } else {
+                $(this).removeClass('is-invalid');
+            }
             
             if (apreciacion && apreciacion.length > maxCaracteres) {
                 error = true;
@@ -563,6 +601,11 @@ $(document).ready(function() {
                 apreciacion: apreciacion || ''
             });
         });
+        
+        if (emptyError) {
+            Swal.fire('Error', 'No es posible dejar la apreciación en blanco. Complete todos los campos antes de guardar.', 'error');
+            return;
+        }
         
         if (error) {
             Swal.fire('Error', `Las apreciaciones no pueden exceder los ${maxCaracteres} caracteres`, 'error');

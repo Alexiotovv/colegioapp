@@ -88,6 +88,11 @@
                     <i class="fas fa-link me-2"></i>Asignación por Módulo
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reglas-tab" data-bs-toggle="tab" data-bs-target="#reglas" type="button" role="tab">
+                    <i class="fas fa-shield-alt me-2"></i>Reglas de Notas
+                </button>
+            </li>
         </ul>
         
         <div class="tab-content" id="configTabsContent">
@@ -182,6 +187,29 @@
                     </div>
                 </div>
             </div>
+
+            <div class="tab-pane fade" id="reglas" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="config-card">
+                            <h5 class="mb-3">Regla para notas B/C en Primaria</h5>
+                            <p class="text-muted">Si esta regla está activada, las notas B o C registradas en aulas de Primaria requerirán una conclusión descriptiva.</p>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="toggleReglaConclusionBCPrimaria" {{ $requiereConclusionBCPrimaria ? 'checked' : '' }}>
+                                <label class="form-check-label" for="toggleReglaConclusionBCPrimaria">Requerir conclusión descriptiva para B/C en Primaria</label>
+                            </div>
+                        </div>
+                        <div class="config-card">
+                            <h5 class="mb-3">Regla para nota B en Secundaria</h5>
+                            <p class="text-muted">Si esta regla está activada, la nota B registrada en aulas de Secundaria requerirá una conclusión descriptiva.</p>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="toggleReglaConclusionBSecundaria" {{ $requiereConclusionBSecundaria ? 'checked' : '' }}>
+                                <label class="form-check-label" for="toggleReglaConclusionBSecundaria">Requerir conclusión descriptiva para B en Secundaria</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -200,7 +228,7 @@
                     
                     <div class="mb-3">
                         <label for="codigo" class="form-label required-field">Código</label>
-                        <input type="text" class="form-control" id="codigo" name="codigo" maxlength="10" required>
+                        <input type="text" class="form-control" id="codigo" name="codigo" maxlength=20" required>
                         <small class="text-muted">Ej: AD, A, B, C, EXO, 20, 19, etc.</small>
                     </div>
                     
@@ -612,6 +640,50 @@ $(document).ready(function() {
             error: function(xhr) {
                 console.error(xhr);
                 toast.error(xhr.responseJSON?.message || 'Error al guardar la asignación');
+            }
+        });
+    });
+
+    $('#toggleReglaConclusionBCPrimaria').on('change', function() {
+        let valor = $(this).is(':checked') ? 1 : 0;
+
+        $.ajax({
+            url: '{{ route("admin.configuracion-notas.regla-conclusion-bc-primaria.store") }}',
+            method: 'POST',
+            data: {
+                valor: valor,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    toast.success(response.message);
+                }
+            },
+            error: function(xhr) {
+                toast.error(xhr.responseJSON?.message || 'Error al guardar la regla');
+                $('#toggleReglaConclusionBCPrimaria').prop('checked', !valor);
+            }
+        });
+    });
+
+    $('#toggleReglaConclusionBSecundaria').on('change', function() {
+        let valor = $(this).is(':checked') ? 1 : 0;
+
+        $.ajax({
+            url: '{{ route("admin.configuracion-notas.regla-conclusion-b-secundaria.store") }}',
+            method: 'POST',
+            data: {
+                valor: valor,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    toast.success(response.message);
+                }
+            },
+            error: function(xhr) {
+                toast.error(xhr.responseJSON?.message || 'Error al guardar la regla');
+                $('#toggleReglaConclusionBSecundaria').prop('checked', !valor);
             }
         });
     });

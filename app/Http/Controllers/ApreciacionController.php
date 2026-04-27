@@ -139,6 +139,10 @@ class ApreciacionController extends Controller
         
         try {
             foreach ($request->apreciaciones as $item) {
+                if (!isset($item['apreciacion']) || trim($item['apreciacion']) === '') {
+                    throw new \Exception('No es posible dejar la apreciación en blanco.');
+                }
+                
                 // Validar longitud de la apreciación
                 if (strlen($item['apreciacion']) > $maxCaracteres) {
                     throw new \Exception("La apreciación excede el máximo de {$maxCaracteres} caracteres");

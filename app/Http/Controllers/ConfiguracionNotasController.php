@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TipoNota;
 use App\Models\ModuloRegistro;
+use App\Models\Configuracion;
 use Illuminate\Http\Request;
 
 class ConfiguracionNotasController extends Controller
@@ -13,8 +14,10 @@ class ConfiguracionNotasController extends Controller
     {
         $tiposNotas = TipoNota::ordered()->get();
         $modulos = ModuloRegistro::activo()->get();
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
         
-        return view('configuracion-notas.index', compact('tiposNotas', 'modulos'));
+        return view('configuracion-notas.index', compact('tiposNotas', 'modulos', 'requiereConclusionBCPrimaria', 'requiereConclusionBSecundaria'));
     }
     
     public function getTiposNotasByModulo(Request $request)
@@ -39,7 +42,7 @@ class ConfiguracionNotasController extends Controller
     public function storeTipoNota(Request $request)
     {
         $request->validate([
-            'codigo' => 'required|string|max:10|unique:tipos_notas,codigo',
+            'codigo' => 'required|string|max:20|unique:tipos_notas,codigo',
             'nombre' => 'required|string|max:50',
             'tipo_dato' => 'required|in:NUMERICO,LITERAL',
             'orden' => 'nullable|integer',
@@ -66,7 +69,7 @@ class ConfiguracionNotasController extends Controller
     public function updateTipoNota(Request $request, TipoNota $tiposNota)
     {
         $request->validate([
-            'codigo' => 'required|string|max:10|unique:tipos_notas,codigo,' . $tiposNota->id,
+            'codigo' => 'required|string|max:20|unique:tipos_notas,codigo,' . $tiposNota->id,
             'nombre' => 'required|string|max:50',
             'tipo_dato' => 'required|in:NUMERICO,LITERAL',
             'orden' => 'nullable|integer',
@@ -139,6 +142,53 @@ class ConfiguracionNotasController extends Controller
         return TipoNota::where('activo', true)
             ->orderBy('orden')
             ->get(['id','codigo','nombre','tipo_dato']);
+    }
+
+    public function getReglaConclusionBCPrimaria()
+    {
+        return response()->json([
+            'valor' => (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false)
+        ]);
+    }
+
+    public function guardarReglaConclusionBCPrimaria(Request $request)
+    {
+        $request->validate([
+            'valor' => 'required|boolean',
+        ]);
+
+        Configuracion::setValor(
+            'notas_requiere_conclusion_bc_primaria',
+            $request->valor ? 1 : 0,
+            'Requerir conclusión descriptiva para notas B/C en Primaria',
+            'numero'
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Regla guardada correctamente',
+            'valor' => (bool) $request->valor
+        ]);
+    }
+
+    public function guardarReglaConclusionBSecundaria(Request $request)
+    {
+        $request->validate([
+            'valor' => 'required|boolean',
+        ]);
+
+        Configuracion::setValor(
+            'notas_requiere_conclusion_b_secundaria',
+            $request->valor ? 1 : 0,
+            'Requerir conclusión descriptiva para nota B en Secundaria',
+            'numero'
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Regla guardada correctamente',
+            'valor' => (bool) $request->valor
+        ]);
     }
     public function getTipoNota(TipoNota $tiposNota)
     {

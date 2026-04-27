@@ -342,6 +342,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/configuracion-notas/tipos-by-modulo', [ConfiguracionNotasController::class, 'getTiposNotasByModulo'])->name('configuracion-notas.tipos-by-modulo');
             Route::get('/configuracion-notas/tipos-nota-todos', [ConfiguracionNotasController::class, 'getAllTiposNotas'])->name('configuracion-notas.tipos-nota-todos');
             Route::post('/configuracion-notas/asignar', [ConfiguracionNotasController::class, 'asignarNotasModulo'])->name('configuracion-notas.asignar');
+            Route::get('/configuracion-notas/regla-conclusion-bc-primaria', [ConfiguracionNotasController::class, 'getReglaConclusionBCPrimaria'])->name('configuracion-notas.regla-conclusion-bc-primaria');
+            Route::post('/configuracion-notas/regla-conclusion-bc-primaria', [ConfiguracionNotasController::class, 'guardarReglaConclusionBCPrimaria'])->name('configuracion-notas.regla-conclusion-bc-primaria.store');
+            Route::post('/configuracion-notas/regla-conclusion-b-secundaria', [ConfiguracionNotasController::class, 'guardarReglaConclusionBSecundaria'])->name('configuracion-notas.regla-conclusion-b-secundaria.store');
         });
         
         // Módulo: libretas

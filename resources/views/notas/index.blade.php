@@ -82,6 +82,22 @@
         outline: none;
         box-shadow: 0 0 0 2px rgba(26, 71, 42, 0.25);
     }
+
+    .nota-select.modified {
+        position: relative;
+    }
+
+    .nota-select.modified::after {
+        content: '';
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+    }
     
     .nota-guardada {
         background-color: #d4edda;
@@ -460,6 +476,8 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="conclusion_nota_id">
+                <input type="hidden" id="conclusion_matricula_id">
+                <input type="hidden" id="conclusion_competencia_id">
                 <div class="alert alert-info mb-3" id="conclusion_info">
                     <!-- Información del alumno, competencia y nota -->
                 </div>
@@ -495,6 +513,15 @@ $(document).ready(function() {
     let notasHabilitadas = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
     let opcionesNotas = ['AD', 'A', 'B', 'C']; // Valor por defecto mientras se cargan
+    let requiereConclusionBCPrimaria = false;
+    let requiereConclusionBSecundaria = false;
+    let aulaEsPrimaria = false;
+    let aulaEsSecundaria = false;
+    let conclusionesPendientes = {};
+    window.requerirConclusionBCPrimaria = false;
+    window.requerirConclusionBSecundaria = false;
+    window.aulaEsPrimaria = false;
+    window.aulaEsSecundaria = false;
 
     // ==================== CARGAR OPCIONES DE NOTAS ====================
     function cargarOpcionesNotas() {
@@ -601,6 +628,14 @@ $(document).ready(function() {
                 competenciasData = response.competencias || [];
                 notasData = response.notas || {};
                 notasHabilitadas = response.notas_habilitadas || false;
+                aulaEsPrimaria = response.aula_es_primaria || false;
+                aulaEsSecundaria = response.aula_es_secundaria || false;
+                requiereConclusionBCPrimaria = response.requerir_conclusion_bc_primaria || false;
+                requiereConclusionBSecundaria = response.requerir_conclusion_b_secundaria || false;
+                window.requerirConclusionBCPrimaria = requiereConclusionBCPrimaria;
+                window.requerirConclusionBSecundaria = requiereConclusionBSecundaria;
+                window.aulaEsPrimaria = aulaEsPrimaria;
+                window.aulaEsSecundaria = aulaEsSecundaria;
                 
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', notasHabilitadas);
@@ -611,6 +646,11 @@ $(document).ready(function() {
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${notasHabilitadas ? '<span class="badge-habilitado">HABILITADO</span>' : '<span class="badge-deshabilitado">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
+                if ((aulaEsPrimaria && requiereConclusionBCPrimaria) || (aulaEsSecundaria && requiereConclusionBSecundaria)) {
+                    $('#infoConclusionRegla').show();
+                } else {
+                    $('#infoConclusionRegla').hide();
+                }
                 
                 renderTabla();
                 $('#tablaContainer').show();
@@ -688,6 +728,9 @@ $(document).ready(function() {
                 let notaGuardada = notaValue ? 'nota-guardada' : '';
                 let notaId = nota ? nota.id : '';
                 let tieneConclusion = nota && nota.tiene_conclusion;
+                let requerirConclusion = (requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(notaValue)) ||
+                                         (requiereConclusionBSecundaria && aulaEsSecundaria && notaValue === 'B');
+                let commentColor = tieneConclusion ? '#28a745' : (requerirConclusion ? '#dc3545' : '#6c757d');
                 
                 bodyHtml += `
                     <td style="text-align: center; vertical-align: middle;">
@@ -706,12 +749,14 @@ $(document).ready(function() {
                         </div>
                         <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-nota-id="${notaId}" value="${notaValue}">
                         <button class="btn-message" 
+                            data-matricula="${matricula.id}"
+                            data-competencia-id="${competencia.id}"
                                 data-nota-id="${notaId}"
                                 data-alumno="${matricula.alumno.nombre_completo}"
                                 data-competencia="${competencia.nombre}"
                                 data-nota="${notaValue}"
                                 style="background: none; border: none; cursor: pointer; margin-left: 5px;">
-                            <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
+                            <i class="fas fa-comment-dots" style="font-size: 16px; color: ${commentColor};"></i>
                         </button>
                      </td>
                 `;
@@ -750,13 +795,15 @@ $(document).ready(function() {
             let alumnoNombre = btn.data('alumno');
             let competenciaNombre = btn.data('competencia');
             let notaValor = btn.data('nota');
+            let matriculaId = btn.data('matricula');
+            let competenciaId = btn.data('competencia-id') || btn.data('competencia');
             
-            if (!notaId) {
-                Swal.fire('Advertencia', 'Primero debe guardar la nota antes de agregar una conclusión', 'warning');
+            if (!notaValor || notaValor.trim() === '') {
+                Swal.fire('Advertencia', 'Debe seleccionar una nota antes de registrar una conclusión', 'warning');
                 return;
             }
-            
-            abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor);
+
+            abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor, matriculaId, competenciaId);
         });
         
         // Eventos de los dropdowns
@@ -776,10 +823,48 @@ $(document).ready(function() {
             } else {
                 $boton.removeClass('nota-guardada');
             }
+
+            let ruleActive = Boolean(typeof requerirConclusionBCPrimaria !== 'undefined'
+                ? requerirConclusionBCPrimaria
+                : (typeof window !== 'undefined' ? window.requerirConclusionBCPrimaria : false)
+            );
+            let isPrimaria = Boolean(typeof aulaEsPrimaria !== 'undefined'
+                ? aulaEsPrimaria
+                : (typeof window !== 'undefined' ? window.aulaEsPrimaria : false)
+            );
+            let isSecundaria = Boolean(typeof aulaEsSecundaria !== 'undefined'
+                ? aulaEsSecundaria
+                : (typeof window !== 'undefined' ? window.aulaEsSecundaria : false)
+            );
+            let ruleActivePrimaria = Boolean(typeof requiereConclusionBCPrimaria !== 'undefined'
+                ? requiereConclusionBCPrimaria
+                : (typeof window !== 'undefined' ? window.requerirConclusionBCPrimaria : false)
+            );
+            let ruleActiveSecundaria = Boolean(typeof requiereConclusionBSecundaria !== 'undefined'
+                ? requiereConclusionBSecundaria
+                : (typeof window !== 'undefined' ? window.requerirConclusionBSecundaria : false)
+            );
+            
+            if ((ruleActivePrimaria && isPrimaria && ['B', 'C'].includes(valor)) ||
+                (ruleActiveSecundaria && isSecundaria && valor === 'B')) {
+                let mensaje = ruleActivePrimaria && isPrimaria ? 
+                    'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.' :
+                    'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
+                Swal.fire('Atención', mensaje, 'info');
+                $btnMensaje.find('i').css('color', '#dc3545');
+            }
+
+            if (valor) {
+                $boton.addClass('modified');
+            } else {
+                $boton.removeClass('modified');
+            }
             
             // Actualizar progress bar si existe
             if (typeof progressBar !== 'undefined') {
-                progressBar.update();
+                setTimeout(function() {
+                    progressBar.update();
+                }, 0);
             }
         });
     }
@@ -805,6 +890,16 @@ $(document).ready(function() {
                 });
             }
         });
+
+        let conclusiones = [];
+        for (let key in conclusionesPendientes) {
+            let [matriculaId, competenciaId] = key.split('_');
+            conclusiones.push({
+                matricula_id: matriculaId,
+                competencia_id: competenciaId,
+                conclusion: conclusionesPendientes[key]
+            });
+        }
         
         if (notas.length === 0) {
             Swal.fire('Advertencia', 'No hay notas para guardar', 'warning');
@@ -822,6 +917,8 @@ $(document).ready(function() {
             method: 'POST',
             data: {
                 notas: notas,
+                conclusiones: conclusiones,
+                aula_id: $('#aula_id').val(),
                 periodo_id: periodoId,
                 _token: '{{ csrf_token() }}'
             },
@@ -849,7 +946,7 @@ $(document).ready(function() {
     }
     
     // ==================== MODAL CONCLUSIÓN ====================
-    function abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor) {
+    function abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor, matriculaId, competenciaId) {
         $('#modalConclusionLabel').text(`Conclusión Descriptiva`);
         $('#conclusion_info').html(`
             <strong>Alumno:</strong> ${alumnoNombre}<br>
@@ -857,20 +954,29 @@ $(document).ready(function() {
             <strong>Nota:</strong> ${notaValor}
         `);
         $('#conclusion_nota_id').val(notaId);
+        $('#conclusion_matricula_id').val(matriculaId || '');
+        $('#conclusion_competencia_id').val(competenciaId || '');
         $('#conclusion_texto').val('');
-        
-        $.ajax({
-            url: '/admin/notas/conclusion/' + notaId,
-            method: 'GET',
-            success: function(response) {
-                if (response.success && response.conclusion) {
-                    $('#conclusion_texto').val(response.conclusion);
+
+        if (notaId) {
+            $.ajax({
+                url: '/admin/notas/conclusion/' + notaId,
+                method: 'GET',
+                success: function(response) {
+                    if (response.success && response.conclusion) {
+                        $('#conclusion_texto').val(response.conclusion);
+                    }
+                },
+                error: function() {
+                    console.log('No hay conclusión previa');
                 }
-            },
-            error: function() {
-                console.log('No hay conclusión previa');
+            });
+        } else {
+            let pendingKey = `${matriculaId}_${competenciaId}`;
+            if (conclusionesPendientes[pendingKey]) {
+                $('#conclusion_texto').val(conclusionesPendientes[pendingKey]);
             }
-        });
+        }
         
         $('#modalConclusion').modal('show');
     }
@@ -879,9 +985,20 @@ $(document).ready(function() {
     $('#btnGuardarConclusion').on('click', function() {
         let notaId = $('#conclusion_nota_id').val();
         let conclusion = $('#conclusion_texto').val();
+        let matriculaId = $('#conclusion_matricula_id').val();
+        let competenciaId = $('#conclusion_competencia_id').val();
         
         if (!conclusion.trim()) {
             Swal.fire('Advertencia', 'Por favor ingrese una conclusión', 'warning');
+            return;
+        }
+
+        if (!notaId) {
+            let pendingKey = `${matriculaId}_${competenciaId}`;
+            conclusionesPendientes[pendingKey] = conclusion.trim();
+            toast.success('Conclusión guardada localmente. Recuerde guardar las notas para persistirla.');
+            $('#modalConclusion').modal('hide');
+            $(`.btn-message[data-matricula="${matriculaId}"][data-competencia-id="${competenciaId}"] i`).css('color', '#28a745');
             return;
         }
         
