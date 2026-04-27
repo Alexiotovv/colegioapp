@@ -9,6 +9,7 @@ use App\Models\CompetenciaTransversal;
 use App\Models\Periodo;
 use App\Models\Matricula;
 use App\Models\AnioAcademico;
+use App\Models\Configuracion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\ModuloRegistro;
@@ -103,12 +104,28 @@ class RegistroCompetenciaTransversalController extends Controller
         
         $periodo = Periodo::find($periodoId);
         $registrosHabilitados = $periodo ? $periodo->activo : false;
+
+        $esPrimaria = false;
+        $esSecundaria = false;
+        $aula = Aula::with(['grado.nivel'])->find($aulaId);
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelNombre = $aula->grado->nivel->nombre;
+            $esPrimaria = stripos($nivelNombre, 'primaria') !== false;
+            $esSecundaria = stripos($nivelNombre, 'secundaria') !== false;
+        }
+
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
         
         return response()->json([
             'matriculas' => $matriculas,
             'competencias' => $competencias,
             'registros' => $registros,
             'registros_habilitados' => $registrosHabilitados,
+            'aula_es_primaria' => $esPrimaria,
+            'aula_es_secundaria' => $esSecundaria,
+            'requerir_conclusion_bc_primaria' => $requiereConclusionBCPrimaria,
+            'requerir_conclusion_b_secundaria' => $requiereConclusionBSecundaria,
         ]);
     }
     
@@ -121,6 +138,7 @@ class RegistroCompetenciaTransversalController extends Controller
         $request->validate([
             'registros' => 'required|array',
             'periodo_id' => 'required|exists:periodos,id',
+            'aula_id' => 'required|exists:aulas,id',
         ]);
         
         $periodo = Periodo::find($request->periodo_id);
@@ -133,12 +151,60 @@ class RegistroCompetenciaTransversalController extends Controller
         
         $docenteId = auth()->id();
         
+        $matriculaIds = collect($request->registros)->pluck('matricula_id')->unique()->toArray();
+        $competenciaIds = collect($request->registros)->pluck('competencia_transversal_id')->unique()->toArray();
+
+        $existingRegistros = RegistroCompetenciaTransversal::where('periodo_id', $request->periodo_id)
+            ->whereIn('matricula_id', $matriculaIds)
+            ->whereIn('competencia_transversal_id', $competenciaIds)
+            ->get()
+            ->keyBy(function ($registro) {
+                return $registro->matricula_id . '_' . $registro->competencia_transversal_id;
+            });
+
+        $aula = Aula::with(['grado.nivel'])->find($request->aula_id);
+        $esPrimaria = false;
+        $esSecundaria = false;
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelNombre = $aula->grado->nivel->nombre;
+            $esPrimaria = stripos($nivelNombre, 'primaria') !== false;
+            $esSecundaria = stripos($nivelNombre, 'secundaria') !== false;
+        }
+
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
+
         DB::beginTransaction();
         
         try {
             $notasPermitidas = ['AD', 'A', 'B', 'C', 'CND', 'ND'];
             
             foreach ($request->registros as $item) {
+                $registroKey = $item['matricula_id'] . '_' . $item['competencia_transversal_id'];
+                $existingRegistro = $existingRegistros[$registroKey] ?? null;
+                $existingConclusion = $existingRegistro && $existingRegistro->conclusion ? true : false;
+                $notaValor = strtoupper(trim($item['nota']));
+                $tieneConclusion = !empty($item['conclusion']);
+
+                if ($requiereConclusionBCPrimaria && $esPrimaria && in_array($notaValor, ['B', 'C'])) {
+                    if (! $tieneConclusion && ! $existingConclusion) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Las notas B/C en aulas de Primaria requieren una conclusión descriptiva. Por favor registre la conclusión antes de guardar.'
+                        ], 422);
+                    }
+                }
+
+                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'B') {
+                    if (! $tieneConclusion && ! $existingConclusion) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'La nota B en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión antes de guardar.'
+                        ], 422);
+                    }
+                }
                 if (!in_array($item['nota'], $notasPermitidas)) {
                     throw new \Exception("Nota no válida: " . $item['nota']);
                 }

@@ -845,12 +845,12 @@ $(document).ready(function() {
                 : (typeof window !== 'undefined' ? window.requerirConclusionBSecundaria : false)
             );
             
-            if ((ruleActivePrimaria && isPrimaria && ['B', 'C'].includes(valor)) ||
+            if ((ruleActivePrimaria && isPrimaria && valor === 'B') ||
                 (ruleActiveSecundaria && isSecundaria && valor === 'B')) {
                 let mensaje = ruleActivePrimaria && isPrimaria ? 
                     'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.' :
                     'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
-                Swal.fire('Atención', mensaje, 'info');
+                // Swal.fire('Atención', mensaje, 'info');
                 $btnMensaje.find('i').css('color', '#dc3545');
             }
 

@@ -93,6 +93,22 @@
         outline: none;
         box-shadow: 0 0 0 2px rgba(26, 71, 42, 0.25);
     }
+
+    .nota-select.modified {
+        position: relative;
+    }
+
+    .nota-select.modified::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+    }
     
     .conclusion-textarea {
         width: 200px;
@@ -445,6 +461,11 @@
             <span id="infoPeriodoText"></span>
         </div>
         
+        <div class="alert alert-info" id="infoConclusionRegla" style="display: none;">
+            <i class="fas fa-info-circle me-2"></i>
+            <span id="infoConclusionReglaText"></span>
+        </div>
+        
         <!-- Progress Bar -->
         <div class="progress-container" id="progressContainer" style="display: none;">
             <div class="progress-header">
@@ -545,6 +566,10 @@ $(document).ready(function() {
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
     
     let opcionesNotas = ['AD', 'A', 'B', 'C', 'CND', 'ND'];
+    let requiereConclusionBCPrimaria = false;
+    let requiereConclusionBSecundaria = false;
+    let aulaEsPrimaria = false;
+    let aulaEsSecundaria = false;
 
     // Función para cargar opciones de notas desde el servidor
     function cargarOpcionesNotas() {
@@ -605,6 +630,10 @@ $(document).ready(function() {
                 competenciasData = response.competencias || [];
                 registrosData = response.registros || {};
                 registrosHabilitados = response.registros_habilitados || false;
+                aulaEsPrimaria = response.aula_es_primaria || false;
+                aulaEsSecundaria = response.aula_es_secundaria || false;
+                requiereConclusionBCPrimaria = response.requerir_conclusion_bc_primaria || false;
+                requiereConclusionBSecundaria = response.requerir_conclusion_b_secundaria || false;
                 
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', registrosHabilitados);
@@ -615,6 +644,19 @@ $(document).ready(function() {
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${registrosHabilitados ? '<span class="badge bg-success">HABILITADO</span>' : '<span class="badge bg-secondary">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
+                if ((aulaEsPrimaria && requiereConclusionBCPrimaria) || (aulaEsSecundaria && requiereConclusionBSecundaria)) {
+                    let messages = [];
+                    if (aulaEsPrimaria && requiereConclusionBCPrimaria) {
+                        messages.push('Las notas B/C en Primaria requieren una conclusión descriptiva.');
+                    }
+                    if (aulaEsSecundaria && requiereConclusionBSecundaria) {
+                        messages.push('La nota B en Secundaria requiere una conclusión descriptiva.');
+                    }
+                    $('#infoConclusionReglaText').text(messages.join(' '));
+                    $('#infoConclusionRegla').show();
+                } else {
+                    $('#infoConclusionRegla').hide();
+                }
                 
                 renderTabla();
                 $('#tablaContainer').show();
@@ -716,6 +758,7 @@ $(document).ready(function() {
                             data-registro-id="${registroId}"
                             data-matricula-id="${matricula.id}"
                             data-competencia-id="${competencia.id}"
+                            data-tiene-conclusion="${tieneConclusion ? 1 : 0}"
                             data-alumno="${matricula.alumno.nombre_completo}"
                             data-competencia="${competencia.nombre}"
                             data-nota="${notaValue}"
@@ -730,6 +773,16 @@ $(document).ready(function() {
     }
     
     $('#tablaBody').html(bodyHtml);
+    $('.nota-valor').each(function() {
+        $(this).data('initial', $(this).val() || '');
+        let inicial = $(this).data('initial');
+        let $boton = $(this).closest('td').find('.dropdown-toggle');
+        if ($(this).val() !== inicial) {
+            $boton.addClass('modified');
+        } else {
+            $boton.removeClass('modified');
+        }
+    });
     
     // Configurar eventos de los dropdowns
     $('.dropdown-menu .dropdown-item').on('click', function(e) {
@@ -749,6 +802,26 @@ $(document).ready(function() {
             boton.addClass('registro-guardado');
         } else {
             boton.removeClass('registro-guardado');
+        }
+
+        let inicial = hiddenInput.data('initial') || '';
+        if (valor !== inicial) {
+            boton.addClass('modified');
+        } else {
+            boton.removeClass('modified');
+        }
+
+        let ruleActivePrimaria = requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(valor);
+        let ruleActiveSecundaria = requiereConclusionBSecundaria && aulaEsSecundaria && valor === 'B';
+        if (ruleActivePrimaria || ruleActiveSecundaria) {
+            let mensaje = ruleActivePrimaria
+                ? 'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.'
+                : 'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
+            // Swal.fire('Atención', mensaje, 'info');
+            let tieneConclusion = btnMensaje.data('tiene-conclusion') === 1 || btnMensaje.data('tiene-conclusion') === '1';
+            if (!tieneConclusion) {
+                btnMensaje.find('i').css('color', '#dc3545');
+            }
         }
         
         actualizarProgreso();
@@ -780,6 +853,7 @@ $(document).ready(function() {
             Swal.fire('Error', 'El registro de competencias transversales no está habilitado', 'error');
             return;
         }
+        let aulaId = $('#aula_id').val();
         
         // 🔥 Verificar que todos los registros estén completos
         let totalInputs = 0;
@@ -841,6 +915,7 @@ $(document).ready(function() {
             data: {
                 registros: registros,
                 periodo_id: periodoId,
+                aula_id: aulaId,
                 _token: '{{ csrf_token() }}'
             },
             success: function(response) {
