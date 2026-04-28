@@ -180,8 +180,8 @@
 
                 if (partes.length >= 2) {
                     const primerNombre = partes[0];
-                    const primerApellido = partes[partes.length - 1];
-                    const username = primerNombre + '.' + primerApellido + '@colcoopcv.com';
+                    const segundoApellido = partes.length === 2 ? partes[partes.length - 1] : partes[partes.length - 2];
+                    const username = primerNombre + '.' + segundoApellido + '@colcoopcv.com';
                     $('#username').val(username);
                 }
 
