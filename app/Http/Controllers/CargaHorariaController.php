@@ -61,6 +61,12 @@ class CargaHorariaController extends Controller
     
     public function store(Request $request)
     {
+        // Verificar si viene el array de asignaciones (múltiples)
+        if ($request->has('asignaciones')) {
+            return $this->guardarMultiplesAsignaciones($request);
+        }
+        
+        // Si no, procesar una asignación simple (para compatibilidad)
         $request->validate([
             'docente_id' => 'required|exists:users,id',
             'curso_id' => 'required|exists:cursos,id',
@@ -70,6 +76,16 @@ class CargaHorariaController extends Controller
             'hora_inicio' => 'nullable|date_format:H:i',
             'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
         ]);
+
+        $curso = Curso::find($request->curso_id);
+        $aula = Aula::find($request->aula_id);
+
+        if (!$this->puedeAsignarCursoEnAula($curso, $aula)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede asignar un curso de ' . ($curso?->nivel?->nombre ?? 'un nivel diferente') . ' en un aula de ' . ($aula?->nivel?->nombre ?? 'un nivel diferente') . '.'
+            ], 422);
+        }
         
         // 🔥 VALIDACIÓN: Verificar si ya existe la misma asignación
         $existeAsignacion = CargaHoraria::where('docente_id', $request->docente_id)
@@ -332,5 +348,101 @@ class CargaHorariaController extends Controller
             });
         
         return response()->json($cursos);
+    }
+
+    public function guardarMultiplesAsignaciones(Request $request)
+    {
+        try {
+            $asignacionesJson = $request->input('asignaciones');
+            $asignaciones = json_decode($asignacionesJson, true);
+            
+            if (!is_array($asignaciones) || empty($asignaciones)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay asignaciones para guardar'
+                ], 422);
+            }
+            
+            $exitosas = 0;
+            $errores = [];
+            
+            foreach ($asignaciones as $index => $datos) {
+                try {
+                    // Validar datos
+                    if (!isset($datos['docente_id']) || !isset($datos['curso_id']) || !isset($datos['aula_id'])) {
+                        $errores[] = "Asignación " . ($index + 1) . ": Datos incompletos";
+                        continue;
+                    }
+                    
+                    $curso = Curso::with('nivel')->find($datos['curso_id']);
+                    $aula = Aula::with('nivel')->find($datos['aula_id']);
+
+                    if (!$this->puedeAsignarCursoEnAula($curso, $aula)) {
+                        $errores[] = 'Asignación ' . ($index + 1) . ': no se puede asignar un curso de ' . ($curso?->nivel?->nombre ?? 'un nivel diferente') . ' en un aula de ' . ($aula?->nivel?->nombre ?? 'un nivel diferente') . '.';
+                        continue;
+                    }
+
+                    // Verificar duplicado
+                    $existeAsignacion = CargaHoraria::where('docente_id', $datos['docente_id'])
+                        ->where('curso_id', $datos['curso_id'])
+                        ->where('aula_id', $datos['aula_id'])
+                        ->exists();
+                    
+                    if ($existeAsignacion) {
+                        $errores[] = "Asignación " . ($index + 1) . ": Ya existe esta combinación";
+                        continue;
+                    }
+                    
+                    // Normalizar valores: convertir cadenas vacías a NULL y forzar tipos
+                    $horasSem = isset($datos['horas_semanales']) && is_numeric($datos['horas_semanales']) ? (int) $datos['horas_semanales'] : 4;
+                    $diaSemana = isset($datos['dia_semana']) && trim($datos['dia_semana']) !== '' ? $datos['dia_semana'] : null;
+                    $horaInicio = isset($datos['hora_inicio']) && trim($datos['hora_inicio']) !== '' ? $datos['hora_inicio'] : null;
+                    $horaFin = isset($datos['hora_fin']) && trim($datos['hora_fin']) !== '' ? $datos['hora_fin'] : null;
+
+                    // Crear asignación con valores normalizados
+                    CargaHoraria::create([
+                        'docente_id' => $datos['docente_id'],
+                        'curso_id' => $datos['curso_id'],
+                        'aula_id' => $datos['aula_id'],
+                        'horas_semanales' => $horasSem,
+                        'dia_semana' => $diaSemana,
+                        'hora_inicio' => $horaInicio,
+                        'hora_fin' => $horaFin,
+                        'estado' => 'activo',
+                        'observaciones' => $datos['observaciones'] ?? null,
+                    ]);
+                    
+                    $exitosas++;
+                } catch (\Exception $e) {
+                    $errores[] = "Asignación " . ($index + 1) . ": " . $e->getMessage();
+                }
+            }
+            
+            $mensaje = "$exitosas asignación(es) guardada(s) exitosamente";
+            if (!empty($errores)) {
+                $mensaje .= ". Errores: " . implode("; ", $errores);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'exitosas' => $exitosas,
+                'errores' => $errores
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar las asignaciones: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function puedeAsignarCursoEnAula(?Curso $curso, ?Aula $aula): bool
+    {
+        if (!$curso || !$aula) {
+            return false;
+        }
+
+        return (int) $curso->nivel_id === (int) $aula->nivel_id;
     }
 }

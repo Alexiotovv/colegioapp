@@ -142,6 +142,17 @@
         font-size: 24px;
         color: #6c757d;
     }
+    
+    .cola-item {
+        background: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        border-radius: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 </style>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
@@ -186,6 +197,36 @@
                     <i class="fas fa-book me-2 text-primary"></i> 2. Cursos del Docente
                 </div>
                 <div class="card-body">
+                    <!-- Selector de aula ahora ocupa todo el ancho sobre las columnas de cursos -->
+                    <div id="aulaSelectorContainer" style="display: none; margin-bottom: 18px;">
+                        <div class="aula-selector">
+                            <div class="row align-items-center">
+                                <div class="col-12 mb-2">
+                                    <div class="alert alert-info mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Curso seleccionado:</strong>
+                                        <span id="cursoSeleccionadoNombre"></span>
+                                        <input type="hidden" id="cursoSeleccionadoId" name="curso_id">
+                                    </div>
+                                </div>
+                                <div class="col-md-9">
+                                    <label for="aula_id" class="form-label fw-semibold">
+                                        <i class="fas fa-door-open me-1"></i> Seleccionar Aula:
+                                    </label>
+                                    <select class="form-select" id="aula_id" name="aula_id" required>
+                                        <option value="">-- Primero seleccione un curso --</option>
+                                    </select>
+                                    <small class="text-muted">Las aulas disponibles dependen del nivel del curso</small>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="button" id="btnAgregar" class="btn btn-success w-100" onclick="agregarAsignacion()" disabled>
+                                        <i class="fas fa-plus-circle me-2"></i> Agregar a Cola
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="cursos-container">
                         <!-- Columna: Cursos No Asignados (Disponibles) -->
                         <div class="cursos-columna">
@@ -221,30 +262,7 @@
                         </div>
                     </div>
                     
-                    <!-- Información del curso seleccionado y selector de aula -->
-                    <div id="aulaSelectorContainer" style="display: none;">
-                        <div class="aula-selector">
-                            <div class="row align-items-center">
-                                <div class="col-md-6">
-                                    <div class="alert alert-info mb-0">
-                                        <i class="fas fa-info-circle me-2"></i>
-                                        <strong>Curso seleccionado:</strong> 
-                                        <span id="cursoSeleccionadoNombre"></span>
-                                        <input type="hidden" id="cursoSeleccionadoId" name="curso_id">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="aula_id" class="form-label fw-semibold">
-                                        <i class="fas fa-door-open me-1"></i> Seleccionar Aula:
-                                    </label>
-                                    <select class="form-select" id="aula_id" name="aula_id" required>
-                                        <option value="">-- Primero seleccione un curso --</option>
-                                    </select>
-                                    <small class="text-muted">Las aulas disponibles dependen del nivel del curso</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Información del curso seleccionado y selector de aula (moved above) -->
                 </div>
             </div>
             
@@ -292,14 +310,35 @@
             
             <!-- Botones -->
             <div class="d-flex justify-content-end gap-2 mt-3" id="botonesAccion" style="display: none;">
-                <a href="{{ route('admin.carga-horaria.index') }}" class="btn btn-secondary px-4">
-                    <i class="fas fa-times me-2"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-primary px-4" id="submitBtn" disabled>
-                    <i class="fas fa-save me-2"></i> Asignar Curso
+                <button type="button" class="btn btn-secondary px-4" onclick="limpiarFormulario()">
+                    <i class="fas fa-redo me-2"></i> Limpiar
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Cola de asignaciones (lado derecho) -->
+<div id="colaContainer" class="form-container mt-4" style="display: none;">
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white fw-bold">
+            <i class="fas fa-tasks me-2"></i> Cola de Asignaciones
+            <span class="badge bg-light text-dark ms-2" id="colaCount">0</span>
+        </div>
+        <div class="card-body" id="colaItems" style="max-height: 400px; overflow-y: auto; min-height: 200px;">
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                No hay asignaciones en la cola
+            </div>
+        </div>
+        <div class="card-footer bg-light d-flex gap-2">
+            <button type="button" id="btnGuardarTodo" class="btn btn-primary flex-grow-1" onclick="guardarTodasAsignaciones()" style="display: none;">
+                <i class="fas fa-save me-2"></i> Asignar Curso
+            </button>
+            <button type="button" class="btn btn-warning flex-grow-1" onclick="limpiarCola()" style="display: none;" id="btnLimpiarCola">
+                <i class="fas fa-trash me-2"></i> Limpiar Cola
+            </button>
+        </div>
     </div>
 </div>
 @endsection
@@ -307,6 +346,9 @@
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+let cursoSeleccionadoId = null;
+let colaAsignaciones = [];
+
 $(document).ready(function() {
     // Inicializar Select2
     $('.select2').select2({
@@ -318,7 +360,6 @@ $(document).ready(function() {
     
     let todosLosCursos = [];
     let cursosAsignados = [];
-    let cursoSeleccionadoId = null;
     
     // Cuando se selecciona un docente
     $('#docente_id').on('change', function() {
@@ -334,14 +375,17 @@ $(document).ready(function() {
                 success: function(response) {
                     if (Array.isArray(response)) {
                         todosLosCursos = response;
-                        console.log('Cursos totales cargados:', todosLosCursos.length);
-                        cargarCursosDocente(docenteId);
+                    } else if (response && Array.isArray(response.data)) {
+                        todosLosCursos = response.data;
                     } else {
                         console.error('Respuesta inesperada en todos-cursos:', response);
                         todosLosCursos = [];
                         Swal.fire('Error', 'Error al cargar los cursos disponibles', 'error');
                         mostrarLoading(false);
+                        return;
                     }
+                    console.log('Cursos totales cargados:', todosLosCursos.length);
+                    cargarCursosDocente(docenteId);
                 },
                 error: function(xhr) {
                     console.error('Error en todos-cursos:', xhr);
@@ -364,13 +408,48 @@ $(document).ready(function() {
             method: 'GET',
             data: { docente_id: docenteId },
             success: function(response) {
-                // Verificar que response es un array
-                if (Array.isArray(response)) {
-                    cursosAsignados = response;
-                } else {
-                    console.error('Respuesta inesperada:', response);
-                    cursosAsignados = [];
-                }
+                // Normalizar distintos formatos de respuesta para cursos asignados
+                let raw = null;
+                if (Array.isArray(response)) raw = response;
+                else if (response && Array.isArray(response.data)) raw = response.data;
+                else if (response && Array.isArray(response.cursos)) raw = response.cursos;
+                else if (response && Array.isArray(response.asignaciones)) raw = response.asignaciones;
+                else raw = [];
+
+                console.log('RAW cursos-asignados:', raw);
+
+                // Normalizar cada elemento a { id, nombre, nivel, aula }
+                cursosAsignados = raw.map(item => {
+                    // Caso: el elemento ya es un curso
+                    if (item && (item.id || item.curso_id) && (item.nombre || item.name || item.titulo || item.curso_nombre)) {
+                        return {
+                            id: item.id || item.curso_id,
+                            nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
+                            nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
+                            aula: item.aula || item.aula_nombre || item.aula_id || ''
+                        };
+                    }
+
+                    // Caso: elemento es una asignación que contiene objeto `curso` o `curso_data`
+                    if (item && (item.curso || item.curso_data || item.cursoObj)) {
+                        let c = item.curso || item.curso_data || item.cursoObj;
+                        return {
+                            id: c.id || c.curso_id || '',
+                            nombre: c.nombre || c.name || c.titulo || '',
+                            nivel: c.nivel || c.nivel_nombre || '',
+                            aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : '')
+                        };
+                    }
+
+                    // Caso genérico: intentar extraer campos conocidos
+                    return {
+                        id: item.id || item.curso_id || '',
+                        nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
+                        nivel: item.nivel || item.nivel_nombre || '',
+                        aula: item.aula || item.aula_nombre || ''
+                    };
+                });
+
                 renderizarCursos();
                 $('#cursosSection').show();
                 mostrarLoading(false);
@@ -392,8 +471,8 @@ $(document).ready(function() {
     }
     
     function renderizarCursos() {
-        // IDs de cursos ya asignados
-        let idsAsignados = cursosAsignados.map(c => c.id);
+        // IDs de cursos ya asignados (soportar id o curso_id)
+        let idsAsignados = cursosAsignados.map(c => c.id || c.curso_id);
         
         // Cursos no asignados
         let cursosNoAsignados = todosLosCursos.filter(curso => !idsAsignados.includes(curso.id));
@@ -406,15 +485,19 @@ $(document).ready(function() {
         if (cursosAsignados.length > 0) {
             let htmlAsignados = '';
             for (let curso of cursosAsignados) {
+                let cursoNombre = curso.nombre || curso.name || curso.titulo || 'Sin nombre';
+                let cursoNivel = curso.nivel || curso.nivel_nombre || 'Sin nivel';
+                let cursoAula = curso.aula || curso.aula_nombre || 'No asignada';
+                let cursoId = curso.id || curso.curso_id || '';
                 htmlAsignados += `
-                    <div class="curso-card asignado" data-curso-id="${curso.id}">
+                    <div class="curso-card asignado" data-curso-id="${cursoId}">
                         <div class="curso-nombre">
                             <i class="fas fa-check-circle text-success me-1"></i>
-                            ${curso.nombre}
+                            ${cursoNombre}
                         </div>
                         <div class="curso-info">
-                            <i class="fas fa-layer-group me-1"></i> ${curso.nivel || 'Sin nivel'}<br>
-                            <i class="fas fa-door-open me-1"></i> Aula: ${curso.aula || 'No asignada'}
+                            <i class="fas fa-layer-group me-1"></i> ${cursoNivel}<br>
+                            <i class="fas fa-door-open me-1"></i> Aula: ${cursoAula}
                         </div>
                         <span class="badge-asignado">Asignado</span>
                     </div>
@@ -434,17 +517,20 @@ $(document).ready(function() {
         if (cursosNoAsignados.length > 0) {
             let htmlDisponibles = '';
             for (let curso of cursosNoAsignados) {
+                let cursoNombre = curso.nombre || curso.name || curso.titulo || 'Sin nombre';
+                let cursoNivel = curso.nivel || curso.nivel_nombre || '';
+                let cursoId = curso.id || curso.curso_id || '';
                 htmlDisponibles += `
-                    <div class="curso-card ${cursoSeleccionadoId === curso.id ? 'seleccionado' : ''}" 
-                         data-curso-id="${curso.id}"
-                         data-curso-nombre="${curso.nombre}"
-                         data-curso-nivel="${curso.nivel || ''}">
+                    <div class="curso-card ${cursoSeleccionadoId == cursoId ? 'seleccionado' : ''}" 
+                         data-curso-id="${cursoId}"
+                         data-curso-nombre="${cursoNombre}"
+                         data-curso-nivel="${cursoNivel}">
                         <div class="curso-nombre">
                             <i class="fas fa-book text-primary me-1"></i>
-                            ${curso.nombre}
+                            ${cursoNombre}
                         </div>
                         <div class="curso-info">
-                            <i class="fas fa-layer-group me-1"></i> ${curso.nivel || 'Sin nivel'}
+                            <i class="fas fa-layer-group me-1"></i> ${cursoNivel || 'Sin nivel'}
                         </div>
                         <span class="badge-disponible">Disponible</span>
                     </div>
@@ -474,7 +560,7 @@ $(document).ready(function() {
                 $('#aulaSelectorContainer').show();
                 $('#datosAdicionales').show();
                 $('#botonesAccion').show();
-                $('#submitBtn').prop('disabled', true);
+                $('#btnAgregar').prop('disabled', true);
             });
         } else {
             $('#cursosDisponiblesList').html(`
@@ -505,18 +591,18 @@ $(document).ready(function() {
                         </option>`);
                     }
                     aulaSelect.prop('disabled', false);
-                    $('#submitBtn').prop('disabled', false);
+                    $('#btnAgregar').prop('disabled', false);
                 } else {
                     aulaSelect.html('<option value="">No hay aulas disponibles para este nivel</option>');
                     aulaSelect.prop('disabled', true);
-                    $('#submitBtn').prop('disabled', true);
+                    $('#btnAgregar').prop('disabled', true);
                     Swal.fire('Advertencia', 'No hay aulas disponibles para este curso', 'warning');
                 }
             },
             error: function() {
                 aulaSelect.html('<option value="">Error al cargar aulas</option>');
                 aulaSelect.prop('disabled', true);
-                $('#submitBtn').prop('disabled', true);
+                $('#btnAgregar').prop('disabled', true);
             }
         });
     }
@@ -537,63 +623,165 @@ $(document).ready(function() {
             `);
         }
     }
-    
-    // Enviar formulario
-    $('#cargaHorariaForm').on('submit', function(e) {
-        e.preventDefault();
-        
-        let docenteId = $('#docente_id').val();
-        let cursoId = $('#cursoSeleccionadoId').val();
-        let aulaId = $('#aula_id').val();
-        
-        if (!docenteId) {
-            Swal.fire('Error', 'Seleccione un docente', 'error');
-            return;
-        }
-        
-        if (!cursoId) {
-            Swal.fire('Error', 'Seleccione un curso', 'error');
-            return;
-        }
-        
-        if (!aulaId) {
-            Swal.fire('Error', 'Seleccione un aula', 'error');
-            return;
-        }
-        
-        let submitBtn = $('#submitBtn');
-        submitBtn.prop('disabled', true);
-        submitBtn.html('<span class="loading-spinner me-2"></span> Asignando...');
-        
-        $.ajax({
-            url: '{{ route("admin.carga-horaria.store") }}',
-            method: 'POST',
-            data: $(this).serialize(),
-            success: function(response) {
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡Asignación Exitosa!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    }).then(() => {
-                        window.location.href = '{{ route("admin.carga-horaria.index") }}';
-                    });
-                }
-            },
-            error: function(xhr) {
-                let errorMessage = xhr.responseJSON?.message || 'Error al guardar la asignación';
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMessage
-                });
-                submitBtn.prop('disabled', false);
-                submitBtn.html('<i class="fas fa-save me-2"></i> Asignar Curso');
-            }
-        });
-    });
 });
+
+function agregarAsignacion() {
+    let docenteId = $('#docente_id').val();
+    let cursoId = $('#cursoSeleccionadoId').val();
+    let aulaId = $('#aula_id').val();
+    let horasSem = $('#horas_semanales').val();
+    let diaSemana = $('#dia_semana').val();
+    let horaInicio = $('#hora_inicio').val();
+    let horaFin = $('#hora_fin').val();
+    let observaciones = $('#observaciones').val();
+    
+    if (!docenteId || !cursoId || !aulaId) {
+        Swal.fire('Error', 'Seleccione docente, curso y aula', 'error');
+        return;
+    }
+    
+    // Obtener datos del curso y aula
+    let cursoNombre = $('#cursoSeleccionadoNombre').text();
+    let aulaNombre = $('#aula_id option:selected').text();
+    
+    let asignacion = {
+        docente_id: docenteId,
+        curso_id: cursoId,
+        aula_id: aulaId,
+        horas_semanales: horasSem,
+        dia_semana: diaSemana,
+        hora_inicio: horaInicio,
+        hora_fin: horaFin,
+        observaciones: observaciones,
+        curso_nombre: cursoNombre,
+        aula_nombre: aulaNombre
+    };
+    
+    colaAsignaciones.push(asignacion);
+    actualizarCola();
+    limpiarFormulario();
+    
+    Swal.fire('Éxito', 'Asignación agregada a la cola', 'success');
+}
+
+function actualizarCola() {
+    $('#colaContainer').show();
+    $('#colaCount').text(colaAsignaciones.length);
+    
+    if (colaAsignaciones.length === 0) {
+        $('#colaItems').html(`
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                No hay asignaciones en la cola
+            </div>
+        `);
+        $('#btnGuardarTodo').hide();
+        $('#btnLimpiarCola').hide();
+    } else {
+        let html = '';
+        colaAsignaciones.forEach((asig, index) => {
+            let horario = asig.hora_inicio && asig.hora_fin ? `${asig.hora_inicio} - ${asig.hora_fin}` : 'Flexible';
+            html += `
+                <div class="cola-item">
+                    <div class="flex-grow-1">
+                        <small class="text-muted">Asignación ${index + 1}</small><br>
+                        <strong>${asig.curso_nombre}</strong><br>
+                        <small>${asig.aula_nombre}</small><br>
+                        <small class="text-muted">${asig.horas_semanales}h | ${asig.dia_semana || 'Flexible'} | ${horario}</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger ms-2" onclick="eliminarDeCoIa(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        });
+        $('#colaItems').html(html);
+        $('#btnGuardarTodo').show();
+        $('#btnLimpiarCola').show();
+    }
+}
+
+function eliminarDeCoIa(index) {
+    colaAsignaciones.splice(index, 1);
+    actualizarCola();
+    Swal.fire('Eliminado', 'Asignación removida de la cola', 'info');
+}
+
+function limpiarFormulario() {
+    cursoSeleccionadoId = null;
+    $('#cursoSeleccionadoId').val('');
+    $('#aula_id').html('<option value="">-- Seleccionar aula --</option>').prop('disabled', true);
+    $('#horas_semanales').val('4');
+    $('#dia_semana').val('');
+    $('#hora_inicio').val('');
+    $('#hora_fin').val('');
+    $('#observaciones').val('');
+    $('#aulaSelectorContainer').hide();
+    $('#datosAdicionales').hide();
+    $('#botonesAccion').hide();
+}
+
+function limpiarCola() {
+    Swal.fire({
+        title: '¿Limpiar cola?',
+        text: 'Se eliminarán todas las asignaciones de la cola',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, limpiar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            colaAsignaciones = [];
+            actualizarCola();
+        }
+    });
+}
+
+function guardarTodasAsignaciones() {
+    if (colaAsignaciones.length === 0) {
+        Swal.fire('Error', 'No hay asignaciones en la cola', 'error');
+        return;
+    }
+    
+    let btn = $('#btnGuardarTodo');
+    btn.prop('disabled', true);
+    btn.html('<span class="loading-spinner me-2"></span> Guardando...');
+    
+    $.ajax({
+        url: '{{ route("admin.carga-horaria.store") }}',
+        method: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            asignaciones: JSON.stringify(colaAsignaciones)
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: response.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    limpiarColaDirecto();
+                    limpiarFormulario();
+                    $('#docente_id').trigger('change');
+                });
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = xhr.responseJSON?.message || 'Error al guardar las asignaciones';
+            Swal.fire('Error', errorMsg, 'error');
+            btn.prop('disabled', false);
+            btn.html('<i class="fas fa-save me-2"></i> Asignar Curso');
+        }
+    });
+}
+
+function limpiarColaDirecto() {
+    colaAsignaciones = [];
+    actualizarCola();
+    $('#btnGuardarTodo').prop('disabled', false).html('<i class="fas fa-save me-2"></i> Asignar Curso');
+}
 </script>
 @endsection
