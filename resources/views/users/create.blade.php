@@ -168,6 +168,20 @@
 @section('scripts')
 <script>
     $(document).ready(function() {
+        // Generar email automáticamente desde el nombre
+        $('#name').on('input', function() {
+            const nombre = $(this).val().trim();
+            if (nombre) {
+                const email = nombre
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .split(/\s+/)
+                    .join('') + '.0@gmail.com';
+                $('#email').val(email);
+            }
+        });
+
         // Toggle password visibility
         $('#togglePassword').on('click', function() {
             const passwordField = $('#password');
