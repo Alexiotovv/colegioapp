@@ -64,7 +64,7 @@ class AulaController extends Controller
         
         // 🔥 Obtener solo usuarios con rol docente
         $docentes = User::whereHas('role', function($query) {
-            $query->whereIn('nombre', ['docente', 'tutor']);
+            $query->where('nombre', '!=', 'admin');
         })->where('activo', true)->orderBy('name')->get();
         
         $turnos = Aula::TURNOS;
@@ -134,7 +134,7 @@ class AulaController extends Controller
         
         // 🔥 Obtener solo usuarios con rol docente
         $docentes = User::whereHas('role', function($query) {
-            $query->whereIn('nombre', ['docente', 'tutor']);
+            $query->where('nombre', '!=', 'admin');
         })->where('activo', true)->orderBy('name')->get();
         
         $turnos = Aula::TURNOS;
