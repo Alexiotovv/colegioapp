@@ -135,7 +135,18 @@ class Aula extends Model
             return 'AULA-' . uniqid();
         }
         
-        return strtoupper(substr($grado->nombre, 0, 2) . $seccion->nombre . substr($anio->anio, -2));
+        $codigoBase = strtoupper(substr($grado->nombre, 0, 2) . $seccion->nombre . substr($anio->anio, -2));
+        
+        // Verificar si el código ya existe
+        $contador = 1;
+        $codigo = $codigoBase;
+        
+        while (self::where('codigo', $codigo)->exists()) {
+            $codigo = $codigoBase . '-' . $contador;
+            $contador++;
+        }
+        
+        return $codigo;
     }
     public function cargaHoraria()
     {
