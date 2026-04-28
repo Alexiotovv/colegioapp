@@ -181,11 +181,11 @@
                 if (partes.length >= 2) {
                     const primerNombre = partes[0];
                     const primerApellido = partes[partes.length - 1];
-                    const username = primerNombre + '.' + primerApellido + '@gmail.com';
+                    const username = primerNombre + '.' + primerApellido + '@colcoopcv.com';
                     $('#username').val(username);
                 }
 
-                const email = partes.join('') + '.0@gmail.com';
+                const email = partes.join('') + '.0@colcoopcv.com';
                 $('#email').val(email);
             }
         });
