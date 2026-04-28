@@ -168,16 +168,24 @@
 @section('scripts')
 <script>
     $(document).ready(function() {
-        // Generar email automáticamente desde el nombre
+        // Generar email y username automáticamente desde el nombre
         $('#name').on('input', function() {
             const nombre = $(this).val().trim();
             if (nombre) {
-                const email = nombre
+                const partes = nombre
                     .toLowerCase()
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
-                    .split(/\s+/)
-                    .join('') + '.0@gmail.com';
+                    .split(/\s+/);
+
+                if (partes.length >= 2) {
+                    const primerNombre = partes[0];
+                    const primerApellido = partes[partes.length - 1];
+                    const username = primerNombre + '.' + primerApellido + '@gmail.com';
+                    $('#username').val(username);
+                }
+
+                const email = partes.join('') + '.0@gmail.com';
                 $('#email').val(email);
             }
         });
