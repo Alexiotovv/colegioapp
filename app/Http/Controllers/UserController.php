@@ -10,6 +10,7 @@ use App\Models\Alumno;
 use App\Models\Apoderado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -105,5 +106,92 @@ class UserController extends Controller
     {
         $user->update(['activo' => !$user->activo]);
         return back()->with('success', 'Estado del usuario actualizado');
+    }
+
+    public function getRolesData()
+    {
+        $roles = Role::withCount('users')
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'nombre' => $role->nombre,
+                    'descripcion' => $role->descripcion,
+                    'activo' => (bool) $role->activo,
+                    'users_count' => $role->users_count,
+                    'created_at' => optional($role->created_at)->format('d/m/Y H:i'),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'roles' => $roles,
+        ]);
+    }
+
+    public function storeRole(Request $request)
+    {
+        $data = $request->validate([
+            'nombre' => 'required|string|max:50|unique:roles,nombre',
+            'descripcion' => 'nullable|string|max:200',
+            'activo' => 'nullable|boolean',
+        ]);
+
+        $role = Role::create([
+            'nombre' => strtolower(trim($data['nombre'])),
+            'descripcion' => $data['descripcion'] ?? null,
+            'activo' => $request->boolean('activo', true),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Rol creado exitosamente',
+            'role' => [
+                'id' => $role->id,
+                'nombre' => $role->nombre,
+                'descripcion' => $role->descripcion,
+                'activo' => (bool) $role->activo,
+                'users_count' => 0,
+                'created_at' => optional($role->created_at)->format('d/m/Y H:i'),
+            ],
+        ]);
+    }
+
+    public function updateRole(Request $request, Role $role)
+    {
+        $data = $request->validate([
+            'nombre' => ['required', 'string', 'max:50', Rule::unique('roles', 'nombre')->ignore($role->id)],
+            'descripcion' => 'nullable|string|max:200',
+            'activo' => 'nullable|boolean',
+        ]);
+
+        $role->update([
+            'nombre' => strtolower(trim($data['nombre'])),
+            'descripcion' => $data['descripcion'] ?? null,
+            'activo' => $request->boolean('activo', true),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Rol actualizado exitosamente',
+            'role' => [
+                'id' => $role->id,
+                'nombre' => $role->nombre,
+                'descripcion' => $role->descripcion,
+                'activo' => (bool) $role->activo,
+            ],
+        ]);
+    }
+
+    public function toggleRoleActive(Role $role)
+    {
+        $role->update(['activo' => !$role->activo]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado del rol actualizado',
+            'activo' => (bool) $role->activo,
+        ]);
     }
 }

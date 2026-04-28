@@ -60,6 +60,10 @@ Route::middleware(['auth'])->group(function () {
         
         // Módulo: users
         Route::middleware(['modulo:users'])->group(function () {
+            Route::get('/users/roles/data', [UserController::class, 'getRolesData'])->name('users.roles.data');
+            Route::post('/users/roles', [UserController::class, 'storeRole'])->name('users.roles.store');
+            Route::put('/users/roles/{role}', [UserController::class, 'updateRole'])->name('users.roles.update');
+            Route::patch('/users/roles/{role}/toggle-active', [UserController::class, 'toggleRoleActive'])->name('users.roles.toggle-active');
             Route::resource('users', UserController::class);
             Route::patch('/users/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle-active');
         });
