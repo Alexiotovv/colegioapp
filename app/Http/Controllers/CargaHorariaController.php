@@ -31,10 +31,10 @@ class CargaHorariaController extends Controller
         
         $cargas = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
         
-        // Obtener docentes usando role_id
-        $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
-        $docentes = User::where('role_id', $rolDocenteId)
-                        ->where('activo', true)
+        // Obtener todos los usuarios excepto admin
+        $docentes = User::whereHas('role', function($query) {
+            $query->where('nombre', '!=', 'admin');
+        })->where('activo', true)
                         ->orderBy('name')
                         ->get(['id', 'name', 'email']);
         
@@ -47,9 +47,9 @@ class CargaHorariaController extends Controller
 
     public function create()
     {
-        $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
-        $docentes = User::where('role_id', $rolDocenteId)
-                        ->where('activo', true)
+        $docentes = User::whereHas('role', function($query) {
+            $query->where('nombre', '!=', 'admin');
+        })->where('activo', true)
                         ->orderBy('name')
                         ->get(['id', 'name', 'email']);
         
@@ -128,9 +128,9 @@ class CargaHorariaController extends Controller
     
     public function edit(CargaHoraria $cargaHorarium)
     {
-        $rolDocenteId = DB::table('roles')->where('nombre', 'docente')->value('id');
-        $docentes = User::where('role_id', $rolDocenteId)
-                        ->where('activo', true)
+        $docentes = User::whereHas('role', function($query) {
+            $query->where('nombre', '!=', 'admin');
+        })->where('activo', true)
                         ->orderBy('name')
                         ->get(['id', 'name', 'email']);
         

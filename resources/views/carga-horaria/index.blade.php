@@ -28,6 +28,8 @@
         display: inline-block;
     }
 </style>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 @endsection
 
 @section('content')
@@ -46,11 +48,11 @@
     <div class="filter-card">
         <form method="GET" class="row g-3">
             <div class="col-md-4">
-                <select name="docente_id" class="form-select">
+                    <select name="docente_id" class="form-select select2" id="filterDocente">
                     <option value="">Todos los docentes</option>
                     @foreach($docentes as $docente)
-                        <option value="{{ $docente->id }}" {{ request('docente_id') == $docente->id ? 'selected' : '' }}>
-                            {{ $docente->nombre_completo }}
+                            <option value="{{ $docente->id }}" {{ request('docente_id') == $docente->id ? 'selected' : '' }}>
+                                {{ $docente->name }} - {{ $docente->email }}
                         </option>
                     @endforeach
                 </select>
