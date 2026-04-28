@@ -91,6 +91,7 @@
     </div>
     
     <div class="filter-card">
+
         <div class="row g-3">
             <div class="col-md-6">
                 <label for="aula_id" class="form-label required-field">Aula</label>

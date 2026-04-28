@@ -159,8 +159,8 @@
             
             <!-- ==================== TAB ASIGNACIÓN POR MÓDULO ==================== -->
             <div class="tab-pane fade" id="asignacion" role="tabpanel">
-                <div class="row">
-                    <div class="col-md-4">
+                <div class="row align-items-end">
+                    <div class="col-md-8">
                         <label for="modulo_select" class="form-label">Seleccionar Módulo</label>
                         <select class="form-select" id="modulo_select">
                             <option value="">Seleccionar módulo</option>
@@ -171,7 +171,15 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-md-4">
+                        <button class="btn btn-success w-100" id="btnNuevoModulo">
+                            <i class="fas fa-plus me-2"></i>Nuevo Módulo
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-12">
                         <label class="form-label">Tipos de Nota Asignados</label>
                         <div id="tiposNotasAsignados" class="border rounded p-3" style="min-height: 200px;">
                             <p class="text-muted text-center">Seleccione un módulo para ver sus tipos de nota asignados</p>
@@ -301,6 +309,62 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Nuevo Módulo de Registro -->
+<div class="modal fade" id="modalNuevoModulo" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle me-2"></i>
+                    Registrar Nuevo Módulo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formNuevoModulo">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="modulo_codigo" class="form-label required-field">Código</label>
+                        <input type="text" class="form-control" id="modulo_codigo" name="codigo" required>
+                        <small class="text-muted">Ej: evaluaciones_actitudinales, comportamiento, etc.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="modulo_nombre" class="form-label required-field">Nombre</label>
+                        <input type="text" class="form-control" id="modulo_nombre" name="nombre" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="modulo_descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="modulo_descripcion" name="descripcion" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="modulo_ruta" class="form-label required-field">Ruta</label>
+                        <select class="form-select" id="modulo_ruta" name="ruta" required style="width: 100%;">
+                            <option value="">Seleccionar ruta existente...</option>
+                        </select>
+                        <small class="text-muted">Selecciona la ruta INDEX del módulo (debe terminar en .index)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="modulo_activo" name="activo" value="1" checked>
+                            <label class="form-check-label" for="modulo_activo">Activo</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success" id="btnSaveModulo">
+                        <i class="fas fa-save me-2"></i> Guardar Módulo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -533,8 +597,15 @@ $(document).ready(function() {
         currentModuloCodigo = $(this).find('option:selected').data('codigo');
         
         if (currentModuloId) {
+            let url = '{{ route("admin.configuracion-notas.tipos-by-modulo") }}';
+            
+            // Si es el módulo de actitudinal, usar una URL diferente
+            if (currentModuloCodigo === 'registro-evaluaciones-actitudinales') {
+                url = '{{ route("admin.configuracion-notas.tipos-by-modulo-actitudinal") }}';
+            }
+            
             $.ajax({
-                url: '{{ route("admin.configuracion-notas.tipos-by-modulo") }}',
+                url: url,
                 method: 'GET',
                 data: { modulo_codigo: currentModuloCodigo },
                 success: function(response) {
@@ -687,6 +758,111 @@ $(document).ready(function() {
             }
         });
     });
+
+
+    // ========== FUNCIONES PARA NUEVO MÓDULO ==========
+    let rutasDisponibles = [];
+
+    // Cargar rutas disponibles para el select
+    function cargarRutasDisponibles() {
+        return $.ajax({
+            url: '{{ route("admin.configuracion-notas.rutas-disponibles") }}',
+            method: 'GET',
+            success: function(response) {
+                rutasDisponibles = response;
+                let select = $('#modulo_ruta');
+                select.html('<option value="">Seleccionar ruta existente...</option>');
+                
+                // Filtrar solo rutas que terminan en .index (páginas principales)
+                let rutasIndex = rutasDisponibles.filter(ruta => ruta.name.endsWith('.index'));
+                
+                for (let ruta of rutasIndex) {
+                    select.append(`<option value="${ruta.name}">${ruta.name} → ${ruta.uri}</option>`);
+                }
+                
+                // Inicializar Select2 si está disponible
+                if (typeof $.fn.select2 !== 'undefined') {
+                    select.select2({
+                        theme: 'bootstrap-5',
+                        placeholder: 'Seleccionar ruta...',
+                        width: '100%'
+                    });
+                }
+            },
+            error: function(xhr) {
+                console.error('Error al cargar rutas:', xhr);
+            }
+        });
+    }
+
+    // Abrir modal de nuevo módulo
+    $('#btnNuevoModulo').on('click', function() {
+        $('#formNuevoModulo')[0].reset();
+        $('#modulo_activo').prop('checked', true);
+        $('.is-invalid').removeClass('is-invalid');
+        cargarRutasDisponibles().always(function() {
+            $('#modalNuevoModulo').modal('show');
+        });
+    });
+
+    // Enviar formulario de nuevo módulo
+    $('#formNuevoModulo').on('submit', function(e) {
+        e.preventDefault();
+        
+        let submitBtn = $('#btnSaveModulo');
+        let originalHtml = submitBtn.html();
+        
+        submitBtn.prop('disabled', true);
+        submitBtn.html('<span class="loading-spinner me-2"></span> Guardando...');
+        
+        $.ajax({
+            url: '{{ route("admin.configuracion-notas.modulo.store") }}',
+            method: 'POST',
+            data: $(this).serialize() + '&_token={{ csrf_token() }}',
+            success: function(response) {
+                if (response.success) {
+                    $('#modalNuevoModulo').modal('hide');
+                    toast.success(response.message);
+                    
+                    // Agregar el nuevo módulo al select
+                    let newOption = new Option(
+                        response.modulo.nombre,
+                        response.modulo.id,
+                        false,
+                        true
+                    );
+                    $(newOption).attr('data-codigo', response.modulo.codigo);
+                    $('#modulo_select').append(newOption).trigger('change');
+                    
+                    // También agregar al array de módulos para futuras referencias
+                    if (typeof modulosLista === 'undefined') {
+                        window.modulosLista = window.modulosLista || [];
+                    }
+                    window.modulosLista.push(response.modulo);
+                }
+            },
+            error: function(xhr) {
+                let errors = xhr.responseJSON?.errors;
+                if (errors) {
+                    for (let field in errors) {
+                        $(`#modulo_${field}`).addClass('is-invalid');
+                        if ($(`#modulo_${field}`).next('.invalid-feedback').length === 0) {
+                            $(`#modulo_${field}`).after(`<div class="invalid-feedback">${errors[field][0]}</div>`);
+                        } else {
+                            $(`#modulo_${field}`).next('.invalid-feedback').text(errors[field][0]);
+                        }
+                    }
+                } else {
+                    toast.error(xhr.responseJSON?.message || 'Error al guardar el módulo');
+                }
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false);
+                submitBtn.html(originalHtml);
+            }
+        });
+    });
+
 
 
 });

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 use App\Models\TipoNota;
 use App\Models\ModuloRegistro;
 use App\Models\Configuracion;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
 class ConfiguracionNotasController extends Controller
@@ -195,7 +196,110 @@ class ConfiguracionNotasController extends Controller
         return response()->json($tiposNota);
     }
 
+    // Agrega este método para obtener tipos de nota específicos para actitudinal
+    public function getTiposNotasByModuloActitudinal(Request $request)
+    {
+        $modulo = ModuloRegistro::where('codigo', 'registro-evaluaciones-actitudinales')->first();
+        
+        if (!$modulo) {
+            return response()->json([]);
+        }
+        
+        $tiposNotasAsignados = $modulo->tiposNotas()
+            ->wherePivot('activo', true)
+            ->orderBy('orden')
+            ->get(['tipos_notas.id', 'tipos_notas.codigo', 'tipos_notas.nombre', 'tipos_notas.tipo_dato']);
+        
+        return response()->json([
+            'tipos_notas' => $tiposNotasAsignados
+        ]);
+    }
 
+    /**
+     * Obtener todas las rutas disponibles del sistema
+     */
+    public function getRutasDisponibles()
+    {
+        try {
+            $routes = Route::getRoutes();
+            $routeList = [];
+            
+            foreach ($routes as $route) {
+                $routeName = $route->getName();
+                
+                // Solo incluir rutas con nombre
+                if ($routeName) {
+                    // Filtrar rutas no deseadas
+                    $excluded = ['debugbar', 'ignition', 'sanctum', 'telescope', 'horizon', 'livewire'];
+                    $excludedPattern = '/^(' . implode('|', $excluded) . ')/';
+                    
+                    if (!preg_match($excludedPattern, $routeName)) {
+                        // Solo rutas GET
+                        $methods = $route->methods();
+                        if (in_array('GET', $methods)) {
+                            $routeList[] = [
+                                'name' => $routeName,
+                                'uri' => $route->uri(),
+                                'methods' => implode('|', $methods)
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // Ordenar por nombre de ruta
+            usort($routeList, function($a, $b) {
+                return strcmp($a['name'], $b['name']);
+            });
+            
+            // Limitar a las primeras 200 rutas para evitar sobrecarga
+            $routeList = array_slice($routeList, 0, 200);
+            
+            return response()->json($routeList);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en getRutasDisponibles: ' . $e->getMessage());
+            return response()->json([
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+
+    /**
+     * Almacenar un nuevo módulo de registro
+     */
+    public function storeModulo(Request $request)
+    {
+        $request->validate([
+            'codigo' => 'required|string|max:50|unique:modulos_registro,codigo',
+            'nombre' => 'required|string|max:100',
+            'descripcion' => 'nullable|string',
+            'ruta' => 'required|string|max:100',
+            'activo' => 'nullable|boolean',
+        ]);
+        
+        $modulo = ModuloRegistro::create([
+            'codigo' => $request->codigo,
+            'nombre' => $request->nombre,
+            'descripcion' => $request->descripcion,
+            'ruta' => $request->ruta,
+            'activo' => $request->has('activo'),
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Módulo creado exitosamente',
+            'modulo' => [
+                'id' => $modulo->id,
+                'codigo' => $modulo->codigo,
+                'nombre' => $modulo->nombre,
+                'descripcion' => $modulo->descripcion,
+                'ruta' => $modulo->ruta,
+                'activo' => $modulo->activo
+            ]
+        ]);
+    }
 
     
 }

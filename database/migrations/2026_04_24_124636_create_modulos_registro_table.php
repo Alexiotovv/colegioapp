@@ -26,6 +26,7 @@ return new class extends Migration
             ['codigo' => 'evaluaciones_padre', 'nombre' => 'Evaluación del Padre', 'ruta' => 'registro-evaluaciones.index', 'created_at' => now()],
             ['codigo' => 'otras_evaluaciones', 'nombre' => 'Otras Evaluaciones', 'ruta' => 'registro-otras-evaluaciones.index', 'created_at' => now()],
             ['codigo' => 'inasistencias', 'nombre' => 'Inasistencias', 'ruta' => 'registro-asistencias.index', 'created_at' => now()],
+            ['codigo' => 'registro-evaluaciones-actitudinales', 'nombre' => 'Evaluaciones Actitudinales', 'ruta' => 'admin.registro-evaluaciones-actitudinales.index', 'created_at' => now()],
         ]);
     }
 

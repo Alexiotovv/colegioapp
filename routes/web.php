@@ -25,6 +25,7 @@ use App\Http\Controllers\NotaController;
 use App\Http\Controllers\ApreciacionController;
 use App\Http\Controllers\RegistroEvaluacionController;
 use App\Http\Controllers\EvaluacionJerarquicoController;
+use App\Http\Controllers\EvaluacionController;
 use App\Http\Controllers\TipoInasistenciaJerarquicoController;
 use App\Http\Controllers\RegistroAsistenciaController;
 use App\Http\Controllers\TipoOtraEvaluacionJerarquicoController;
@@ -40,7 +41,9 @@ use App\Http\Controllers\NivelController;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\AvanceNotasController;
-
+use App\Http\Controllers\CuadroNotaController;
+use App\Http\Controllers\RegistroEvaluacionActitudinalController;
+use App\Http\Controllers\EvaluacionActitudinalJerarquicoController;
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -237,6 +240,19 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/evaluaciones-jerarquico/evaluacion/{evaluacion}', [EvaluacionJerarquicoController::class, 'getEvaluacion'])->name('evaluaciones-jerarquico.get');
         });
         
+        // ==================== CUADROS DE NOTAS ====================
+        Route::middleware(['modulo:cuadros-notas'])->prefix('cuadros-notas')->name('cuadros-notas.')->group(function () {
+            Route::get('modulos-dinamicos/', [CuadroNotaController::class, 'index'])->name('index');
+            Route::get('/create', [CuadroNotaController::class, 'create'])->name('create');
+            Route::post('/', [CuadroNotaController::class, 'store'])->name('store');
+            Route::get('/{cuadros_nota}/edit', [CuadroNotaController::class, 'edit'])->name('edit');
+            Route::put('/{cuadros_nota}', [CuadroNotaController::class, 'update'])->name('update');
+            Route::delete('/{cuadros_nota}', [CuadroNotaController::class, 'destroy'])->name('destroy');
+            Route::post('/{cuadros_nota}/duplicate', [CuadroNotaController::class, 'duplicate'])->name('duplicate');
+            Route::get('/{cuadros_nota}/preview', [CuadroNotaController::class, 'preview'])->name('preview');
+            Route::post('/{cuadros_nota}/pdf', [CuadroNotaController::class, 'pdf'])->name('pdf');
+        });
+        
         // Módulo: tipos-inasistencia-jerarquico
         Route::middleware(['modulo:tipos-inasistencia-jerarquico'])->group(function () {
             Route::get('/tipos-inasistencia-jerarquico', [TipoInasistenciaJerarquicoController::class, 'index'])->name('tipos-inasistencia-jerarquico.index');
@@ -319,6 +335,28 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware(['modulo:registro-competencias-transversales-habilitar'])->group(function () {
             Route::post('/registro-competencias-transversales/toggle-habilitacion', [RegistroCompetenciaTransversalController::class, 'toggleHabilitacion'])->name('registro-competencias-transversales.toggle-habilitacion');
         });
+
+
+        // ==================== EVALUACIONES ACTITUDINALES JERÁRQUICAS ====================
+        Route::middleware(['modulo:evaluaciones-actitudinales-jerarquico'])->group(function () {
+            Route::get('/evaluaciones-actitudinales-jerarquico', [EvaluacionActitudinalJerarquicoController::class, 'index'])->name('evaluaciones-actitudinales-jerarquico.index');#estooo a modulo
+            Route::post('/evaluaciones-actitudinales-jerarquico/evaluacion', [EvaluacionActitudinalJerarquicoController::class, 'storeEvaluacion'])->name('evaluaciones-actitudinales-jerarquico.store');
+            Route::put('/evaluaciones-actitudinales-jerarquico/evaluacion/{evaluacionActitudinal}', [EvaluacionActitudinalJerarquicoController::class, 'updateEvaluacion'])->name('evaluaciones-actitudinales-jerarquico.update');
+            Route::delete('/evaluaciones-actitudinales-jerarquico/evaluacion/{evaluacionActitudinal}', [EvaluacionActitudinalJerarquicoController::class, 'destroyEvaluacion'])->name('evaluaciones-actitudinales-jerarquico.destroy');
+            Route::patch('/evaluaciones-actitudinales-jerarquico/evaluacion/{evaluacionActitudinal}/toggle', [EvaluacionActitudinalJerarquicoController::class, 'toggleActive'])->name('evaluaciones-actitudinales-jerarquico.toggle');
+            Route::get('/evaluaciones-actitudinales-jerarquico/evaluacion/{evaluacionActitudinal}', [EvaluacionActitudinalJerarquicoController::class, 'getEvaluacion'])->name('evaluaciones-actitudinales-jerarquico.get');
+        });
+
+        // ==================== REGISTRO DE EVALUACIONES ACTITUDINALES ====================
+        Route::middleware(['modulo:registro-evaluaciones-actitudinales'])->group(function () {
+            Route::get('/registro-evaluaciones-actitudinales', [RegistroEvaluacionActitudinalController::class, 'index'])->name('registro-evaluaciones-actitudinales.index');##esto a modulo
+            Route::get('/registro-evaluaciones-actitudinales/get-data', [RegistroEvaluacionActitudinalController::class, 'getDataForRegistro'])->name('registro-evaluaciones-actitudinales.get-data');
+            Route::post('/registro-evaluaciones-actitudinales/save', [RegistroEvaluacionActitudinalController::class, 'saveRegistros'])->name('registro-evaluaciones-actitudinales.save');
+            Route::get('/registro-evaluaciones-actitudinales/opciones', [RegistroEvaluacionActitudinalController::class, 'getOpcionesValoraciones'])->name('registro-evaluaciones-actitudinales.opciones');
+            Route::post('/registro-evaluaciones-actitudinales/toggle-habilitacion', [RegistroEvaluacionActitudinalController::class, 'toggleHabilitacion'])->name('registro-evaluaciones-actitudinales.toggle-habilitacion');
+        });
+
+
         
         // ==================== CONFIGURACIÓN DEL SISTEMA ====================
         
@@ -345,6 +383,11 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/configuracion-notas/regla-conclusion-bc-primaria', [ConfiguracionNotasController::class, 'getReglaConclusionBCPrimaria'])->name('configuracion-notas.regla-conclusion-bc-primaria');
             Route::post('/configuracion-notas/regla-conclusion-bc-primaria', [ConfiguracionNotasController::class, 'guardarReglaConclusionBCPrimaria'])->name('configuracion-notas.regla-conclusion-bc-primaria.store');
             Route::post('/configuracion-notas/regla-conclusion-b-secundaria', [ConfiguracionNotasController::class, 'guardarReglaConclusionBSecundaria'])->name('configuracion-notas.regla-conclusion-b-secundaria.store');
+
+            Route::get('/configuracion-notas/rutas-disponibles', [ConfiguracionNotasController::class, 'getRutasDisponibles'])->name('configuracion-notas.rutas-disponibles');
+            Route::post('/configuracion-notas/modulo', [ConfiguracionNotasController::class, 'storeModulo'])->name('configuracion-notas.modulo.store');
+
+            Route::get('/configuracion-notas/tipos-by-modulo-actitudinal', [ConfiguracionNotasController::class, 'getTiposNotasByModuloActitudinal'])->name('configuracion-notas.tipos-by-modulo-actitudinal');
         });
         
         // Módulo: libretas
