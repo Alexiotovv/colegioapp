@@ -183,10 +183,8 @@
                     const segundoApellido = partes.length === 2 ? partes[partes.length - 1] : partes[partes.length - 2];
                     const username = primerNombre + '.' + segundoApellido + '@colcoopcv.com';
                     $('#username').val(username);
+                    $('#email').val(username);
                 }
-
-                const email = partes.join('') + '.0@colcoopcv.com';
-                $('#email').val(email);
             }
         });
 
