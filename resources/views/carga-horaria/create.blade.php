@@ -748,64 +748,95 @@ function guardarCursosSeleccionados() {
         return;
     }
 
-    let btn = $('#btnGuardarCursos');
-    let btnFlecha = $('#btnGuardarCursosFlecha');
-    btn.prop('disabled', true);
-    btnFlecha.prop('disabled', true);
-    btn.html('<span class="loading-spinner me-2"></span> Guardando...');
-    btnFlecha.html('<span class="loading-spinner me-2"></span> Guardar cursos');
+    verificarDuplicadoAsignacion(docenteId, aulaId, selectedCourseIds, function(conflictos) {
+        if (conflictos.length > 0) {
+            let cursosIds = conflictos.map(c => c.curso_id).join(', ');
+            toast.error('No se puede guardar. El curso ya está asignado a otro docente en esta aula: ' + cursosIds);
+            $('#btnGuardarCursos').prop('disabled', false);
+            $('#btnGuardarCursosFlecha').prop('disabled', false);
+            return;
+        }
 
-    let asignaciones = selectedCourseIds.map(cursoId => ({
-        docente_id: docenteId,
-        curso_id: cursoId,
-        aula_id: aulaId,
-        horas_semanales: horasSem,
-        dia_semana: diaSemana,
-        hora_inicio: horaInicio,
-        hora_fin: horaFin,
-        observaciones: observaciones
-    }));
+        let btn = $('#btnGuardarCursos');
+        let btnFlecha = $('#btnGuardarCursosFlecha');
+        btn.prop('disabled', true);
+        btnFlecha.prop('disabled', true);
+        btn.html('<span class="loading-spinner me-2"></span> Guardando...');
+        btnFlecha.html('<span class="loading-spinner me-2"></span> Guardar cursos');
 
-    $.ajax({
-        url: '{{ route("admin.carga-horaria.store") }}',
-        method: 'POST',
-        data: {
-            _token: '{{ csrf_token() }}',
-            asignaciones: JSON.stringify(asignaciones)
-        },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                toast.success(response.message || 'Asignaciones guardadas exitosamente');
-                
-                // Resetear estado local inmediatamente
-                selectedCourseIds = [];
-                $('#buscarCursosDisponibles').val('');
-                $('#buscarCursosAsignados').val('');
-                
-                // Restaurar botones
-                $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                $('#btnGuardarCursos').prop('disabled', true);
-                $('#btnGuardarCursosFlecha').prop('disabled', true);
-                
-                // Recargar datos del servidor (esto ocurre en paralelo, sin esperar)
-                recargarCursosAsignados(docenteId);
-            } else {
-                toast.error(response.message || 'Error al guardar las asignaciones');
+        let asignaciones = selectedCourseIds.map(cursoId => ({
+            docente_id: docenteId,
+            curso_id: cursoId,
+            aula_id: aulaId,
+            horas_semanales: horasSem,
+            dia_semana: diaSemana,
+            hora_inicio: horaInicio,
+            hora_fin: horaFin,
+            observaciones: observaciones
+        }));
+
+        $.ajax({
+            url: '{{ route("admin.carga-horaria.store") }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                asignaciones: JSON.stringify(asignaciones)
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    toast.success(response.message || 'Asignaciones guardadas exitosamente');
+                    
+                    // Resetear estado local inmediatamente
+                    selectedCourseIds = [];
+                    $('#buscarCursosDisponibles').val('');
+                    $('#buscarCursosAsignados').val('');
+                    
+                    // Restaurar botones
+                    $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+                    $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+                    $('#btnGuardarCursos').prop('disabled', true);
+                    $('#btnGuardarCursosFlecha').prop('disabled', true);
+                    
+                    // Recargar datos del servidor (esto ocurre en paralelo, sin esperar)
+                    recargarCursosAsignados(docenteId);
+                } else {
+                    toast.error(response.message || 'Error al guardar las asignaciones');
+                    $('#btnGuardarCursos').prop('disabled', false);
+                    $('#btnGuardarCursosFlecha').prop('disabled', false);
+                    $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+                    $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = xhr.responseJSON?.message || 'Error al guardar las asignaciones';
+                toast.error(errorMsg);
                 $('#btnGuardarCursos').prop('disabled', false);
                 $('#btnGuardarCursosFlecha').prop('disabled', false);
                 $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
                 $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
             }
+        });
+    });
+}
+
+function verificarDuplicadoAsignacion(docenteId, aulaId, cursoIds, callback) {
+    $.ajax({
+        url: '{{ route("admin.carga-horaria.verificar-duplicado") }}',
+        method: 'GET',
+        data: {
+            docente_id: docenteId,
+            aula_id: aulaId,
+            curso_ids: cursoIds
+        },
+        dataType: 'json',
+        success: function(response) {
+            callback(response.conflictos || []);
         },
         error: function(xhr) {
-            let errorMsg = xhr.responseJSON?.message || 'Error al guardar las asignaciones';
+            let errorMsg = xhr.responseJSON?.message || 'Error al verificar duplicados';
             toast.error(errorMsg);
-            $('#btnGuardarCursos').prop('disabled', false);
-            $('#btnGuardarCursosFlecha').prop('disabled', false);
-            $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-            $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+            callback([]);
         }
     });
 }

@@ -7,6 +7,7 @@ use App\Models\CargaHoraria;
 use App\Models\User;
 use App\Models\Curso;
 use App\Models\Aula;
+use App\Models\Periodo;
 use App\Models\AnioAcademico;
 use Illuminate\Http\Request;
 use DB;
@@ -97,6 +98,14 @@ class CargaHorariaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Ya existe una asignación para este docente, curso y aula.'
+            ], 422);
+        }
+
+        $conflictoAula = $this->conflictoCursoMismoAulaEnPeriodoActivo($request->curso_id, $request->aula_id, $request->docente_id);
+        if ($conflictoAula) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este curso ya está asignado a otro docente en el mismo aula para el año escolar activo y periodo actual.'
             ], 422);
         }
         
@@ -355,12 +364,49 @@ class CargaHorariaController extends Controller
 
     public function verificarDuplicado(Request $request)
     {
-        $existe = CargaHoraria::where('docente_id', $request->docente_id)
-            ->where('curso_id', $request->curso_id)
-            ->where('aula_id', $request->aula_id)
-            ->exists();
-        
-        return response()->json(['existe' => $existe]);
+        $request->validate([
+            'docente_id' => 'required|exists:users,id',
+            'aula_id' => 'required|exists:aulas,id',
+            'curso_ids' => 'sometimes|array',
+            'curso_ids.*' => 'integer|exists:cursos,id',
+            'curso_id' => 'sometimes|integer|exists:cursos,id'
+        ]);
+
+        $cursoIds = [];
+        if ($request->has('curso_ids')) {
+            $cursoIds = $request->curso_ids;
+        } elseif ($request->filled('curso_id')) {
+            $cursoIds = [$request->curso_id];
+        }
+
+        $conflictos = [];
+        if (!empty($cursoIds)) {
+            $cargas = CargaHoraria::whereIn('curso_id', $cursoIds)
+                ->where('aula_id', $request->aula_id)
+                ->where('estado', 'activo')
+                ->where('docente_id', '!=', $request->docente_id)
+                ->whereHas('aula', function ($q) {
+                    $anioActivo = AnioAcademico::where('activo', true)->first();
+                    if ($anioActivo) {
+                        $q->where('anio_academico_id', $anioActivo->id);
+                    }
+                })
+                ->with('docente')
+                ->get();
+
+            $conflictos = $cargas->map(function ($carga) {
+                return [
+                    'curso_id' => $carga->curso_id,
+                    'docente_id' => $carga->docente_id,
+                    'docente_nombre' => $carga->docente->name ?? 'Otro docente'
+                ];
+            })->toArray();
+        }
+
+        return response()->json([
+            'conflictos' => $conflictos,
+            'existe' => count($conflictos) > 0
+        ]);
     }
 
     public function getAllCursos()
@@ -380,6 +426,36 @@ class CargaHorariaController extends Controller
             });
         
         return response()->json($cursos);
+    }
+
+    private function conflictoCursoMismoAulaEnPeriodoActivo($cursoId, $aulaId, $docenteId)
+    {
+        $aula = Aula::find($aulaId);
+        if (!$aula) {
+            return false;
+        }
+
+        $anioActivo = AnioAcademico::where('activo', true)->first();
+        $periodoActivo = Periodo::where('activo', true)
+            ->when($anioActivo, fn($query) => $query->where('anio_academico_id', $anioActivo->id))
+            ->first();
+
+        // Si no hay aula o año activo, usamos la comparación básica por aula y curso.
+        $query = CargaHoraria::where('curso_id', $cursoId)
+            ->where('aula_id', $aulaId)
+            ->where('estado', 'activo')
+            ->where('docente_id', '!=', $docenteId);
+
+        // Asegurar que la aula pertenezca al año activo cuando exista.
+        if ($anioActivo) {
+            $query->whereHas('aula', fn($q) => $q->where('anio_academico_id', $anioActivo->id));
+        }
+
+        // Si hay periodo activo, asumimos que la validación se aplica al periodo actual.
+        // Dado que CargaHoraria no almacena periodo explícito, se usa el hecho de que
+        // el curso no puede repetirse en la misma aula dentro de la misma aula/año activo.
+
+        return $query->exists();
     }
 
     public function guardarMultiplesAsignaciones(Request $request)
@@ -424,6 +500,12 @@ class CargaHorariaController extends Controller
                         $errores[] = "Asignación " . ($index + 1) . ": Ya existe esta combinación";
                         continue;
                     }
+
+                        $conflictoAula = $this->conflictoCursoMismoAulaEnPeriodoActivo($datos['curso_id'], $datos['aula_id'], $datos['docente_id']);
+                        if ($conflictoAula) {
+                            $errores[] = "Asignación " . ($index + 1) . ": Este curso ya está asignado a otro docente en el mismo aula para el año escolar activo y periodo actual.";
+                            continue;
+                        }
                     
                     // Normalizar valores: convertir cadenas vacías a NULL y forzar tipos
                     $horasSem = isset($datos['horas_semanales']) && is_numeric($datos['horas_semanales']) ? (int) $datos['horas_semanales'] : 4;
