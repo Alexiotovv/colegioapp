@@ -277,6 +277,7 @@ class CargaHorariaController extends Controller
                 'nombre' => $carga->curso->nombre ?? 'Curso no disponible',
                 'nivel' => $carga->curso->nivel->nombre ?? 'Sin nivel',
                 'aula' => $carga->aula->nombre ?? 'Aula no asignada',
+                   'seccion' => $carga->aula->seccion->nombre ?? null,
                 'horas_semanales' => $carga->horas_semanales ?? 0,
                 'dia_semana' => $carga->dia_semana_nombre ?? null,
                 'horario' => $carga->horario ?? null
@@ -315,6 +316,8 @@ class CargaHorariaController extends Controller
             return [
                 'id' => $aula->id,
                 'nombre' => $aula->nombre,
+                'nivel_id' => $aula->nivel_id,
+                'nivel_nombre' => $aula->grado?->nivel?->nombre ?? null,
                 'grado' => $aula->grado ? $aula->grado->nombre : null,
                 'seccion' => $aula->seccion ? $aula->seccion->nombre : null,
                 'turno_nombre' => $aula->turno_nombre,
@@ -322,6 +325,29 @@ class CargaHorariaController extends Controller
             ];
         });
         
+        return response()->json($result);
+    }
+
+    public function getAulasDisponibles()
+    {
+        $aulas = Aula::with(['grado.nivel', 'seccion'])
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+
+        $result = $aulas->map(function($aula) {
+            return [
+                'id' => $aula->id,
+                'nombre' => $aula->nombre,
+                'nivel_id' => $aula->nivel_id,
+                'nivel_nombre' => $aula->grado?->nivel?->nombre ?? null,
+                'grado' => $aula->grado ? $aula->grado->nombre : null,
+                'seccion' => $aula->seccion ? $aula->seccion->nombre : null,
+                'turno_nombre' => $aula->turno_nombre,
+                'turno' => $aula->turno
+            ];
+        });
+
         return response()->json($result);
     }
 
@@ -344,6 +370,7 @@ class CargaHorariaController extends Controller
             ->map(function($curso) {
                 return [
                     'id' => $curso->id,
+                    'nivel_id' => $curso->nivel_id,
                     'nombre' => $curso->nombre,
                     'nivel' => $curso->nivel->nombre ?? 'Sin nivel',
                     'codigo' => $curso->codigo

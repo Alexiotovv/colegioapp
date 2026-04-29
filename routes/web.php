@@ -448,6 +448,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['modulo:carga-horaria'])->group(function () {
             Route::get('/carga-horaria/cursos-by-docente', [CargaHorariaController::class, 'getCursosByDocente'])->name('admin.carga-horaria.cursos-by-docente');
             Route::get('/carga-horaria/aulas-by-curso', [CargaHorariaController::class, 'getAulasByCurso'])->name('admin.carga-horaria.aulas-by-curso');
+               Route::get('/carga-horaria/aulas-disponibles', [CargaHorariaController::class, 'getAulasDisponibles'])->name('admin.carga-horaria.aulas-disponibles');
             Route::get('/carga-horaria/verificar-duplicado', [CargaHorariaController::class, 'verificarDuplicado'])->name('admin.carga-horaria.verificar-duplicado');
             Route::get('/carga-horaria/todos-cursos', [CargaHorariaController::class, 'getAllCursos'])->name('admin.carga-horaria.todos-cursos');
     });
