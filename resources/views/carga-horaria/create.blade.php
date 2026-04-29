@@ -743,6 +743,8 @@ function guardarCursosSeleccionados() {
         toast.error('Seleccione docente y aula antes de guardar');
         return;
     }
+    let docenteNombre = $('#docente_id option:selected').text();
+    let aulaNombre = $('#aula_id option:selected').text();
     if (selectedCourseIds.length === 0) {
         toast.error('Seleccione al menos un curso disponible');
         return;
@@ -751,7 +753,7 @@ function guardarCursosSeleccionados() {
     verificarDuplicadoAsignacion(docenteId, aulaId, selectedCourseIds, function(conflictos) {
         if (conflictos.length > 0) {
             let cursosIds = conflictos.map(c => c.curso_id).join(', ');
-            toast.error('No se puede guardar. El curso ya está asignado a otro docente en esta aula: ' + cursosIds);
+            toast.error(`No se puede guardar. ${docenteNombre} no se puede asignar ese curso en ${aulaNombre} porque ya está asignado a otro docente: ${cursosIds}`);
             $('#btnGuardarCursos').prop('disabled', false);
             $('#btnGuardarCursosFlecha').prop('disabled', false);
             return;
@@ -785,7 +787,7 @@ function guardarCursosSeleccionados() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    toast.success(response.message || 'Asignaciones guardadas exitosamente');
+                        toast.success(response.message || `Asignación guardada para ${docenteNombre} en ${aulaNombre}`);
                     
                     // Resetear estado local inmediatamente
                     selectedCourseIds = [];
