@@ -752,8 +752,8 @@ function guardarCursosSeleccionados() {
 
     verificarDuplicadoAsignacion(docenteId, aulaId, selectedCourseIds, function(conflictos) {
         if (conflictos.length > 0) {
-            let cursosIds = conflictos.map(c => c.curso_id).join(', ');
-            toast.error(`No se puede guardar. ${docenteNombre} no se puede asignar ese curso en ${aulaNombre} porque ya está asignado a otro docente: ${cursosIds}`);
+            let docenteConflicto = conflictos[0]?.docente_nombre || conflictos[0]?.docenteName || conflictos[0]?.docente || 'otro docente';
+            toast.error(`No se puede guardar. ${docenteNombre} no puede asignar ese curso en ${aulaNombre} porque ya está asignado a ${docenteConflicto}.`);
             $('#btnGuardarCursos').prop('disabled', false);
             $('#btnGuardarCursosFlecha').prop('disabled', false);
             return;

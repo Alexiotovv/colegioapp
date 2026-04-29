@@ -30,16 +30,45 @@
         show(message, type = 'success', duration = 2000) {
             const toast = this.createToast(message, type);
             this.container.appendChild(toast);
-            
             setTimeout(() => {
                 toast.style.transform = 'translateX(0)';
                 toast.style.opacity = '1';
             }, 10);
-            
-            setTimeout(() => {
+
+            const timer = {
+                timeoutId: null,
+                startTime: Date.now(),
+                remaining: duration,
+                paused: false,
+            };
+
+            const closeToast = () => {
                 this.close(toast);
-            }, duration);
-            
+                timer.timeoutId = null;
+            };
+
+            timer.timeoutId = setTimeout(closeToast, timer.remaining);
+
+            const pauseTimer = () => {
+                if (!timer.paused && timer.timeoutId) {
+                    clearTimeout(timer.timeoutId);
+                    timer.remaining -= Date.now() - timer.startTime;
+                    timer.paused = true;
+                }
+            };
+
+            const resumeTimer = () => {
+                if (timer.paused) {
+                    timer.startTime = Date.now();
+                    timer.timeoutId = setTimeout(closeToast, Math.max(timer.remaining, 0));
+                    timer.paused = false;
+                }
+            };
+
+            toast.addEventListener('mouseenter', pauseTimer);
+            toast.addEventListener('mouseleave', resumeTimer);
+
+            toast.__toastTimer = timer;
             return toast;
         }
 
@@ -102,6 +131,10 @@
         close(toast) {
             toast.style.transform = 'translateX(100%)';
             toast.style.opacity = '0';
+            if (toast.__toastTimer && toast.__toastTimer.timeoutId) {
+                clearTimeout(toast.__toastTimer.timeoutId);
+                toast.__toastTimer.timeoutId = null;
+            }
             
             setTimeout(() => {
                 if (toast.parentNode) {
