@@ -270,7 +270,10 @@ class CargaHorariaController extends Controller
         // Mapear asegurando que todas las propiedades existan
         $resultado = $cursosAsignados->map(function($carga) {
             return [
+                // id: curso id (mantener compatibilidad con lo ya esperado en el front)
                 'id' => $carga->curso->id ?? null,
+                // carga_id: id de la asignación (CargaHoraria) — necesario para eliminar
+                'carga_id' => $carga->id ?? null,
                 'nombre' => $carga->curso->nombre ?? 'Curso no disponible',
                 'nivel' => $carga->curso->nivel->nombre ?? 'Sin nivel',
                 'aula' => $carga->aula->nombre ?? 'Aula no asignada',
