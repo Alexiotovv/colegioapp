@@ -48,11 +48,14 @@
         border-radius: 10px;
         padding: 12px 15px;
         margin-bottom: 10px;
-        cursor: pointer;
         transition: all 0.3s;
         border: 1px solid #e9ecef;
         position: relative;
     }
+
+        .curso-card:not(.asignado) {
+            cursor: pointer;
+        }
     
     .curso-card:hover {
         transform: translateX(5px);
@@ -90,7 +93,8 @@
     .badge-asignado {
         position: absolute;
         top: 10px;
-        right: 10px;
+        /* ubicar el badge hacia la mitad del lado derecho (antes del botón X) */
+        right: 44px;
         background: #28a745;
         color: white;
         padding: 2px 8px;
@@ -220,7 +224,7 @@
                                 </div>
                                 <div class="col-md-3 d-flex align-items-end">
                                     <button type="button" id="btnAgregar" class="btn btn-success w-100" onclick="agregarAsignacion()" disabled>
-                                        <i class="fas fa-plus-circle me-2"></i> Agregar a Cola
+                                        <i class="fas fa-plus-circle me-2"></i> Agregar Curso
                                     </button>
                                 </div>
                             </div>
@@ -235,6 +239,8 @@
                                 Cursos Disponibles
                                 <span class="badge bg-secondary ms-2" id="disponiblesCount">0</span>
                             </h6>
+                                <!-- Búsqueda de cursos disponibles -->
+                                <input type="text" class="form-control mb-2" id="buscarCursosDisponibles" placeholder="🔍 Buscar..." style="padding: 8px; font-size: 13px;">
                             <div class="cursos-lista" id="cursosDisponiblesList">
                                 <div class="text-center py-4 text-muted">
                                     <i class="fas fa-spinner fa-spin"></i> Cargando cursos...
@@ -254,6 +260,8 @@
                                 Cursos Asignados
                                 <span class="badge bg-success ms-2" id="asignadosCount">0</span>
                             </h6>
+                                <!-- Búsqueda de cursos asignados -->
+                                <input type="text" class="form-control mb-2" id="buscarCursosAsignados" placeholder="🔍 Buscar..." style="padding: 8px; font-size: 13px;">
                             <div class="cursos-lista" id="cursosAsignadosList">
                                 <div class="text-center py-4 text-muted">
                                     Seleccione un docente para ver sus cursos
@@ -318,36 +326,13 @@
     </div>
 </div>
 
-<!-- Cola de asignaciones (lado derecho) -->
-<div id="colaContainer" class="form-container mt-4" style="display: none;">
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-primary text-white fw-bold">
-            <i class="fas fa-tasks me-2"></i> Cola de Asignaciones
-            <span class="badge bg-light text-dark ms-2" id="colaCount">0</span>
-        </div>
-        <div class="card-body" id="colaItems" style="max-height: 400px; overflow-y: auto; min-height: 200px;">
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
-                No hay asignaciones en la cola
-            </div>
-        </div>
-        <div class="card-footer bg-light d-flex gap-2">
-            <button type="button" id="btnGuardarTodo" class="btn btn-primary flex-grow-1" onclick="guardarTodasAsignaciones()" style="display: none;">
-                <i class="fas fa-save me-2"></i> Asignar Curso
-            </button>
-            <button type="button" class="btn btn-warning flex-grow-1" onclick="limpiarCola()" style="display: none;" id="btnLimpiarCola">
-                <i class="fas fa-trash me-2"></i> Limpiar Cola
-            </button>
-        </div>
-    </div>
-</div>
+<!-- Cola de asignaciones removida - guardado directo en BD -->
 @endsection
 
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 let cursoSeleccionadoId = null;
-let colaAsignaciones = [];
 
 $(document).ready(function() {
     // Inicializar Select2
@@ -360,6 +345,35 @@ $(document).ready(function() {
     
     let todosLosCursos = [];
     let cursosAsignados = [];
+    
+    // Búsqueda de cursos disponibles
+    $('#buscarCursosDisponibles').on('keyup', function() {
+        let textoBusqueda = $(this).val().toLowerCase();
+        $('.curso-card:not(.asignado)').each(function() {
+            let nombreCurso = $(this).data('curso-nombre').toLowerCase();
+            let nivelCurso = $(this).data('curso-nivel').toLowerCase();
+            if (nombreCurso.includes(textoBusqueda) || nivelCurso.includes(textoBusqueda)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+
+    // Búsqueda de cursos asignados
+    $('#buscarCursosAsignados').on('keyup', function() {
+        let texto = $(this).val().toLowerCase();
+        $('.curso-card.asignado').each(function() {
+            // Buscar en el nombre y en la info (nivel/aula)
+            let nombre = $(this).find('.curso-nombre').text().toLowerCase();
+            let info = $(this).find('.curso-info').text().toLowerCase();
+            if (nombre.includes(texto) || info.includes(texto)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
     
     // Cuando se selecciona un docente
     $('#docente_id').on('change', function() {
@@ -424,6 +438,7 @@ $(document).ready(function() {
                     if (item && (item.id || item.curso_id) && (item.nombre || item.name || item.titulo || item.curso_nombre)) {
                         return {
                             id: item.id || item.curso_id,
+                            carga_id: item.carga_id || item.asignacion_id || item.id || null,
                             nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
                             nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
                             aula: item.aula || item.aula_nombre || item.aula_id || ''
@@ -435,6 +450,7 @@ $(document).ready(function() {
                         let c = item.curso || item.curso_data || item.cursoObj;
                         return {
                             id: c.id || c.curso_id || '',
+                            carga_id: item.id || item.carga_id || null,
                             nombre: c.nombre || c.name || c.titulo || '',
                             nivel: c.nivel || c.nivel_nombre || '',
                             aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : '')
@@ -444,6 +460,7 @@ $(document).ready(function() {
                     // Caso genérico: intentar extraer campos conocidos
                     return {
                         id: item.id || item.curso_id || '',
+                        carga_id: item.carga_id || item.id || null,
                         nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
                         nivel: item.nivel || item.nivel_nombre || '',
                         aula: item.aula || item.aula_nombre || ''
@@ -489,8 +506,12 @@ $(document).ready(function() {
                 let cursoNivel = curso.nivel || curso.nivel_nombre || 'Sin nivel';
                 let cursoAula = curso.aula || curso.aula_nombre || 'No asignada';
                 let cursoId = curso.id || curso.curso_id || '';
+                let cargaId = curso.carga_id || curso.cargaId || curso.asignacion_id || curso.asignacionId || '';
                 htmlAsignados += `
-                    <div class="curso-card asignado" data-curso-id="${cursoId}">
+                    <div class="curso-card asignado" data-curso-id="${cursoId}" data-carga-id="${cargaId}" style="position: relative;">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarCursoAsignado(${cargaId})" style="position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-times"></i>
+                        </button>
                         <div class="curso-nombre">
                             <i class="fas fa-check-circle text-success me-1"></i>
                             ${cursoNombre}
@@ -640,71 +661,151 @@ function agregarAsignacion() {
         return;
     }
     
-    // Obtener datos del curso y aula
-    let cursoNombre = $('#cursoSeleccionadoNombre').text();
-    let aulaNombre = $('#aula_id option:selected').text();
+    let btn = $('#btnAgregar');
+    btn.prop('disabled', true);
+    btn.html('<span class="loading-spinner me-2"></span> Guardando...');
     
-    let asignacion = {
-        docente_id: docenteId,
-        curso_id: cursoId,
-        aula_id: aulaId,
-        horas_semanales: horasSem,
-        dia_semana: diaSemana,
-        hora_inicio: horaInicio,
-        hora_fin: horaFin,
-        observaciones: observaciones,
-        curso_nombre: cursoNombre,
-        aula_nombre: aulaNombre
-    };
-    
-    colaAsignaciones.push(asignacion);
-    actualizarCola();
-    limpiarFormulario();
-    
-    Swal.fire('Éxito', 'Asignación agregada a la cola', 'success');
+    $.ajax({
+        url: '{{ route("admin.carga-horaria.store") }}',
+        method: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            docente_id: docenteId,
+            curso_id: cursoId,
+            aula_id: aulaId,
+            horas_semanales: horasSem,
+            dia_semana: diaSemana,
+            hora_inicio: horaInicio,
+            hora_fin: horaFin,
+            observaciones: observaciones
+        },
+        success: function(response) {
+            if (response.success) {
+                Swal.fire('Éxito', 'Asignación guardada exitosamente', 'success');
+                limpiarFormulario();
+                recargarCursosAsignados(docenteId);
+            } else {
+                Swal.fire('Error', response.message || 'Error al guardar', 'error');
+                btn.prop('disabled', false);
+                btn.html('<i class="fas fa-plus-circle me-2"></i> Agregar Curso');
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = xhr.responseJSON?.message || 'Error al guardar la asignación';
+            Swal.fire('Error', errorMsg, 'error');
+            btn.prop('disabled', false);
+            btn.html('<i class="fas fa-plus-circle me-2"></i> Agregar Curso');
+        }
+    });
 }
 
-function actualizarCola() {
-    $('#colaContainer').show();
-    $('#colaCount').text(colaAsignaciones.length);
-    
-    if (colaAsignaciones.length === 0) {
-        $('#colaItems').html(`
-            <div class="text-center text-muted py-4">
-                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
-                No hay asignaciones en la cola
-            </div>
-        `);
-        $('#btnGuardarTodo').hide();
-        $('#btnLimpiarCola').hide();
-    } else {
-        let html = '';
-        colaAsignaciones.forEach((asig, index) => {
-            let horario = asig.hora_inicio && asig.hora_fin ? `${asig.hora_inicio} - ${asig.hora_fin}` : 'Flexible';
-            html += `
-                <div class="cola-item">
-                    <div class="flex-grow-1">
-                        <small class="text-muted">Asignación ${index + 1}</small><br>
-                        <strong>${asig.curso_nombre}</strong><br>
-                        <small>${asig.aula_nombre}</small><br>
-                        <small class="text-muted">${asig.horas_semanales}h | ${asig.dia_semana || 'Flexible'} | ${horario}</small>
+function recargarCursosAsignados(docenteId) {
+    $.ajax({
+        url: '{{ route("admin.carga-horaria.cursos-by-docente") }}',
+        method: 'GET',
+        data: { docente_id: docenteId },
+        success: function(response) {
+            let raw = null;
+            if (Array.isArray(response)) raw = response;
+            else if (response && Array.isArray(response.data)) raw = response.data;
+            else if (response && Array.isArray(response.cursos)) raw = response.cursos;
+            else if (response && Array.isArray(response.asignaciones)) raw = response.asignaciones;
+            else raw = [];
+            
+            let cursosAsignados = raw.map(item => {
+                if (item && (item.id || item.curso_id) && (item.nombre || item.name || item.titulo || item.curso_nombre)) {
+                    return {
+                        id: item.id || item.curso_id,
+                        nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
+                        nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
+                        aula: item.aula || item.aula_nombre || item.aula_id || ''
+                    };
+                }
+                if (item && (item.curso || item.curso_data || item.cursoObj)) {
+                    let c = item.curso || item.curso_data || item.cursoObj;
+                    return {
+                        id: c.id || c.curso_id || '',
+                        nombre: c.nombre || c.name || c.titulo || '',
+                        nivel: c.nivel || c.nivel_nombre || '',
+                        aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : '')
+                    };
+                }
+                return {
+                    id: item.id || item.curso_id || '',
+                    nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
+                    nivel: item.nivel || item.nivel_nombre || '',
+                    aula: item.aula || item.aula_nombre || ''
+                };
+            });
+            
+            let htmlAsignados = '';
+            if (cursosAsignados.length > 0) {
+                for (let curso of cursosAsignados) {
+                    let cargaId = curso.carga_id || curso.cargaId || curso.asignacion_id || curso.asignacionId || curso.id || '';
+                    htmlAsignados += `
+                        <div class="curso-card asignado" data-curso-id="${curso.id}" data-carga-id="${cargaId}" style="position: relative;">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarCursoAsignado(${cargaId})" style="position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <div class="curso-nombre">
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                ${curso.nombre}
+                            </div>
+                            <div class="curso-info">
+                                <i class="fas fa-layer-group me-1"></i> ${curso.nivel}<br>
+                                <i class="fas fa-door-open me-1"></i> Aula: ${curso.aula}
+                            </div>
+                            <span class="badge-asignado">Asignado</span>
+                        </div>
+                    `;
+                }
+            } else {
+                htmlAsignados = `
+                    <div class="empty-cursos">
+                        <i class="fas fa-smile-wink fa-2x mb-2 d-block"></i>
+                        Este docente aún no tiene cursos asignados
                     </div>
-                    <button type="button" class="btn btn-sm btn-danger ms-2" onclick="eliminarDeCoIa(${index})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-        });
-        $('#colaItems').html(html);
-        $('#btnGuardarTodo').show();
-        $('#btnLimpiarCola').show();
-    }
+                `;
+            }
+            
+            $('#cursosAsignadosList').html(htmlAsignados);
+            $('#asignadosCount').text(cursosAsignados.length);
+        },
+        error: function() {
+            console.error('Error al recargar cursos asignados');
+        }
+    });
 }
 
-function eliminarDeCoIa(index) {
-    colaAsignaciones.splice(index, 1);
-    actualizarCola();
-    Swal.fire('Eliminado', 'Asignación removida de la cola', 'info');
+function eliminarCursoAsignado(cargaId) {
+    Swal.fire({
+        title: '¿Eliminar asignación?',
+        text: 'Esta acción no se puede deshacer. Si el curso tiene datos enlazados, no se podrá eliminar.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '/admin/carga-horaria/' + cargaId,
+                method: 'DELETE',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire('Eliminado', 'La asignación ha sido eliminada correctamente', 'success');
+                        let docenteId = $('#docente_id').val();
+                        recargarCursosAsignados(docenteId);
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = xhr.responseJSON?.message || 'No se puede eliminar: el curso tiene datos enlazados o ya está en uso';
+                    Swal.fire('Error', errorMsg, 'error');
+                }
+            });
+        }
+    });
 }
 
 function limpiarFormulario() {
@@ -719,69 +820,9 @@ function limpiarFormulario() {
     $('#aulaSelectorContainer').hide();
     $('#datosAdicionales').hide();
     $('#botonesAccion').hide();
-}
-
-function limpiarCola() {
-    Swal.fire({
-        title: '¿Limpiar cola?',
-        text: 'Se eliminarán todas las asignaciones de la cola',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, limpiar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            colaAsignaciones = [];
-            actualizarCola();
-        }
-    });
-}
-
-function guardarTodasAsignaciones() {
-    if (colaAsignaciones.length === 0) {
-        Swal.fire('Error', 'No hay asignaciones en la cola', 'error');
-        return;
-    }
-    
-    let btn = $('#btnGuardarTodo');
-    btn.prop('disabled', true);
-    btn.html('<span class="loading-spinner me-2"></span> Guardando...');
-    
-    $.ajax({
-        url: '{{ route("admin.carga-horaria.store") }}',
-        method: 'POST',
-        data: {
-            _token: '{{ csrf_token() }}',
-            asignaciones: JSON.stringify(colaAsignaciones)
-        },
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Éxito!',
-                    text: response.message,
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    limpiarColaDirecto();
-                    limpiarFormulario();
-                    $('#docente_id').trigger('change');
-                });
-            }
-        },
-        error: function(xhr) {
-            let errorMsg = xhr.responseJSON?.message || 'Error al guardar las asignaciones';
-            Swal.fire('Error', errorMsg, 'error');
-            btn.prop('disabled', false);
-            btn.html('<i class="fas fa-save me-2"></i> Asignar Curso');
-        }
-    });
-}
-
-function limpiarColaDirecto() {
-    colaAsignaciones = [];
-    actualizarCola();
-    $('#btnGuardarTodo').prop('disabled', false).html('<i class="fas fa-save me-2"></i> Asignar Curso');
+    let btn = $('#btnAgregar');
+    btn.prop('disabled', false);
+    btn.html('<i class="fas fa-plus-circle me-2"></i> Agregar Curso');
 }
 </script>
 @endsection
