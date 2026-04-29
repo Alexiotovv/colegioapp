@@ -277,6 +277,8 @@ class CargaHorariaController extends Controller
                 'nombre' => $carga->curso->nombre ?? 'Curso no disponible',
                 'nivel' => $carga->curso->nivel->nombre ?? 'Sin nivel',
                 'aula' => $carga->aula->nombre ?? 'Aula no asignada',
+                'aula_id' => $carga->aula_id ?? null,
+                'nivel_id' => $carga->curso->nivel_id ?? null,
                    'seccion' => $carga->aula->seccion->nombre ?? null,
                 'horas_semanales' => $carga->horas_semanales ?? 0,
                 'dia_semana' => $carga->dia_semana_nombre ?? null,

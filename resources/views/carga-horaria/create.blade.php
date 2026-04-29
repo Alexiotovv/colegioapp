@@ -431,6 +431,7 @@ $(document).ready(function() {
             $('#aulaSeleccionadaNombre').text(aulaNombre);
             selectedCourseIds = [];
             actualizarCursosDisponibles();
+            renderizarCursos();
             $('#btnGuardarCursos').prop('disabled', true);
             $('#btnGuardarCursosFlecha').prop('disabled', true);
         } else {
@@ -471,6 +472,7 @@ $(document).ready(function() {
                         return {
                             id: item.id || item.curso_id,
                             carga_id: item.carga_id || item.asignacion_id || item.id || null,
+                            aula_id: item.aula_id || item.aulaId || null,
                             nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
                             nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
                             aula: item.aula || item.aula_nombre || item.aula_id || ''
@@ -483,6 +485,7 @@ $(document).ready(function() {
                         return {
                             id: c.id || c.curso_id || '',
                             carga_id: item.id || item.carga_id || null,
+                            aula_id: item.aula_id || item.aulaId || item.aula?.id || null,
                             nombre: c.nombre || c.name || c.titulo || '',
                             nivel: c.nivel || c.nivel_nombre || '',
                             aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : '')
@@ -493,6 +496,7 @@ $(document).ready(function() {
                     return {
                         id: item.id || item.curso_id || '',
                         carga_id: item.carga_id || item.id || null,
+                        aula_id: item.aula_id || item.aulaId || null,
                         nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
                         nivel: item.nivel || item.nivel_nombre || '',
                         aula: item.aula || item.aula_nombre || ''
@@ -571,16 +575,20 @@ $(document).ready(function() {
 // ========== FUNCIONES GLOBALES (Fuera del document.ready) ==========
 
 function renderizarCursos() {
+    // Filtrar cursos asignados por aula seleccionada, si existe
+    let cursosAsignadosFiltrados = aulaSeleccionadaId
+        ? cursosAsignados.filter(c => String(c.aula_id) === String(aulaSeleccionadaId))
+        : cursosAsignados;
     // IDs de cursos ya asignados (soportar id o curso_id)
-    let idsAsignados = cursosAsignados.map(c => c.id || c.curso_id);
+    let idsAsignados = cursosAsignadosFiltrados.map(c => c.id || c.curso_id);
     // Actualizar contadores
-    $('#asignadosCount').text(cursosAsignados.length);
+    $('#asignadosCount').text(cursosAsignadosFiltrados.length);
     $('#disponiblesCount').text(0);
     
     // Renderizar cursos asignados
-    if (cursosAsignados.length > 0) {
+    if (cursosAsignadosFiltrados.length > 0) {
         let htmlAsignados = '';
-        for (let curso of cursosAsignados) {
+        for (let curso of cursosAsignadosFiltrados) {
             let cursoNombre = curso.nombre || curso.name || curso.titulo || 'Sin nombre';
             let cursoNivel = curso.nivel || curso.nivel_nombre || 'Sin nivel';
             let cursoAula = curso.aula || curso.aula_nombre || 'No asignada';
@@ -609,7 +617,7 @@ function renderizarCursos() {
         $('#cursosAsignadosList').html(`
             <div class="empty-cursos">
                 <i class="fas fa-smile-wink fa-2x mb-2 d-block"></i>
-                Este docente aún no tiene cursos asignados
+                ${aulaSeleccionadaId ? 'Este docente no tiene cursos asignados en esta aula' : 'Este docente aún no tiene cursos asignados'}
             </div>
         `);
     }
@@ -638,7 +646,9 @@ function actualizarCursosDisponibles() {
         return;
     }
 
-    let idsAsignados = cursosAsignados.map(c => String(c.id || c.curso_id));
+        let idsAsignados = cursosAsignados
+            .filter(c => !aulaSeleccionadaId || String(c.aula_id) === String(aulaSeleccionadaId))
+            .map(c => String(c.id || c.curso_id));
     let cursosFiltrados = todosLosCursos.filter(curso => {
         let nivelCoincide = aulaSeleccionadaNivelId ? curso.nivel_id == aulaSeleccionadaNivelId : true;
         return nivelCoincide && !idsAsignados.includes(String(curso.id));
@@ -819,6 +829,7 @@ function recargarCursosAsignados(docenteId) {
                     return {
                         id: item.id || item.curso_id,
                         carga_id: item.carga_id || item.asignacion_id || item.id || null,
+                        aula_id: item.aula_id || item.aulaId || null,
                         seccion: item.seccion || item.aula_seccion || item.aula || '',
                         nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
                         nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
@@ -830,6 +841,7 @@ function recargarCursosAsignados(docenteId) {
                     return {
                         id: c.id || c.curso_id || '',
                         carga_id: item.id || item.carga_id || item.asignacion_id || null,
+                        aula_id: item.aula_id || item.aulaId || item.aula?.id || null,
                         seccion: item.seccion || item.aula_seccion || item.aula || '',
                         nombre: c.nombre || c.name || c.titulo || '',
                         nivel: c.nivel || c.nivel_nombre || '',
@@ -839,6 +851,7 @@ function recargarCursosAsignados(docenteId) {
                 return {
                     id: item.id || item.curso_id || '',
                     carga_id: item.carga_id || item.asignacion_id || null,
+                    aula_id: item.aula_id || item.aulaId || null,
                     seccion: item.seccion || item.aula_seccion || item.aula || '',
                     nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
                     nivel: item.nivel || item.nivel_nombre || '',
