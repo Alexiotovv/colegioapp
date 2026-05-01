@@ -21,7 +21,9 @@ use App\Http\Controllers\CursoJerarquicoController;
 use App\Http\Controllers\AulaController;
 use App\Http\Controllers\ConfiguracionAcademicaController;
 use App\Http\Controllers\CargaHorariaController;
+use App\Http\Controllers\CargaHorariaReporteController;
 use App\Http\Controllers\NotaController;
+use App\Http\Controllers\ReporteNotasController;
 use App\Http\Controllers\ApreciacionController;
 use App\Http\Controllers\RegistroEvaluacionController;
 use App\Http\Controllers\EvaluacionJerarquicoController;
@@ -196,6 +198,9 @@ Route::middleware(['auth'])->group(function () {
         
         // Módulo: carga-horaria
         Route::middleware(['modulo:carga-horaria'])->group(function () {
+            Route::get('/carga-horaria/reporte', [CargaHorariaReporteController::class, 'index'])->name('carga-horaria-reporte.reporte');
+            Route::get('/carga-horaria/reporte/data', [CargaHorariaReporteController::class, 'data'])->name('carga-horaria-reporte.data');
+            Route::get('/carga-horaria/aulas-disponibles', [CargaHorariaReporteController::class, 'getAulasDisponibles'])->name('carga-horaria.aulas-disponibles');
             Route::resource('carga-horaria', CargaHorariaController::class);
             Route::patch('/carga-horaria/{cargaHorarium}/toggle', [CargaHorariaController::class, 'toggleActive'])->name('carga-horaria.toggle');
         });
@@ -204,6 +209,9 @@ Route::middleware(['auth'])->group(function () {
         
         // Módulo: notas
         Route::middleware(['modulo:notas'])->group(function () {
+            Route::get('/reportes/notas', [ReporteNotasController::class, 'index'])->name('reportes-notas.index');
+            Route::get('/reportes/notas/filtros', [ReporteNotasController::class, 'filtros'])->name('reportes-notas.filtros');
+            Route::get('/reportes/notas/exportar', [ReporteNotasController::class, 'exportar'])->name('reportes-notas.exportar');
             Route::get('/notas', [NotaController::class, 'index'])->name('notas.index');
             Route::get('/notas/cursos-by-aula', [NotaController::class, 'getCursosByAula'])->name('notas.cursos-by-aula');
             Route::get('/notas/get-data', [NotaController::class, 'getDataForNotas'])->name('notas.get-data');

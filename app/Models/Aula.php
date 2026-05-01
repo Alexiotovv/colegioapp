@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Aula extends Model
 {
@@ -151,5 +152,11 @@ class Aula extends Model
     public function cargaHoraria()
     {
         return $this->hasMany(CargaHoraria::class, 'aula_id');
+    }
+
+    public function cargaHorariaActivas(): HasMany
+    {
+        return $this->hasMany(CargaHoraria::class, 'aula_id')
+            ->where('estado', CargaHoraria::ESTADO_ACTIVO);
     }
 }
