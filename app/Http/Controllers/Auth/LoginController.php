@@ -6,12 +6,14 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\ConfiguracionInstitucion;
 
 class LoginController extends Controller
 {
     public function showLoginForm()
     {
-        return view('auth.login');
+        $configInstitucion = ConfiguracionInstitucion::getConfig();
+        return view('auth.login', compact('configInstitucion'));
     }
     
     public function login(Request $request)

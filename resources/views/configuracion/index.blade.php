@@ -113,6 +113,11 @@
                     <i class="fas fa-address-book me-2"></i>Libreta de Notas
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="cuadros-tab" data-bs-toggle="tab" data-bs-target="#cuadros" type="button" role="tab">
+                    <i class="fas fa-th-large me-2"></i>Cuadros de Libreta
+                </button>
+            </li>
         </ul>
         
         <div class="tab-content" id="configTabsContent">
@@ -352,7 +357,7 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="firma_tutor" class="form-label">Firma del Tutor</label>
+                            <label for="firma_tutor" class="form-label">Firma del Subdirector 1</label>
                             <input type="file" class="form-control" id="firma_tutor" name="firma_tutor" accept="image/*">
                             @if($configLibreta->firma_tutor)
                                 <div class="preview-container">
@@ -365,28 +370,22 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="nombre_tutor" class="form-label">Nombre del Tutor</label>
+                            <label for="nombre_tutor" class="form-label">Nombre del Subdirector 1</label>
                             <input type="text" class="form-control" id="nombre_tutor" name="nombre_tutor" value="{{ old('nombre_tutor', $configLibreta->nombre_tutor) }}">
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="cargo_tutor" class="form-label">Cargo del Tutor</label>
+                            <label for="cargo_tutor" class="form-label">Cargo del subdirector 1</label>
                             <input type="text" class="form-control" id="cargo_tutor" name="cargo_tutor" value="{{ old('cargo_tutor', $configLibreta->cargo_tutor) }}">
                         </div>
                     </div>
                     
                     <!-- Firma del Subdirector -->
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h5 class="mb-3">Firma del Subdirector</h5>
-                        </div>
-                    </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="firma_subdirector" class="form-label">Firma del Subdirector</label>
+                            <label for="firma_subdirector" class="form-label">Firma del Subdirector 2</label>
                             <input type="file" class="form-control" id="firma_subdirector" name="firma_subdirector" accept="image/*">
                             @if($configLibreta->firma_subdirector)
                                 <div class="preview-container">
@@ -399,7 +398,7 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="nombre_subdirector" class="form-label">Nombre del Subdirector</label>
+                            <label for="nombre_subdirector" class="form-label">Nombre del Subdirector 2</label>
                             <input type="text" class="form-control" id="nombre_subdirector" name="nombre_subdirector" 
                                 value="{{ old('nombre_subdirector', $configLibreta->nombre_subdirector) }}">
                         </div>
@@ -407,7 +406,7 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="cargo_subdirector" class="form-label">Cargo del Subdirector</label>
+                            <label for="cargo_subdirector" class="form-label">Cargo del Subdirector 2</label>
                             <input type="text" class="form-control" id="cargo_subdirector" name="cargo_subdirector" 
                                 value="{{ old('cargo_subdirector', $configLibreta->cargo_subdirector) }}">
                         </div>
@@ -440,6 +439,57 @@
                             </button>
                         </div>
                     </div>
+                </form>
+            </div>
+
+            <!-- ==================== TAB CUADROS DE LIBRETA ==================== -->
+            <div class="tab-pane fade" id="cuadros" role="tabpanel">
+                <form method="POST" action="{{ route('admin.configuracion.save-libreta-cuadros') }}">
+                    @csrf
+
+                    @php
+                        $availableCuadros = [
+                            'cursos_competencias' => 'Cursos y Competencias',
+                            'competencias_transversales' => 'Competencias Transversales',
+                            'apreciaciones_tutor' => 'Apreciaciones del Tutor',
+                            'evaluacion_padre' => 'Evaluación al Padre de Familia',
+                            'evaluaciones_actitudinales' => 'Evaluaciones Actitudinales',
+                            'inasistencias' => 'Inasistencias',
+                            'otras_evaluaciones' => 'Comportamiento y Otras Evaluaciones',
+                        ];
+                    @endphp
+
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <p class="text-muted">Seleccione qué cuadros se deben mostrar en la previsualización de la libreta por cada nivel.</p>
+                        </div>
+                    </div>
+
+                    @foreach($niveles as $nivel)
+                        @php
+                            $selected = $cuadrosPorNivel[$nivel->id] ?? null;
+                        @endphp
+                        <form method="POST" action="{{ route('admin.configuracion.save-libreta-cuadros') }}">
+                            @csrf
+                            <input type="hidden" name="nivel_id" value="{{ $nivel->id }}">
+                            <div class="config-card mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">{{ $nivel->nombre }}</h5>
+                                    <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        @foreach($availableCuadros as $key => $label)
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox" name="cuadros[]" id="{{ $nivel->id }}_{{ $key }}" value="{{ $key }}" {{ is_array($selected) && in_array($key, $selected) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="{{ $nivel->id }}_{{ $key }}">{{ $label }}</label>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    @endforeach
                 </form>
             </div>
         </div>

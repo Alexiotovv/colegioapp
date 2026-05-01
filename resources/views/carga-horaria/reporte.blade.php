@@ -513,7 +513,7 @@
     }
 
     function cargarAulasPorAnio(anioId) {
-        const url = '{{ route('admin.carga-horaria.aulas-disponibles') }}';
+        const url = '{{ route('admin.carga-horaria-reporte.aulas-disponibles') }}';
         
         fetch(`${url}?anio_id=${anioId}`, {
             method: 'GET',

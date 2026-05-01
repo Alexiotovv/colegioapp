@@ -21,11 +21,6 @@
             box-sizing: border-box;
         }
         
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
-            height: 100vh;
-        }
         
         .login-container {
             display: flex;
@@ -253,16 +248,35 @@
     </style>
 </head>
 <body>
+    @php
+        $logoLoginUrl = null;
+        $dashboardImageUrl = null;
+        if (isset($configInstitucion)) {
+            if (!empty($configInstitucion->logo_login)) {
+                $logoLoginUrl = asset('storage/' . $configInstitucion->logo_login);
+            }
+            if (!empty($configInstitucion->logo_dashboard)) {
+                $dashboardImageUrl = asset('storage/' . $configInstitucion->logo_dashboard);
+            }
+        }
+        $defaultDashboardUrl = 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2';
+    @endphp
     <div class="login-container">
         <!-- Lado izquierdo - Formulario (30%) -->
         <div class="login-form">
             <div class="form-wrapper">
                 <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
-                    <h2>ColcoopCV</h2>
-                    <p>Sistema de Gestión Escolar</p>
+                    @if($logoLoginUrl)
+                        <div class="logo-icon" style="background: transparent; box-shadow: none;">
+                            <img src="{{ $logoLoginUrl }}" alt="Logo de la institución" style="max-width: 100%; max-height: 80px; display: block; margin: 0 auto;">
+                        </div>
+                    @else
+                        <div class="logo-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                    @endif
+                    <h2>{{ $configInstitucion->nombre ?? 'ColcoopCV' }}</h2>
+                    <p>{{ $configInstitucion->descripcion ?? 'Sistema de Gestión Escolar' }}</p>
                 </div>
                 
                 @if(session('error'))
@@ -357,7 +371,7 @@
         
         <!-- Lado derecho - Imagen (70%) -->
         <div class="login-image">
-            <img src="https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" 
+            <img src="{{ $dashboardImageUrl ?? $defaultDashboardUrl }}" 
                  alt="Colegio Imagen">
             <div class="image-overlay"></div>
             <div class="image-text">

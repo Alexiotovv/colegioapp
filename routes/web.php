@@ -46,6 +46,7 @@ use App\Http\Controllers\AvanceNotasController;
 use App\Http\Controllers\CuadroNotaController;
 use App\Http\Controllers\RegistroEvaluacionActitudinalController;
 use App\Http\Controllers\EvaluacionActitudinalJerarquicoController;
+use App\Http\Controllers\CuadroDinamicoController;
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -200,7 +201,7 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware(['modulo:carga-horaria'])->group(function () {
             Route::get('/carga-horaria/reporte', [CargaHorariaReporteController::class, 'index'])->name('carga-horaria-reporte.reporte');
             Route::get('/carga-horaria/reporte/data', [CargaHorariaReporteController::class, 'data'])->name('carga-horaria-reporte.data');
-            Route::get('/carga-horaria/aulas-disponibles', [CargaHorariaReporteController::class, 'getAulasDisponibles'])->name('carga-horaria.aulas-disponibles');
+            Route::get('/carga-horaria/aulas-disponibles', [CargaHorariaReporteController::class, 'getAulasDisponibles'])->name('carga-horaria-reporte.aulas-disponibles');
             Route::resource('carga-horaria', CargaHorariaController::class);
             Route::patch('/carga-horaria/{cargaHorarium}/toggle', [CargaHorariaController::class, 'toggleActive'])->name('carga-horaria.toggle');
         });
@@ -377,8 +378,19 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
             Route::put('/configuracion/institucion', [ConfiguracionController::class, 'updateInstitucion'])->name('configuracion.update-institucion');
             Route::put('/configuracion/libreta', [ConfiguracionController::class, 'updateLibreta'])->name('configuracion.update-libreta');
+            Route::post('/configuracion/libreta-cuadros', [ConfiguracionController::class, 'saveLibretaCuadros'])->name('configuracion.save-libreta-cuadros');
             Route::post('/configuracion/delete-logo', [ConfiguracionController::class, 'deleteLogo'])->name('configuracion.delete-logo');
             Route::post('/configuracion/delete-libreta-image', [ConfiguracionController::class, 'deleteLibretaImage'])->name('configuracion.delete-libreta-image');
+        });
+
+        // Módulo: cuadros dinámicos (configuración)
+        Route::middleware(['modulo:configuracion-sistema'])->group(function () {
+            Route::get('/cuadros-dinamicos', [CuadroDinamicoController::class, 'index'])->name('cuadros-dinamicos.index');
+            Route::get('/cuadros-dinamicos/create', [CuadroDinamicoController::class, 'create'])->name('cuadros-dinamicos.create');
+            Route::post('/cuadros-dinamicos', [CuadroDinamicoController::class, 'store'])->name('cuadros-dinamicos.store');
+            Route::get('/cuadros-dinamicos/{cuadro}/edit', [CuadroDinamicoController::class, 'edit'])->name('cuadros-dinamicos.edit');
+            Route::put('/cuadros-dinamicos/{cuadro}', [CuadroDinamicoController::class, 'update'])->name('cuadros-dinamicos.update');
+            Route::delete('/cuadros-dinamicos/{cuadro}', [CuadroDinamicoController::class, 'destroy'])->name('cuadros-dinamicos.destroy');
         });
         
         // Módulo: configuracion-notas

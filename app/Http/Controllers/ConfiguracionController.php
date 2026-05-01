@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 
 use App\Models\ConfiguracionInstitucion;
 use App\Models\ConfiguracionLibreta;
+use App\Models\ConfiguracionLibretaCuadro;
+use App\Models\Nivel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -14,8 +16,10 @@ class ConfiguracionController extends Controller
     {
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
+        $niveles = Nivel::orderBy('orden')->get();
+        $cuadrosPorNivel = ConfiguracionLibretaCuadro::all()->pluck('cuadros', 'nivel_id')->toArray();
         
-        return view('configuracion.index', compact('configInstitucion', 'configLibreta'));
+        return view('configuracion.index', compact('configInstitucion', 'configLibreta', 'niveles', 'cuadrosPorNivel'));
     }
     
     public function updateInstitucion(Request $request)
@@ -172,6 +176,22 @@ class ConfiguracionController extends Controller
         }
         
         return response()->json(['success' => true]);
+    }
+
+    public function saveLibretaCuadros(Request $request)
+    {
+        $data = $request->validate([
+            'nivel_id' => 'required|integer|exists:niveles,id',
+            'cuadros' => 'nullable|array',
+            'cuadros.*' => 'string'
+        ]);
+
+        $nivelId = $data['nivel_id'];
+        $cuadros = $data['cuadros'] ?? [];
+
+        ConfiguracionLibretaCuadro::setCuadrosForNivel($nivelId, $cuadros);
+
+        return redirect()->route('admin.configuracion.index')->with('success', 'Cuadros de libreta guardados');
     }
 
 
