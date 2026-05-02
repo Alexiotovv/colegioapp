@@ -66,6 +66,44 @@ class CargaHorariaController extends Controller
         if ($request->has('asignaciones')) {
             return $this->guardarMultiplesAsignaciones($request);
         }
+
+        if ($request->boolean('aula_sin_curso')) {
+            $request->validate([
+                'docente_id' => 'required|exists:users,id',
+                'aula_id' => 'required|exists:aulas,id',
+            ]);
+
+            $existing = CargaHoraria::where('docente_id', $request->docente_id)
+                ->where('aula_id', $request->aula_id)
+                ->whereNull('curso_id')
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'El aula ya estaba asignada sin curso',
+                    'data' => $existing->load(['docente', 'curso', 'aula'])
+                ]);
+            }
+
+            $carga = CargaHoraria::create([
+                'docente_id' => $request->docente_id,
+                'curso_id' => null,
+                'aula_id' => $request->aula_id,
+                'horas_semanales' => $request->horas_semanales,
+                'dia_semana' => $request->dia_semana,
+                'hora_inicio' => $request->hora_inicio,
+                'hora_fin' => $request->hora_fin,
+                'estado' => 'activo',
+                'observaciones' => $request->observaciones,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Aula asignada sin curso correctamente',
+                'data' => $carga->load(['docente', 'curso', 'aula'])
+            ]);
+        }
         
         // Si no, procesar una asignación simple (para compatibilidad)
         $request->validate([
@@ -237,12 +275,19 @@ class CargaHorariaController extends Controller
     
     public function destroy(CargaHoraria $cargaHorarium)
     {
-        $cargaHorarium->delete();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Carga horaria eliminada exitosamente'
-        ]);
+        try {
+            $cargaHorarium->forceDelete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Carga horaria eliminada exitosamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar: ' . $e->getMessage()
+            ], 500);
+        }
     }
     
     public function toggleActive(CargaHoraria $cargaHorarium)
@@ -255,6 +300,81 @@ class CargaHorariaController extends Controller
             'estado' => $cargaHorarium->estado
         ]);
     }
+
+    /**
+     * Asignar un aula al docente sin especificar curso (curso_id = null).
+     * Si ya existe una asignación para el docente y el aula con curso_id null, devuelve la existente.
+     */
+    public function assignAulaOnly(Request $request)
+    {
+        $request->validate([
+            'aula_id' => 'required|exists:aulas,id',
+        ]);
+
+        $docenteId = auth()->id();
+        $aulaId = $request->aula_id;
+
+        $existing = CargaHoraria::where('docente_id', $docenteId)
+            ->where('aula_id', $aulaId)
+            ->whereNull('curso_id')
+            ->first();
+
+        if ($existing) {
+            return response()->json(['success' => true, 'message' => 'Asignación existente encontrada', 'data' => $existing]);
+        }
+
+        $carga = CargaHoraria::create([
+            'docente_id' => $docenteId,
+            'curso_id' => null,
+            'aula_id' => $aulaId,
+            'horas_semanales' => null,
+            'dia_semana' => null,
+            'hora_inicio' => null,
+            'hora_fin' => null,
+            'estado' => 'activo',
+            'observaciones' => 'Asignación automática desde Registro de Competencias (sin curso)'
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Asignación creada', 'data' => $carga]);
+    }
+
+    /**
+     * Remover la asignación creada sin curso (curso_id = null) para el docente y aula.
+     * Se puede pasar `carga_id` o `aula_id`.
+     */
+    public function removeAulaOnly(Request $request)
+    {
+        $docenteId = auth()->id();
+
+        if ($request->filled('carga_id')) {
+            $carga = CargaHoraria::where('id', $request->carga_id)->where('docente_id', $docenteId)->first();
+            if (!$carga) {
+                return response()->json(['success' => false, 'message' => 'Asignación no encontrada'], 404);
+            }
+            // Only delete if it has curso_id null
+            if (!is_null($carga->curso_id)) {
+                return response()->json(['success' => false, 'message' => 'Esta asignación tiene curso asociado, no se puede eliminar con este endpoint'], 422);
+            }
+            $carga->delete();
+            return response()->json(['success' => true, 'message' => 'Asignación eliminada']);
+        }
+
+        $request->validate(['aula_id' => 'required|exists:aulas,id']);
+        $aulaId = $request->aula_id;
+
+        $carga = CargaHoraria::where('docente_id', $docenteId)
+            ->where('aula_id', $aulaId)
+            ->whereNull('curso_id')
+            ->first();
+
+        if (!$carga) {
+            return response()->json(['success' => false, 'message' => 'Asignación no encontrada'], 404);
+        }
+
+        $carga->delete();
+
+        return response()->json(['success' => true, 'message' => 'Asignación eliminada']);
+    }
     
     // app/Http/Controllers/CargaHorariaController.php
 
@@ -264,17 +384,20 @@ class CargaHorariaController extends Controller
             'docente_id' => 'required|exists:users,id'
         ]);
         
-        $cursosAsignados = CargaHoraria::where('docente_id', $request->docente_id)
+        $asignaciones = CargaHoraria::where('docente_id', $request->docente_id)
             ->where('estado', 'activo')
             ->with(['curso' => function($q) {
                 $q->with('nivel');
             }, 'aula'])
             ->get();
         
-        // Verificar si hay resultados
-        if ($cursosAsignados->isEmpty()) {
-            return response()->json([]); // Array vacío está bien
-        }
+        $cursosAsignados = $asignaciones->filter(function ($carga) {
+            return !is_null($carga->curso_id);
+        })->values();
+
+        $aulasSinCurso = $asignaciones->filter(function ($carga) {
+            return is_null($carga->curso_id) && !is_null($carga->aula_id);
+        })->values();
         
         // Mapear asegurando que todas las propiedades existan
         $resultado = $cursosAsignados->map(function($carga) {
@@ -302,7 +425,19 @@ class CargaHorariaController extends Controller
             'data' => $resultado->toArray()
         ]);
         
-        return response()->json($resultado);
+        return response()->json([
+            'cursos' => $resultado,
+            'aulas_sin_curso' => $aulasSinCurso->map(function ($carga) {
+                return [
+                    'id' => $carga->id,
+                    'carga_id' => $carga->id,
+                    'aula_id' => $carga->aula_id,
+                    'aula' => $carga->aula->nombre ?? 'Aula no asignada',
+                    'nivel' => $carga->aula?->grado?->nivel?->nombre ?? 'Sin nivel',
+                    'seccion' => $carga->aula?->seccion?->nombre ?? null,
+                ];
+            })->values(),
+        ]);
     }
     
     public function getAulasByCurso(Request $request)

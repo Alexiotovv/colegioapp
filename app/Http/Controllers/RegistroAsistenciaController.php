@@ -4,6 +4,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\RegistroAsistencia;
+use App\Models\CargaHoraria;
 use App\Models\Aula;
 use App\Models\TipoInasistencia;
 use App\Models\Periodo;
@@ -65,9 +66,9 @@ class RegistroAsistenciaController extends Controller
         
         // Verificar permisos
         if ($rol !== 'admin') {
-            $tieneAcceso = Aula::where('id', $aulaId)
+            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
                 ->where('docente_id', $docenteId)
-                ->where('activo', true)
+                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -86,9 +87,21 @@ class RegistroAsistenciaController extends Controller
             ->orderBy('alumnos.nombres', 'ASC')
             ->get();
         
-        // Obtener todos los tipos de inasistencia activos
+        // Determinar el nivel del aula y obtener solo los tipos aplicables a ese nivel
+        $aula = Aula::with('grado.nivel')->find($aulaId);
+        $nivelId = null;
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelId = $aula->grado->nivel->id;
+        }
+
         $tiposInasistencia = TipoInasistencia::with('nivel')
             ->where('activo', true)
+            ->when($nivelId !== null, function ($query) use ($nivelId) {
+                // incluir tipos que sean globales (nivel_id null) o que pertenezcan al nivel del aula
+                $query->where(function ($q) use ($nivelId) {
+                    $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
+                });
+            })
             ->orderBy('orden')
             ->get();
         

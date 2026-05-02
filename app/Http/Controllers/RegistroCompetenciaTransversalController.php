@@ -4,6 +4,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\RegistroCompetenciaTransversal;
+use App\Models\CargaHoraria;
 use App\Models\Aula;
 use App\Models\CompetenciaTransversal;
 use App\Models\Periodo;
@@ -29,9 +30,16 @@ class RegistroCompetenciaTransversalController extends Controller
                 ->orderBy('nombre')
                 ->get();
         } else {
+            $aulaIdsAsignadas = CargaHoraria::where('docente_id', $docenteId)
+                ->where('estado', 'activo')
+                ->whereNotNull('aula_id')
+                ->pluck('aula_id')
+                ->unique()
+                ->values();
+
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('docente_id', $docenteId)
                 ->where('activo', true)
+                ->whereIn('id', $aulaIdsAsignadas)
                 ->orderBy('nombre')
                 ->get();
         }
@@ -62,9 +70,9 @@ class RegistroCompetenciaTransversalController extends Controller
         
         // Verificar permisos
         if ($rol !== 'admin') {
-            $tieneAcceso = Aula::where('id', $aulaId)
+            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
                 ->where('docente_id', $docenteId)
-                ->where('activo', true)
+                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -83,16 +91,28 @@ class RegistroCompetenciaTransversalController extends Controller
             ->orderBy('alumnos.nombres', 'ASC')
             ->get();
         
-        // Obtener todas las competencias transversales activas
+        // Obtener el aula y determinar su nivel para filtrar competencias aplicables
+        $aula = Aula::with(['grado.nivel'])->find($aulaId);
+        $nivelId = null;
+        if ($aula && $aula->grado && $aula->grado->nivel) {
+            $nivelId = $aula->grado->nivel->id;
+        }
+
+        // Obtener todas las competencias transversales activas (filtrar por nivel si aplica)
         $competencias = CompetenciaTransversal::with('nivel')
             ->where('activo', true)
+            ->when($nivelId !== null, function ($query) use ($nivelId) {
+                $query->where(function ($q) use ($nivelId) {
+                    $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
+                });
+            })
             ->orderBy('orden')
             ->get();
-        
+
         // Obtener registros existentes
         $matriculaIds = $matriculas->pluck('id')->toArray();
         $competenciaIds = $competencias->pluck('id')->toArray();
-        
+
         $registros = RegistroCompetenciaTransversal::where('periodo_id', $periodoId)
             ->whereIn('matricula_id', $matriculaIds)
             ->whereIn('competencia_transversal_id', $competenciaIds)
@@ -107,7 +127,6 @@ class RegistroCompetenciaTransversalController extends Controller
 
         $esPrimaria = false;
         $esSecundaria = false;
-        $aula = Aula::with(['grado.nivel'])->find($aulaId);
         if ($aula && $aula->grado && $aula->grado->nivel) {
             $nivelNombre = $aula->grado->nivel->nombre;
             $esPrimaria = stripos($nivelNombre, 'primaria') !== false;

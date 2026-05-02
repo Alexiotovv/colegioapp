@@ -202,6 +202,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/carga-horaria/reporte', [CargaHorariaReporteController::class, 'index'])->name('carga-horaria-reporte.reporte');
             Route::get('/carga-horaria/reporte/data', [CargaHorariaReporteController::class, 'data'])->name('carga-horaria-reporte.data');
             Route::get('/carga-horaria/aulas-disponibles', [CargaHorariaReporteController::class, 'getAulasDisponibles'])->name('carga-horaria-reporte.aulas-disponibles');
+            // Endpoints AJAX para asignar/eliminar aula sin curso (curso_id = null)
+            Route::post('/carga-horaria/assign-aula', [CargaHorariaController::class, 'assignAulaOnly'])->name('carga-horaria.assign-aula');
+            Route::post('/carga-horaria/remove-aula', [CargaHorariaController::class, 'removeAulaOnly'])->name('carga-horaria.remove-aula');
             Route::resource('carga-horaria', CargaHorariaController::class);
             Route::patch('/carga-horaria/{cargaHorarium}/toggle', [CargaHorariaController::class, 'toggleActive'])->name('carga-horaria.toggle');
         });

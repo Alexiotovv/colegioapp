@@ -592,7 +592,7 @@ $(document).ready(function() {
 
     // Cargar opciones de notas al inicio
     cargarOpcionesNotas();
-    
+
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
         $('#fabMenu').toggleClass('show');

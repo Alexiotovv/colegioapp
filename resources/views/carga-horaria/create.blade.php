@@ -228,6 +228,15 @@
                                         <i class="fas fa-arrow-right me-2"></i> Guardar cursos
                                     </button>
                                 </div>
+                                <div class="col-12 mt-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aulaSinCursoCheck">
+                                        <label class="form-check-label" for="aulaSinCursoCheck">
+                                            Asignar aula sin curso (registro automático en `carga_horaria` con `curso_id = null`)
+                                        </label>
+                                    </div>
+                                    <input type="hidden" id="aulaSinCursoCargaId" value="">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -341,6 +350,8 @@ let aulaSeleccionadaNivelId = null;
 let selectedCourseIds = [];
 let todosLosCursos = [];
 let cursosAsignados = [];
+let aulasSinCursoAsignadas = [];
+let modoAulaSinCurso = false;
 
 $(document).ready(function() {
     // Inicializar Select2
@@ -381,6 +392,16 @@ $(document).ready(function() {
             }
         });
     });
+
+    $('#aulaSinCursoCheck').on('change', function() {
+        modoAulaSinCurso = $(this).is(':checked');
+
+        if (modoAulaSinCurso) {
+            guardarAulaSinCurso();
+        } else {
+            eliminarAulaSinCurso();
+        }
+    });
     
     // Cuando se selecciona un docente
     $('#docente_id').on('change', function() {
@@ -406,7 +427,7 @@ $(document).ready(function() {
                         return;
                     }
                     console.log('Cursos totales cargados:', todosLosCursos.length);
-                        cargarAulasDisponibles();
+                    cargarAulasDisponibles();
                     cargarCursosDocente(docenteId);
                 },
                 error: function(xhr) {
@@ -420,6 +441,10 @@ $(document).ready(function() {
             $('#datosAdicionales').hide();
             $('#botonesAccion').hide();
             $('#aulaSelectorContainer').hide();
+            aulasSinCursoAsignadas = [];
+            modoAulaSinCurso = false;
+            $('#aulaSinCursoCheck').prop('checked', false);
+            $('#aulaSinCursoCargaId').val('');
         }
     });
 
@@ -432,10 +457,10 @@ $(document).ready(function() {
             selectedCourseIds = [];
             actualizarCursosDisponibles();
             renderizarCursos();
-            $('#btnGuardarCursos').prop('disabled', true);
-            $('#btnGuardarCursosFlecha').prop('disabled', true);
+            sincronizarAulaSinCursoEstado();
         } else {
             $('#aulaSeleccionadaNombre').text('');
+            sincronizarAulaSinCursoEstado();
             $('#cursosDisponiblesList').html(`
                 <div class="empty-cursos">
                     <i class="fas fa-info-circle fa-2x mb-2 d-block"></i>
@@ -457,11 +482,16 @@ $(document).ready(function() {
             success: function(response) {
                 // Normalizar distintos formatos de respuesta para cursos asignados
                 let raw = null;
+                let rawAulasSinCurso = [];
                 if (Array.isArray(response)) raw = response;
                 else if (response && Array.isArray(response.data)) raw = response.data;
                 else if (response && Array.isArray(response.cursos)) raw = response.cursos;
                 else if (response && Array.isArray(response.asignaciones)) raw = response.asignaciones;
                 else raw = [];
+
+                if (response && Array.isArray(response.aulas_sin_curso)) {
+                    rawAulasSinCurso = response.aulas_sin_curso;
+                }
 
                 console.log('RAW cursos-asignados:', raw);
 
@@ -503,8 +533,18 @@ $(document).ready(function() {
                     };
                 });
 
+                aulasSinCursoAsignadas = rawAulasSinCurso.map(item => ({
+                    id: item.id || item.carga_id || '',
+                    carga_id: item.carga_id || item.id || null,
+                    aula_id: item.aula_id || null,
+                    aula: item.aula || 'Aula no asignada',
+                    nivel: item.nivel || '',
+                    seccion: item.seccion || ''
+                }));
+
                 console.log('Cursos asignados procesados:', cursosAsignados.length);
                 renderizarCursos();
+                sincronizarAulaSinCursoEstado();
                 $('#cursosSection').show();
                 mostrarLoading(false);
             },
@@ -577,8 +617,8 @@ $(document).ready(function() {
 function renderizarCursos() {
     // Filtrar cursos asignados por aula seleccionada, si existe
     let cursosAsignadosFiltrados = aulaSeleccionadaId
-        ? cursosAsignados.filter(c => String(c.aula_id) === String(aulaSeleccionadaId))
-        : cursosAsignados;
+        ? cursosAsignados.filter(c => c.id && String(c.aula_id) === String(aulaSeleccionadaId))
+        : cursosAsignados.filter(c => c.id);
     // IDs de cursos ya asignados (soportar id o curso_id)
     let idsAsignados = cursosAsignadosFiltrados.map(c => c.id || c.curso_id);
     // Actualizar contadores
@@ -630,6 +670,32 @@ function renderizarCursos() {
 
     if (aulaSeleccionadaId) {
         actualizarCursosDisponibles();
+    }
+}
+
+function sincronizarAulaSinCursoEstado() {
+    if (!aulaSeleccionadaId) {
+        modoAulaSinCurso = false;
+        $('#aulaSinCursoCheck').prop('checked', false);
+        $('#aulaSinCursoCargaId').val('');
+        $('#cursosSection .card-body > .cursos-container').show();
+        return;
+    }
+
+    let asignacion = aulasSinCursoAsignadas.find(item => String(item.aula_id) === String(aulaSeleccionadaId));
+
+    if (asignacion) {
+        modoAulaSinCurso = true;
+        $('#aulaSinCursoCheck').prop('checked', true);
+        $('#aulaSinCursoCargaId').val(asignacion.carga_id || '');
+        $('#cursosSection .card-body > .cursos-container').hide();
+        $('#btnGuardarCursos').prop('disabled', true);
+        $('#btnGuardarCursosFlecha').prop('disabled', true);
+    } else {
+        modoAulaSinCurso = false;
+        $('#aulaSinCursoCheck').prop('checked', false);
+        $('#aulaSinCursoCargaId').val('');
+        $('#cursosSection .card-body > .cursos-container').show();
     }
 }
 
@@ -731,6 +797,11 @@ function mostrarLoading(mostrar) {
 }
 
 function guardarCursosSeleccionados() {
+    if (modoAulaSinCurso) {
+        guardarAulaSinCurso();
+        return;
+    }
+
     let docenteId = $('#docente_id').val();
     let aulaId = $('#aula_id').val();
     let horasSem = $('#horas_semanales').val();
@@ -822,6 +893,105 @@ function guardarCursosSeleccionados() {
     });
 }
 
+function guardarAulaSinCurso() {
+    let docenteId = $('#docente_id').val();
+    let aulaId = $('#aula_id').val();
+
+    if (!docenteId || !aulaId) {
+        toast.error('Seleccione docente y aula antes de activar el registro sin curso');
+        $('#aulaSinCursoCheck').prop('checked', false);
+        modoAulaSinCurso = false;
+        $('#cursosSection .card-body > .cursos-container').show();
+        return;
+    }
+
+    $.ajax({
+        url: '{{ route("admin.carga-horaria.store") }}',
+        method: 'POST',
+        data: {
+            docente_id: docenteId,
+            aula_id: aulaId,
+            aula_sin_curso: 1,
+            horas_semanales: $('#horas_semanales').val(),
+            dia_semana: $('#dia_semana').val(),
+            hora_inicio: $('#hora_inicio').val(),
+            hora_fin: $('#hora_fin').val(),
+            observaciones: $('#observaciones').val(),
+            _token: '{{ csrf_token() }}'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                $('#aulaSinCursoCargaId').val(response.data?.id || '');
+                let aulaAsignada = response.data?.aula_id || aulaId;
+                aulasSinCursoAsignadas = aulasSinCursoAsignadas.filter(item => String(item.aula_id) !== String(aulaAsignada));
+                aulasSinCursoAsignadas.push({
+                    id: response.data?.id || '',
+                    carga_id: response.data?.id || '',
+                    aula_id: aulaAsignada,
+                    aula: response.data?.aula?.nombre || $('#aula_id option:selected').text() || ''
+                });
+                selectedCourseIds = [];
+                modoAulaSinCurso = true;
+                $('#btnGuardarCursos').prop('disabled', true);
+                $('#btnGuardarCursosFlecha').prop('disabled', true);
+                $('#cursosSection .card-body > .cursos-container').hide();
+                toast.success(response.message || 'Aula asignada sin curso');
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = xhr.responseJSON?.message || 'No se pudo guardar el aula sin curso';
+            toast.error(errorMsg);
+            $('#aulaSinCursoCheck').prop('checked', false);
+            modoAulaSinCurso = false;
+            $('#cursosSection .card-body > .cursos-container').show();
+        }
+    });
+}
+
+function eliminarAulaSinCurso() {
+    let cargaId = $('#aulaSinCursoCargaId').val();
+    let aulaId = $('#aula_id').val();
+
+    if (!aulaId) {
+        $('#aulaSinCursoCargaId').val('');
+        return;
+    }
+
+    if (!cargaId) {
+        let asignacion = aulasSinCursoAsignadas.find(item => String(item.aula_id) === String(aulaId));
+        cargaId = asignacion?.carga_id || asignacion?.id || '';
+    }
+
+    if (!cargaId) {
+        $('#aulaSinCursoCheck').prop('checked', false);
+        modoAulaSinCurso = false;
+        $('#cursosSection .card-body > .cursos-container').show();
+        return;
+    }
+
+    $.ajax({
+        url: '/admin/carga-horaria/' + cargaId,
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        dataType: 'json',
+        success: function(response) {
+            $('#aulaSinCursoCargaId').val('');
+            aulasSinCursoAsignadas = aulasSinCursoAsignadas.filter(item => String(item.aula_id) !== String(aulaId));
+            modoAulaSinCurso = false;
+            $('#aulaSinCursoCheck').prop('checked', false);
+            $('#cursosSection .card-body > .cursos-container').show();
+            toast.success(response.message || 'Asignación sin curso eliminada');
+        },
+        error: function(xhr) {
+            let errorMsg = xhr.responseJSON?.message || 'No se pudo eliminar el aula sin curso';
+            toast.error(errorMsg);
+        }
+    });
+}
+
 function verificarDuplicadoAsignacion(docenteId, aulaId, cursoIds, callback) {
     $.ajax({
         url: '{{ route("admin.carga-horaria.verificar-duplicado") }}',
@@ -851,11 +1021,16 @@ function recargarCursosAsignados(docenteId) {
         dataType: 'json',
         success: function(response) {
             let raw = null;
+            let rawAulasSinCurso = [];
             if (Array.isArray(response)) raw = response;
             else if (response && Array.isArray(response.data)) raw = response.data;
             else if (response && Array.isArray(response.cursos)) raw = response.cursos;
             else if (response && Array.isArray(response.asignaciones)) raw = response.asignaciones;
             else raw = [];
+
+            if (response && Array.isArray(response.aulas_sin_curso)) {
+                rawAulasSinCurso = response.aulas_sin_curso;
+            }
             
             cursosAsignados = raw.map(item => {
                 if (item && (item.id || item.curso_id) && (item.nombre || item.name || item.titulo || item.curso_nombre)) {
@@ -891,9 +1066,19 @@ function recargarCursosAsignados(docenteId) {
                     aula: item.aula || item.aula_nombre || ''
                 };
             });
+
+            aulasSinCursoAsignadas = rawAulasSinCurso.map(item => ({
+                id: item.id || item.carga_id || '',
+                carga_id: item.carga_id || item.id || null,
+                aula_id: item.aula_id || null,
+                aula: item.aula || 'Aula no asignada',
+                nivel: item.nivel || '',
+                seccion: item.seccion || ''
+            }));
             
             console.log('Cursos asignados recargados:', cursosAsignados.length);
             renderizarCursos();
+            sincronizarAulaSinCursoEstado();
             if (aulaSeleccionadaId) {
                 actualizarCursosDisponibles();
             }
@@ -950,6 +1135,9 @@ function limpiarFormulario() {
     aulaSeleccionadaId = null;
     aulaSeleccionadaNivelId = null;
     selectedCourseIds = [];
+    modoAulaSinCurso = false;
+    $('#aulaSinCursoCheck').prop('checked', false);
+    $('#aulaSinCursoCargaId').val('');
     $('#aulaSeleccionadaId').val('');
     $('#aula_id').html('<option value="">-- Seleccionar aula --</option>').prop('disabled', true);
     $('#horas_semanales').val('4');
@@ -960,6 +1148,7 @@ function limpiarFormulario() {
     $('#aulaSelectorContainer').hide();
     $('#datosAdicionales').hide();
     $('#botonesAccion').hide();
+    $('#cursosSection .card-body > .cursos-container').show();
     let btn = $('#btnGuardarCursos');
     let btnFlecha = $('#btnGuardarCursosFlecha');
     btn.prop('disabled', true);
