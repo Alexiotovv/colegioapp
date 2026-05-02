@@ -35,11 +35,8 @@ class RegistroEvaluacionController extends Controller
                 ->get();
         }
         
-        // 🔥 Obtener todas las evaluaciones activas
-        $evaluaciones = Evaluacion::with('nivel')
-            ->where('activo', true)
-            ->orderBy('orden')
-            ->get();
+        // No pre-cargamos evaluaciones en la vista inicial; se solicitarán vía AJAX
+        $evaluaciones = collect();
         
         $periodos = Periodo::with('anioAcademico')
             ->orderBy('orden')
@@ -90,11 +87,26 @@ class RegistroEvaluacionController extends Controller
         )
         ->get();
         
-        // 🔥 Obtener todas las evaluaciones activas
-        $evaluaciones = Evaluacion::with('nivel')
-            ->where('activo', true)
-            ->orderBy('orden')
-            ->get();
+        // 🔥 Obtener las evaluaciones activas correspondientes al nivel del aula
+        $aula = Aula::with(['grado', 'nivel'])->find($aulaId);
+
+        if ($aula) {
+            $nivelId = $aula->nivel_id ?? ($aula->grado->nivel_id ?? null);
+
+            if ($nivelId) {
+                $evaluaciones = Evaluacion::with('nivel')
+                    ->where('activo', true)
+                    ->where('nivel_id', $nivelId)
+                    ->orderBy('orden')
+                    ->get();
+            } else {
+                // Si no se encuentra nivel asociado, devolver colección vacía
+                $evaluaciones = collect();
+            }
+        } else {
+            // Aula no encontrada -> devolver colección vacía
+            $evaluaciones = collect();
+        }
         
         // Obtener registros existentes
         $matriculaIds = $matriculas->pluck('id')->toArray();
