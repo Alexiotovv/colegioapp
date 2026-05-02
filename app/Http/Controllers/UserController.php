@@ -14,10 +14,23 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('role')->paginate(15);
-        return view('users.index', compact('users'));
+        $search = trim((string) $request->query('search', ''));
+
+        $users = User::with('role')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('email', 'like', '%' . $search . '%')
+                        ->orWhere('username', 'like', '%' . $search . '%');
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate(15)
+            ->appends(['search' => $search]);
+
+        return view('users.index', compact('users', 'search'));
     }
     
     public function create()

@@ -14,7 +14,7 @@
 
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 11px;
+            font-size: 9px;
             background: #ececec;
         }
 
@@ -53,7 +53,7 @@
 
         h1 {
             text-align: center;
-            font-size: 13px;
+            font-size: 11px;
             margin-bottom: 8px;
         }
 
@@ -72,8 +72,8 @@
         }
 
         .logo-side img {
-            max-width: 150px;
-            max-height: 180px;
+            max-width: 100px;
+            max-height: 120px;
         }
 
         .center-box {
@@ -87,7 +87,8 @@
 
         .info-top td {
             border: 1px solid #000;
-            padding: 6px;
+            padding: 3px;
+            font-size: 8px;
         }
 
         .label {
@@ -106,8 +107,8 @@
         th,
         td {
             border: 1px solid #000;
-            padding: 5px;
-            font-size: 9px
+            padding: 3px;
+            font-size: 7px
         }
 
         th {
@@ -116,7 +117,7 @@
         }
 
         .tabla-notas td {
-            font-size: 11px;
+            font-size: 8px;
         }
 
         .tabla-notas td:first-child {

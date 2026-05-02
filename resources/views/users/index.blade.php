@@ -74,10 +74,31 @@
 
         <div class="tab-content pt-4">
             <div class="tab-pane fade show active" id="usuarios-pane" role="tabpanel">
-                <div class="d-flex justify-content-end mb-3">
-                    <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i> Nuevo Usuario
-                    </a>
+                <div class="row g-3 align-items-center mb-3">
+                    <div class="col-md-6 col-lg-5">
+                        <form method="GET" action="{{ route('admin.users.index') }}" class="d-flex gap-2">
+                            <input
+                                type="text"
+                                name="search"
+                                class="form-control"
+                                placeholder="Buscar por nombre, correo o usuario"
+                                value="{{ $search ?? request('search') }}"
+                            >
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            @if(!empty($search ?? request('search')))
+                                <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i>
+                                </a>
+                            @endif
+                        </form>
+                    </div>
+                    <div class="col-md-6 col-lg-7 text-md-end">
+                        <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i> Nuevo Usuario
+                        </a>
+                    </div>
                 </div>
 
                 <div class="table-container">

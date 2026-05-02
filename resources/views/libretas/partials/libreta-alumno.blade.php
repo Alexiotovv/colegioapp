@@ -144,15 +144,15 @@
     <thead>
         <tr>
             <th rowspan="2" style="width: 10%;">Área curricular</th>
-            <th rowspan="2" style="width: 25%;">Competencias</th>
+            <th rowspan="2" style="width: 35%;">Competencias</th>
             @foreach($periodos as $periodo)
                 <th colspan="2" style="text-align: center;">{{ $periodo->nombre }}</th>
             @endforeach
-            <th rowspan="2" style="width: 12%;">NL alcanzado al finalizar el período lectivo</th>
+            <th rowspan="2" style="width: 8%; max-width: 50px;">NL alcanzado</th>
         </tr>
         <tr>
             @foreach($periodos as $periodo)
-                <th style="width: 8%;">NL</th>
+                <th style="width: 5%; max-width: 40px;">NL</th>
                 <th style="width: 20%;">Conclusión descriptiva</th>
             @endforeach
         </tr>
