@@ -15,6 +15,7 @@
                     <input type="hidden" id="curso_id" name="curso_id">
                     <input type="hidden" id="curso_nivel_id" name="nivel_id">
                     <input type="hidden" id="curso_anio_id" name="anio_academico_id">
+                    <input type="hidden" name="aulas_excluidas_present" value="1">
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -57,6 +58,25 @@
                     <div class="mb-3">
                         <label for="curso_descripcion" class="form-label">Descripción</label>
                         <textarea class="form-control" id="curso_descripcion" name="descripcion" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="curso_aulas_excluidas" class="form-label">No enseñar en estas aulas</label>
+                        <select class="form-select" id="curso_aulas_excluidas" name="aulas_excluidas[]" multiple size="8">
+                            @foreach($niveles as $nivel)
+                                @php
+                                    $aulasNivel = $aulasPorNivel[$nivel->id] ?? collect();
+                                @endphp
+                                @if($aulasNivel->count())
+                                    <optgroup label="{{ $nivel->nombre }}">
+                                        @foreach($aulasNivel as $aula)
+                                            <option value="{{ $aula->id }}">{{ $aula->nombreCompleto }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                            @endforeach
+                        </select>
+                        <small class="text-muted">Si seleccionas un aula, este curso no aparecerá en la libreta de esa sección.</small>
                     </div>
                     
                     <div class="alert alert-info">

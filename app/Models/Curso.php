@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Curso extends Model
@@ -60,6 +61,11 @@ class Curso extends Model
     public function competencias(): HasMany
     {
         return $this->hasMany(Competencia::class, 'curso_id');
+    }
+
+    public function aulasExcluidas(): BelongsToMany
+    {
+        return $this->belongsToMany(Aula::class, 'curso_aula_exclusiones', 'curso_id', 'aula_id');
     }
     
     // 🔥 Método para obtener grado (puede ser null o calcular desde nivel)

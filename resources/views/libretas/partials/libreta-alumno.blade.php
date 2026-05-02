@@ -7,13 +7,20 @@
     $esPrimaria = $nivel && $nivel->nombre == 'Primaria';
     
     // ==================== 1. CURSOS Y COMPETENCIAS (filtrado por nivel) ====================
-    $cursos = \App\Models\Curso::with(['competencias' => function($q){
-        $q->where('activo', true)->orderBy('orden');
-    }])
+    $cursos = \App\Models\Curso::with([
+        'competencias' => function($q){
+            $q->where('activo', true)->orderBy('orden');
+        },
+        'aulasExcluidas:id'
+    ])
     ->where('nivel_id', $nivelId)
     ->where('activo', true)
     ->ordered()
     ->get();
+
+    $cursos = $cursos->reject(function ($curso) use ($aula) {
+        return $curso->aulasExcluidas->contains('id', $aula->id);
+    })->values();
     
     $notasPorPeriodo = [];
     

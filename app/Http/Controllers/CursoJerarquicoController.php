@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Aula;
 use App\Models\Nivel;
 use App\Models\AnioAcademico;
 use App\Models\Curso;
@@ -17,11 +18,17 @@ class CursoJerarquicoController extends Controller
         $anios = AnioAcademico::orderBy('anio', 'desc')->get();
         $anioActivo = AnioAcademico::where('activo', true)->first();
         $niveles = Nivel::where('activo', true)->orderBy('orden')->get();
+        $aulasPorNivel = Aula::with('nivel')
+            ->where('activo', true)
+            ->orderBy('nivel_id')
+            ->orderBy('nombre')
+            ->get()
+            ->groupBy('nivel_id');
         
         // Obtener datos jerárquicos
         $data = $this->getHierarchyData($anioActivo ? $anioActivo->id : null);
         
-        return view('cursos-jerarquico.index', compact('anios', 'anioActivo', 'niveles', 'data'));
+        return view('cursos-jerarquico.index', compact('anios', 'anioActivo', 'niveles', 'aulasPorNivel', 'data'));
     }
     
     public function getHierarchyData($anioId = null)
@@ -69,6 +76,8 @@ class CursoJerarquicoController extends Controller
             'nivel_id' => 'required|exists:niveles,id',
             'anio_academico_id' => 'required|exists:anio_academicos,id',
             'horas_semanales' => 'nullable|integer|min:0|max:40',
+            'aulas_excluidas' => 'nullable|array',
+            'aulas_excluidas.*' => 'integer|exists:aulas,id',
         ]);
         
         $curso = Curso::create([
@@ -82,9 +91,11 @@ class CursoJerarquicoController extends Controller
             'nivel_id' => $request->nivel_id,
             'anio_academico_id' => $request->anio_academico_id,
         ]);
+
+        $this->syncAulasExcluidas($curso, $request);
         
         if ($request->ajax()) {
-            return response()->json(['success' => true, 'curso' => $curso, 'message' => 'Curso creado exitosamente']);
+            return response()->json(['success' => true, 'curso' => $curso->load('aulasExcluidas'), 'message' => 'Curso creado exitosamente']);
         }
         
         return redirect()->back()->with('success', 'Curso creado exitosamente');
@@ -145,6 +156,8 @@ class CursoJerarquicoController extends Controller
             'codigo' => 'required|string|max:20|unique:cursos,codigo,' . $curso->id,
             'tipo' => 'required|in:AREA,TALLER,TUTORIA',
             'horas_semanales' => 'nullable|integer|min:0|max:40',
+            'aulas_excluidas' => 'nullable|array',
+            'aulas_excluidas.*' => 'integer|exists:aulas,id',
         ]);
         
         $curso->update([
@@ -155,6 +168,8 @@ class CursoJerarquicoController extends Controller
             'orden' => $request->orden ?? 0,
             'descripcion' => $request->descripcion,
         ]);
+
+        $this->syncAulasExcluidas($curso, $request);
         
         return response()->json(['success' => true, 'message' => 'Curso actualizado exitosamente']);
     }
@@ -236,7 +251,7 @@ class CursoJerarquicoController extends Controller
 
     public function getCurso(Curso $curso)
     {
-        return response()->json($curso);
+        return response()->json($curso->load('aulasExcluidas'));
     }
 
     public function getCompetencia(Competencia $competencia)
@@ -247,6 +262,13 @@ class CursoJerarquicoController extends Controller
     public function getCapacidad(Capacidad $capacidad)
     {
         return response()->json($capacidad);
+    }
+
+    private function syncAulasExcluidas(Curso $curso, Request $request): void
+    {
+        if ($request->has('aulas_excluidas_present')) {
+            $curso->aulasExcluidas()->sync(array_filter((array) $request->input('aulas_excluidas', [])));
+        }
     }
 
 

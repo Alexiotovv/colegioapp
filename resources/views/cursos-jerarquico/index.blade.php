@@ -232,6 +232,7 @@ $(document).ready(function() {
                     $('#curso_descripcion').val(response.descripcion);
                     $('#curso_nivel_id').val(response.nivel_id);
                     $('#curso_anio_id').val(response.anio_academico_id);
+                    $('#curso_aulas_excluidas').val((response.aulas_excluidas || []).map(aula => String(aula.id)));
                 },
                 error: function(xhr) {
                     console.error('Error:', xhr);
@@ -241,9 +242,10 @@ $(document).ready(function() {
         } else {
             $('#modalCursoTitle').text('Nuevo Curso');
             $('#btnSaveCurso').html('<i class="fas fa-save me-2"></i> Guardar');
+            $('#formCurso')[0].reset();
             $('#curso_nivel_id').val(nivelId);
             $('#curso_anio_id').val(currentAnioId);
-            $('#formCurso')[0].reset();
+            $('#curso_aulas_excluidas').val([]);
         }
         
         $('#modalCurso').modal('show');
@@ -252,6 +254,7 @@ $(document).ready(function() {
     window.resetCursoForm = function() {
         $('#formCurso')[0].reset();
         $('#curso_id').val('');
+        $('#curso_aulas_excluidas').val([]);
         $('.invalid-feedback').text('');
         $('.form-control, .form-select').removeClass('is-invalid');
     };
@@ -439,7 +442,7 @@ $(document).ready(function() {
     $('#formCurso').on('submit', function(e) {
         e.preventDefault();
         let cursoId = $('#curso_id').val();
-        let url = cursoId ? '/admin/cursos/' + cursoId : '{{ route("admin.cursos-jerarquico.store-curso") }}';
+        let url = cursoId ? '/admin/cursos-jerarquico/curso/' + cursoId : '{{ route("admin.cursos-jerarquico.store-curso") }}';
         let method = cursoId ? 'PUT' : 'POST';
         
         $.ajax({

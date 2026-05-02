@@ -150,7 +150,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/cursos-jerarquico/curso', [CursoJerarquicoController::class, 'storeCurso'])->name('cursos-jerarquico.store-curso');
             Route::post('/cursos-jerarquico/competencia', [CursoJerarquicoController::class, 'storeCompetencia'])->name('cursos-jerarquico.store-competencia');
             Route::post('/cursos-jerarquico/capacidad', [CursoJerarquicoController::class, 'storeCapacidad'])->name('cursos-jerarquico.store-capacidad');
-            Route::put('/cursos/{curso}', [CursoJerarquicoController::class, 'updateCurso'])->name('cursos-jerarquico.update-curso');
+            Route::put('/cursos-jerarquico/curso/{curso}', [CursoJerarquicoController::class, 'updateCurso'])->name('cursos-jerarquico.update-curso');
             Route::put('/competencias/{competencia}', [CursoJerarquicoController::class, 'updateCompetencia'])->name('cursos-jerarquico.update-competencia');
             Route::put('/capacidades/{capacidad}', [CursoJerarquicoController::class, 'updateCapacidad'])->name('cursos-jerarquico.update-capacidad');
             Route::delete('/cursos-jerarquico/curso/{curso}', [CursoJerarquicoController::class, 'destroyCurso'])->name('cursos-jerarquico.destroy-curso');
