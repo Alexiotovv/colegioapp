@@ -298,6 +298,7 @@ class RegistroCompetenciaTransversalController extends Controller
             'matricula_id' => 'required|exists:matriculas,id',
             'competencia_id' => 'required|exists:competencias_transversales,id',
             'periodo_id' => 'required|exists:periodos,id',
+            'nota' => 'nullable|string|max:10',
             'conclusion' => 'required|string',
         ]);
         
@@ -313,18 +314,39 @@ class RegistroCompetenciaTransversalController extends Controller
             ], 422);
         }
         
-        $registro = RegistroCompetenciaTransversal::updateOrCreate(
-            [
-                'matricula_id' => $request->matricula_id,
-                'competencia_transversal_id' => $request->competencia_id,
-                'periodo_id' => $request->periodo_id,
-            ],
-            [
+        $registro = RegistroCompetenciaTransversal::where('matricula_id', $request->matricula_id)
+            ->where('competencia_transversal_id', $request->competencia_id)
+            ->where('periodo_id', $request->periodo_id)
+            ->first();
+
+        if ($registro) {
+            $registro->update([
                 'docente_id' => auth()->id(),
                 'conclusion' => $request->conclusion,
                 'fecha_registro' => now(),
-            ]
-        );
+            ]);
+        } else {
+            $nota = strtoupper(trim((string) $request->nota));
+            $notasPermitidas = ['AD', 'A', 'B', 'C', 'CND', 'ND'];
+
+            if ($nota === '' || !in_array($nota, $notasPermitidas)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Debe seleccionar una nota válida antes de guardar la conclusión.'
+                ], 422);
+            }
+
+            $registro = RegistroCompetenciaTransversal::create([
+                'matricula_id' => $request->matricula_id,
+                'competencia_transversal_id' => $request->competencia_id,
+                'periodo_id' => $request->periodo_id,
+                'docente_id' => auth()->id(),
+                'nota' => $nota,
+                'tipo_calificacion' => 'LITERAL',
+                'conclusion' => $request->conclusion,
+                'fecha_registro' => now(),
+            ]);
+        }
         
         return response()->json([
             'success' => true,

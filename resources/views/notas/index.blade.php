@@ -734,19 +734,15 @@ $(document).ready(function() {
                 
                 bodyHtml += `
                     <td style="text-align: center; vertical-align: middle;">
-                        <div class="dropdown d-inline-block">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle nota-select ${notaGuardada}" 
-                                    type="button" data-bs-toggle="dropdown" 
-                                    data-matricula="${matricula.id}" 
-                                    data-competencia="${competencia.id}"
-                                    data-nota-id="${notaId}"
-                                    ${!notasHabilitadas ? 'disabled' : ''}>
-                                ${notaValue || 'Seleccionar'}
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-notas">
-                                ${opcionesNotas.map(op => `<li><a class="dropdown-item" href="#" data-valor="${op}">${op}</a></li>`).join('')}
-                            </ul>
-                        </div>
+                        <select class="form-select form-select-sm nota-select ${notaGuardada}"
+                                data-matricula="${matricula.id}"
+                                data-competencia="${competencia.id}"
+                                data-nota-id="${notaId}"
+                                ${!notasHabilitadas ? 'disabled' : ''}
+                                style="width: 110px; margin: 0 auto; display: inline-block;">
+                            <option value="">Seleccionar</option>
+                            ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
+                        </select>
                         <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-nota-id="${notaId}" value="${notaValue}">
                         <button class="btn-message" 
                             data-matricula="${matricula.id}"
@@ -806,22 +802,20 @@ $(document).ready(function() {
             abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor, matriculaId, competenciaId);
         });
         
-        // Eventos de los dropdowns
-        $('.dropdown-menu .dropdown-item').off('click').on('click', function(e) {
-            e.preventDefault();
-            let valor = $(this).data('valor');
-            let $boton = $(this).closest('td').find('.dropdown-toggle');
-            let $hiddenInput = $(this).closest('td').find('.nota-valor');
-            let $btnMensaje = $(this).closest('td').find('.btn-message');
+        // Evento de selección en nota (select nativo con soporte de direccionales)
+        $('.nota-select').off('change').on('change', function() {
+            let valor = $(this).val();
+            let $select = $(this);
+            let $hiddenInput = $select.closest('td').find('.nota-valor');
+            let $btnMensaje = $select.closest('td').find('.btn-message');
             
-            $boton.text(valor);
             $hiddenInput.val(valor);
             $btnMensaje.data('nota', valor);
             
             if (valor) {
-                $boton.addClass('nota-guardada');
+                $select.addClass('nota-guardada');
             } else {
-                $boton.removeClass('nota-guardada');
+                $select.removeClass('nota-guardada');
             }
 
             let ruleActive = Boolean(typeof requerirConclusionBCPrimaria !== 'undefined'
@@ -845,19 +839,25 @@ $(document).ready(function() {
                 : (typeof window !== 'undefined' ? window.requerirConclusionBSecundaria : false)
             );
             
-            if ((ruleActivePrimaria && isPrimaria && valor === 'B') ||
-                (ruleActiveSecundaria && isSecundaria && valor === 'B')) {
+            const requiereConclusionAhora =
+                (ruleActivePrimaria && isPrimaria && ['B', 'C'].includes(valor)) ||
+                (ruleActiveSecundaria && isSecundaria && valor === 'B');
+
+            if (requiereConclusionAhora) {
                 let mensaje = ruleActivePrimaria && isPrimaria ? 
                     'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.' :
                     'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
                 // Swal.fire('Atención', mensaje, 'info');
                 $btnMensaje.find('i').css('color', '#dc3545');
+            } else {
+                // Si ya no aplica la regla (por ejemplo, al cambiar a A), volver a color neutro
+                $btnMensaje.find('i').css('color', '#6c757d');
             }
 
             if (valor) {
-                $boton.addClass('modified');
+                $select.addClass('modified');
             } else {
-                $boton.removeClass('modified');
+                $select.removeClass('modified');
             }
             
             // Actualizar progress bar si existe

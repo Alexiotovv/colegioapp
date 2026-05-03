@@ -109,6 +109,25 @@
         border-radius: 50%;
         box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
     }
+
+    .select-wrapper {
+        position: relative;
+        display: inline-block;
+        z-index: 20;
+    }
+
+    .select-wrapper.modified::after {
+        content: '';
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        background: #dc3545;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+        z-index: 30;
+    }
     
     .conclusion-textarea {
         width: 200px;
@@ -740,18 +759,16 @@ $(document).ready(function() {
                 
                 bodyHtml += `
                     <td style="text-align: center;">
-                    <div class="dropdown d-inline-block">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle nota-select ${notaGuardada}" 
-                                type="button" data-bs-toggle="dropdown" 
-                                data-matricula="${matricula.id}" 
+                    <div class="select-wrapper">
+                        <select class="form-select form-select-sm nota-select ${notaGuardada}"
+                                data-matricula="${matricula.id}"
                                 data-competencia="${competencia.id}"
                                 data-registro-id="${registroId}"
-                                ${!registrosHabilitados ? 'disabled' : ''}>
-                            ${notaValue || 'Seleccionar'}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-notas">
-                            ${opcionesNotas.map(op => `<li><a class="dropdown-item" href="#" data-valor="${op}">${op}</a></li>`).join('')}
-                        </ul>
+                                ${!registrosHabilitados ? 'disabled' : ''}
+                                style="width: 110px; margin: 0 auto; display: inline-block;">
+                            <option value="">Seleccionar</option>
+                            ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
+                        </select>
                     </div>
                     <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-registro-id="${registroId}" value="${notaValue}">
                     <button class="btn-message" 
@@ -776,52 +793,54 @@ $(document).ready(function() {
     $('.nota-valor').each(function() {
         $(this).data('initial', $(this).val() || '');
         let inicial = $(this).data('initial');
-        let $boton = $(this).closest('td').find('.dropdown-toggle');
+        let $wrapper = $(this).closest('td').find('.select-wrapper');
         if ($(this).val() !== inicial) {
-            $boton.addClass('modified');
+            $wrapper.addClass('modified');
         } else {
-            $boton.removeClass('modified');
+            $wrapper.removeClass('modified');
         }
     });
     
-    // Configurar eventos de los dropdowns
-    $('.dropdown-menu .dropdown-item').on('click', function(e) {
-        e.preventDefault();
-        let valor = $(this).data('valor');
-        let boton = $(this).closest('td').find('.dropdown-toggle');
-        let hiddenInput = $(this).closest('td').find('.nota-valor');
-        let btnMensaje = $(this).closest('td').find('.btn-message');
+    // Configurar eventos de selección
+    $('.nota-select').off('change').on('change', function() {
+        let valor = $(this).val();
+        let $select = $(this);
+        let $wrapper = $select.closest('.select-wrapper');
+        let hiddenInput = $select.closest('td').find('.nota-valor');
+        let btnMensaje = $select.closest('td').find('.btn-message');
         
-        boton.text(valor);
         hiddenInput.val(valor);
         
         // Actualizar data-nota del botón mensaje
         btnMensaje.data('nota', valor);
         
         if (valor) {
-            boton.addClass('registro-guardado');
+            $select.addClass('registro-guardado');
         } else {
-            boton.removeClass('registro-guardado');
+            $select.removeClass('registro-guardado');
         }
 
         let inicial = hiddenInput.data('initial') || '';
         if (valor !== inicial) {
-            boton.addClass('modified');
+            $wrapper.addClass('modified');
         } else {
-            boton.removeClass('modified');
+            $wrapper.removeClass('modified');
         }
 
         let ruleActivePrimaria = requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(valor);
         let ruleActiveSecundaria = requiereConclusionBSecundaria && aulaEsSecundaria && valor === 'B';
-        if (ruleActivePrimaria || ruleActiveSecundaria) {
+        let tieneConclusion = btnMensaje.data('tiene-conclusion') === 1 || btnMensaje.data('tiene-conclusion') === '1';
+
+        if (tieneConclusion) {
+            btnMensaje.find('i').css('color', '#28a745');
+        } else if (ruleActivePrimaria || ruleActiveSecundaria) {
             let mensaje = ruleActivePrimaria
                 ? 'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.'
                 : 'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
             // Swal.fire('Atención', mensaje, 'info');
-            let tieneConclusion = btnMensaje.data('tiene-conclusion') === 1 || btnMensaje.data('tiene-conclusion') === '1';
-            if (!tieneConclusion) {
-                btnMensaje.find('i').css('color', '#dc3545');
-            }
+            btnMensaje.find('i').css('color', '#dc3545');
+        } else {
+            btnMensaje.find('i').css('color', '#6c757d');
         }
         
         actualizarProgreso();
@@ -1055,11 +1074,8 @@ $(document).ready(function() {
         $('#progressPercentage').text(porcentaje + '%');
         $('#progressBarFill').css('width', porcentaje + '%');
 
-        if (porcentaje === 100) {
-            $('#btnGuardarTodas').prop('disabled', false);
-        } else {
-            $('#btnGuardarTodas').prop('disabled', true);
-        }
+        // Permitir guardado parcial mientras el registro esté habilitado
+        $('#btnGuardarTodas').prop('disabled', !(registrosHabilitados && totalInputs > 0));
     }
 
 
@@ -1074,6 +1090,7 @@ $(document).ready(function() {
         $('#conclusion_matricula_id').val(matriculaId);
         $('#conclusion_competencia_id').val(competenciaId);
         $('#conclusion_texto').val('');
+        $('#btnGuardarConclusion').data('nota', notaValor || '');
         
         // Si ya existe un registro, cargar la conclusión existente
         if (registroId) {
@@ -1098,6 +1115,7 @@ $(document).ready(function() {
         let competenciaId = $('#conclusion_competencia_id').val();
         let conclusion = $('#conclusion_texto').val();
         let periodoId = $('#periodo_id').val();
+        let nota = ($('#btnGuardarConclusion').data('nota') || '').toString().trim();
         
         if (!conclusion.trim()) {
             toast.warning('Por favor ingrese una conclusión');
@@ -1112,6 +1130,7 @@ $(document).ready(function() {
                 matricula_id: matriculaId,
                 competencia_id: competenciaId,
                 periodo_id: periodoId,
+                nota: nota,
                 conclusion: conclusion,
                 _token: '{{ csrf_token() }}'
             },
