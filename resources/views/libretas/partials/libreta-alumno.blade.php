@@ -357,221 +357,239 @@
 @endif
 
 
-<!-- ==================== EVALUACIONES ACTITUDINALES e INASISTENCIAS ==================== -->
-<div class="two-columns">
-    @if(__cuadro_enabled('evaluaciones_actitudinales', $cuadrosForNivel) && $evaluacionesActitudinales && $evaluacionesActitudinales->count() > 0)
-        <table class="tabla-evaluacion-padres">
-            <thead>
-                <tr><th colspan="5">EVALUACIÓN ACTITUDINAL</th></tr>
-                <tr>
-                    <th>DESCRIPCIÓN</th>
-                    @foreach($periodos as $periodo)
-                        <th>{{ $periodo->nombre }}</th>
-                    @endforeach
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($evaluacionesActitudinales as $evaluacion)
-                    <tr>
-                        <td style="text-align: left;">{{ $evaluacion->nombre }}@if($evaluacion->descripcion)<br><small>{{ $evaluacion->descripcion }}</small>@endif</td>
-                        @foreach($periodos as $periodo)
-                            @php
-                                $registro = $registrosEvaluacionesActitudinales[$periodo->id][$evaluacion->id] ?? null;
-                                $valor = $registro ? $registro->valoracion : '';
-                            @endphp
-                            <td style="text-align: center;">{{ $valor }}@if($registro && $registro->comentario)<br><small class="text-muted">{{ $registro->comentario }}</small>@endif</td>
-                        @endforeach
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
 
-
-    <!-- INASISTENCIAS -->
-    <div class="column">
-        {{-- <h5>INASISTENCIAS</h5> --}}
-        @if(__cuadro_enabled('inasistencias', $cuadrosForNivel) && $tiposInasistencia && $tiposInasistencia->count() > 0)
-        <table class="tabla-evaluacion-padres">
-            <thead>
-                <tr><th colspan="5">ASISTENCIAS</th></tr>
-                <tr>
-                    <th>DESCRIPCIÓN</th>
-                    @foreach($periodos as $periodo)
-                        <th>{{ $periodo->nombre }}</th>
-                    @endforeach
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($tiposInasistencia as $tipo)
-                    <tr>
-                        <td style="text-align: left;">{{ $tipo->nombre }}</td>
-                        @foreach($periodos as $periodo)
-                            @php
-                                $inasistencia = $inasistencias[$periodo->id][$tipo->id] ?? null;
-                                $valor = $inasistencia ? $inasistencia->cantidad : '0';
-                            @endphp
-                            <td style="text-align: center;">{{ $valor }}</td>
-                        @endforeach
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        @else
-            <p class="text-muted">No hay tipos de inasistencia configurados para este nivel.</p>
-        @endif
-    </div>
-
-</div>
-
-<div class="two-columns">
-    
-    <!-- ==================== OTRAS EVALUACIONES ==================== -->
-    @if(__cuadro_enabled('otras_evaluaciones', $cuadrosForNivel) && $otrasEvaluaciones && $otrasEvaluaciones->count() > 0)
-    <!-- OTRAS EVALUACIONES -->
-        <div class="column">
-            
-            <table class="tabla-evaluacion-padres">
-                <thead>
-                    <tr><th colspan="5">COMPORTAMIENTO</th></tr>
-                    <tr>
-                        <th>DESCRIPCIÓN</th>
-                        @foreach($periodos as $periodo)
-                            <th>{{ $periodo->nombre }}</th>
-                        @endforeach
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($otrasEvaluaciones as $tipo)
-                        <tr>
-                            <td style="text-align: left;">{{ $tipo->nombre }}</td>
-                            @foreach($periodos as $periodo)
-                                @php
-                                    $registro = $registrosOtras[$periodo->id][$tipo->id] ?? null;
-                                    $valor = $registro ? $registro->valor : '';
-                                @endphp
-                                <td style="text-align: center;">{{ $valor }}</td>
+<!-- ==================== BLOQUES EN 3 COLUMNAS DESDE EVALUACIÓN ACTITUDINAL ==================== -->
+@php
+    // Construir array de bloques a mostrar en orden
+    $bloques = [];
+    if(__cuadro_enabled('evaluaciones_actitudinales', $cuadrosForNivel) && $evaluacionesActitudinales && $evaluacionesActitudinales->count() > 0) {
+        $bloques[] = 'evaluacion_actitudinal';
+    }
+    if(__cuadro_enabled('inasistencias', $cuadrosForNivel) && $tiposInasistencia && $tiposInasistencia->count() > 0) {
+        $bloques[] = 'inasistencias';
+    }
+    if(__cuadro_enabled('otras_evaluaciones', $cuadrosForNivel) && $otrasEvaluaciones && $otrasEvaluaciones->count() > 0) {
+        $bloques[] = 'otras_evaluaciones';
+    }
+    if(__cuadro_enabled('orden_merito', $cuadrosForNivel)) {
+        $bloques[] = 'orden_merito';
+    }
+    if(__cuadro_enabled('cuadros_dinamicos', $cuadrosForNivel)) {
+        $bloques[] = 'cuadros_dinamicos';
+    }
+    $numCols = 3;
+    // Distribuir verticalmente: cada columna toma los bloques en posiciones $i, $i+3, $i+6...
+    $bloquesPorCol = [[],[],[]];
+    foreach($bloques as $i => $bloque) {
+        $bloquesPorCol[$i % $numCols][] = $bloque;
+    }
+@endphp
+<div class="three-columns" style="display: flex; gap: 12px;">
+    @for($col=0; $col<$numCols; $col++)
+        <div class="column" style="flex:1 1 0; min-width:0;">
+            @if(isset($bloquesPorCol[$col]))
+                @foreach($bloquesPorCol[$col] as $bloque)
+                    @if($bloque === 'evaluacion_actitudinal')
+                        <table class="tabla-evaluacion-padres">
+                            <thead>
+                                <tr><th colspan="5">EVALUACIÓN ACTITUDINAL</th></tr>
+                                <tr>
+                                    <th>DESCRIPCIÓN</th>
+                                    @foreach($periodos as $periodo)
+                                        <th>{{ $periodo->nombre }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($evaluacionesActitudinales as $evaluacion)
+                                    <tr>
+                                        <td style="text-align: left;">{{ $evaluacion->nombre }}@if($evaluacion->descripcion)<br><small>{{ $evaluacion->descripcion }}</small>@endif</td>
+                                        @foreach($periodos as $periodo)
+                                            @php
+                                                $registro = $registrosEvaluacionesActitudinales[$periodo->id][$evaluacion->id] ?? null;
+                                                $valor = $registro ? $registro->valoracion : '';
+                                            @endphp
+                                            <td style="text-align: center;">{{ $valor }}@if($registro && $registro->comentario)<br><small class="text-muted">{{ $registro->comentario }}</small>@endif</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @elseif($bloque === 'inasistencias')
+                        <table class="tabla-evaluacion-padres">
+                            <thead>
+                                <tr><th colspan="5">ASISTENCIAS</th></tr>
+                                <tr>
+                                    <th>DESCRIPCIÓN</th>
+                                    @foreach($periodos as $periodo)
+                                        <th>{{ $periodo->nombre }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($tiposInasistencia as $tipo)
+                                    <tr>
+                                        <td style="text-align: left;">{{ $tipo->nombre }}</td>
+                                        @foreach($periodos as $periodo)
+                                            @php
+                                                $inasistencia = $inasistencias[$periodo->id][$tipo->id] ?? null;
+                                                $valor = $inasistencia ? $inasistencia->cantidad : '0';
+                                            @endphp
+                                            <td style="text-align: center;">{{ $valor }}</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @elseif($bloque === 'otras_evaluaciones')
+                        <table class="tabla-evaluacion-padres">
+                            <thead>
+                                <tr><th colspan="5">COMPORTAMIENTO</th></tr>
+                                <tr>
+                                    <th>DESCRIPCIÓN</th>
+                                    @foreach($periodos as $periodo)
+                                        <th>{{ $periodo->nombre }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($otrasEvaluaciones as $tipo)
+                                    <tr>
+                                        <td style="text-align: left;">{{ $tipo->nombre }}</td>
+                                        @foreach($periodos as $periodo)
+                                            @php
+                                                $registro = $registrosOtras[$periodo->id][$tipo->id] ?? null;
+                                                $valor = $registro ? $registro->valor : '';
+                                            @endphp
+                                            <td style="text-align: center;">{{ $valor }}</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @elseif($bloque === 'orden_merito')
+                        @php
+                            $registrosOrden = \App\Models\RegistroOrdenMerito::with(['periodo', 'tipoOrdenMerito', 'docente'])
+                                ->where('matricula_id', $matricula->id)
+                                ->orderBy('periodo_id')
+                                ->get();
+                        @endphp
+                        @if($registrosOrden && $registrosOrden->count() > 0)
+                            <table class="tabla-evaluacion-padres" style="margin-bottom:10px; table-layout: fixed;">
+                                <thead>
+                                    <tr>
+                                        <th colspan="2">ORDEN DE MÉRITO</th>
+                                    </tr>
+                                    <tr>
+                                        <th>Periodo</th>
+                                        <th style="width:12%; text-align:center;">N° de Orden</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($registrosOrden as $ro)
+                                        <tr>
+                                            <td style="padding:4px 6px; vertical-align:middle;">{{ $ro->periodo->nombre ?? '' }}</td>
+                                            <td style="padding:4px 6px; text-align:center; vertical-align:middle;"><strong>{{ $ro->nota_valor ?? '' }}</strong></td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @else
+                            <div class="mb-2 text-muted">No hay registros de Orden de Mérito para este alumno.</div>
+                        @endif
+                    @elseif($bloque === 'cuadros_dinamicos')
+                        @php
+                            $cuadrosDinamicos = \App\Models\CuadroDinamico::where('mostrar_en_libreta', true)
+                                ->where('activo', true)
+                                ->where(function($q) use ($nivelId) {
+                                    $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
+                                })
+                                ->orderBy('orden')
+                                ->get();
+                        @endphp
+                        @if($cuadrosDinamicos->count())
+                            @foreach($cuadrosDinamicos as $cuadro)
+                                <div class="card p-1 mb-3">
+                                    @if($cuadro->tipo !== 'tabla_generica')
+                                        <h6 class="mb-2">{{ $cuadro->nombre }}</h6>
+                                    @endif
+                                    @php $descripciones = $cuadro->descripciones()->orderBy('orden')->get(); @endphp
+                                    @if($cuadro->tipo === 'tabla_periodos')
+                                        <table class="tabla-evaluacion-padres" style="width:100%;">
+                                            <thead><tr><th>DESCRIPCIÓN</th>
+                                                @foreach($periodos as $periodo)
+                                                    <th>{{ $periodo->nombre }}</th>
+                                                @endforeach
+                                            </tr></thead>
+                                            <tbody>
+                                                @if($descripciones->count())
+                                                    @foreach($descripciones as $d)
+                                                        <tr>
+                                                            <td style="text-align:left;">{{ $d->texto }}</td>
+                                                            @foreach($periodos as $periodo)
+                                                                <td style="text-align:center;">&nbsp;</td>
+                                                            @endforeach
+                                                        </tr>
+                                                    @endforeach
+                                                @else
+                                                    <tr>
+                                                        <td style="text-align:left;">&nbsp;</td>
+                                                        @foreach($periodos as $periodo)
+                                                            <td style="text-align:center;">&nbsp;</td>
+                                                        @endforeach
+                                                    </tr>
+                                                @endif
+                                            </tbody>
+                                        </table>
+                                    @elseif($cuadro->tipo === 'tabla_generica')
+                                        @php
+                                            $op = $cuadro->opciones ?? [];
+                                            $cols = isset($op['columnas']) ? intval($op['columnas']) : 3;
+                                            $rows = isset($op['filas']) ? intval($op['filas']) : 4;
+                                            $mostrarEnc = isset($op['mostrar_encabezados']) && $op['mostrar_encabezados'];
+                                            $encabezados = isset($op['encabezados']) ? (array)$op['encabezados'] : [];
+                                            $celdas = isset($op['celdas']) ? (array)$op['celdas'] : [];
+                                        @endphp
+                                        <table class="tabla-clave-evaluacion" style="width:auto; border-collapse: collapse;">
+                                            <thead>
+                                                <tr style="background:#f0f0f0;"><th colspan="{{ $cols }}" style="text-align:center;padding:6px;border:1px solid #444;font-weight:700;">{{ $cuadro->nombre }}</th></tr>
+                                                @if($mostrarEnc)
+                                                    <tr>
+                                                        @for($c = 0; $c < $cols; $c++)
+                                                            <th style="padding:6px;border:1px solid #444;background:#fafafa;text-align:center;">{{ $encabezados[$c] ?? '' }}</th>
+                                                        @endfor
+                                                    </tr>
+                                                @endif
+                                            </thead>
+                                            <tbody>
+                                                @for($r = 0; $r < max(1, $rows); $r++)
+                                                    <tr>
+                                                        @for($c = 0; $c < $cols; $c++)
+                                                            <td style="padding:4px 6px;border:1px solid #444;vertical-align:middle;font-size:7px;">{{ $celdas[$r][$c] ?? '' }}</td>
+                                                        @endfor
+                                                    </tr>
+                                                @endfor
+                                            </tbody>
+                                        </table>
+                                    @else
+                                        @if($descripciones->count())
+                                            <ul class="mb-0" style="list-style:none;padding-left:0;">
+                                                @foreach($descripciones as $d)
+                                                    <li style="padding:4px 0;border-bottom:1px solid #eee;">{{ $d->texto }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            <div style="min-height:40px;">&nbsp;</div>
+                                        @endif
+                                    @endif
+                                </div>
                             @endforeach
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                        @endif
+                    @endif
+                @endforeach
+            @endif
         </div>
-    @endif
-    
-    
-    <!-- ==================== CLAVE DE EVALUACIÓN ==================== -->
-    @php
-        // Render dynamic cuadros inside the right column (do NOT change styles)
-        $cuadrosDinamicos = \App\Models\CuadroDinamico::where('mostrar_en_libreta', true)
-            ->where('activo', true)
-            ->where(function($q) use ($nivelId) {
-                $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
-            })
-            ->orderBy('orden')
-            ->get();
-
-        if ($cuadrosDinamicos->count()) {
-            echo '<div class="column">';
-            foreach ($cuadrosDinamicos as $cuadro) {
-                echo "<div class=\"card p-1 mb-3\">";
-                if ($cuadro->tipo !== 'tabla_generica') {
-                    echo "<h6 class=\"mb-2\">" . e($cuadro->nombre) . "</h6>";
-                }
-
-                $descripciones = $cuadro->descripciones()->orderBy('orden')->get();
-
-                // If tipo indicates a table per period, show a table with period columns
-                if ($cuadro->tipo === 'tabla_periodos') {
-                    echo '<table class="tabla-evaluacion-padres" style="width:100%;">';
-                    echo '<thead><tr><th>DESCRIPCIÓN</th>';
-                    foreach ($periodos as $periodo) {
-                        echo "<th>" . e($periodo->nombre) . "</th>";
-                    }
-                    echo '</tr></thead>';
-                    echo '<tbody>';
-                    if ($descripciones->count()) {
-                        foreach ($descripciones as $d) {
-                            echo '<tr>';
-                            echo '<td style="text-align:left;">' . e($d->texto) . '</td>';
-                            foreach ($periodos as $periodo) {
-                                echo '<td style="text-align:center;">&nbsp;</td>';
-                            }
-                            echo '</tr>';
-                        }
-                    } else {
-                        // empty row placeholder
-                        echo '<tr>';
-                        echo '<td style="text-align:left;">&nbsp;</td>';
-                        foreach ($periodos as $periodo) {
-                            echo '<td style="text-align:center;">&nbsp;</td>';
-                        }
-                        echo '</tr>';
-                    }
-                    echo '</tbody></table>';
-                } else {
-                    // support a generic table type with N columns / N rows and optional headers
-                    if ($cuadro->tipo === 'tabla_generica') {
-                        $op = $cuadro->opciones ?? [];
-                        $cols = isset($op['columnas']) ? intval($op['columnas']) : 3;
-                        $rows = isset($op['filas']) ? intval($op['filas']) : 4;
-                        $mostrarEnc = isset($op['mostrar_encabezados']) && $op['mostrar_encabezados'];
-                        $encabezados = isset($op['encabezados']) ? (array)$op['encabezados'] : [];
-                        $celdas = isset($op['celdas']) ? (array)$op['celdas'] : [];
-
-                        // 👇 Aplicar clase para estilo compacto
-                        echo '<table class="tabla-clave-evaluacion" style="width:auto; border-collapse: collapse;">';
-                        // Title row that spans all columns (header occupying full width)
-                        echo '<thead>';
-                        echo '<tr style="background:#f0f0f0;"><th colspan="' . $cols . '" style="text-align:center;padding:6px;border:1px solid #444;font-weight:700;">' . e($cuadro->nombre) . '</th></tr>';
-                        if ($mostrarEnc) {
-                            echo '<tr>';
-                            for ($c = 0; $c < $cols; $c++) {
-                                $label = isset($encabezados[$c]) ? e($encabezados[$c]) : '';
-                                echo '<th style="padding:6px;border:1px solid #444;background:#fafafa;text-align:center;">' . $label . '</th>';
-                            }
-                            echo '</tr>';
-                        }
-                        echo '</thead>';
-
-                        echo '<tbody>';
-                        for ($r = 0; $r < max(1, $rows); $r++) {
-                            echo '<tr>';
-                            for ($c = 0; $c < $cols; $c++) {
-                                $celValue = '';
-                                if (isset($celdas[$r]) && is_array($celdas[$r]) && isset($celdas[$r][$c])) {
-                                    $celValue = e($celdas[$r][$c]);
-                                }
-                                // 👇 Padding reducido: 4px en lugar de 8px, y height reducido
-                                echo '<td style="padding:4px 6px;border:1px solid #444;vertical-align:middle;font-size:7px;">' . $celValue . '</td>';  
-                            }
-                            echo '</tr>';
-                        }
-                        echo '</tbody>';
-                        echo '</table>';
-                    } else {
-                    // default: render descriptions as simple list or legend box
-                    if ($descripciones->count()) {
-                        echo '<ul class="mb-0" style="list-style:none;padding-left:0;">';
-                        foreach ($descripciones as $d) {
-                            echo '<li style="padding:4px 0;border-bottom:1px solid #eee;">' . e($d->texto) . '</li>';
-                        }
-                        echo '</ul>';
-                    } else {
-                        echo '<div style="min-height:40px;">&nbsp;</div>';
-                    }
-                    }
-                }
-
-                echo '</div>'; // card
-            }
-            echo '</div>'; // column
-        }
-    @endphp
-
-    
-    
-    
+    @endfor
 </div>
 
 

@@ -456,6 +456,8 @@
                             'evaluaciones_actitudinales' => 'Evaluaciones Actitudinales',
                             'inasistencias' => 'Inasistencias',
                             'otras_evaluaciones' => 'Comportamiento y Otras Evaluaciones',
+                            'orden_merito' => 'Orden de Mérito',
+                            'cuadros_dinamicos' => 'Cuadros Dinámicos',
                         ];
                     @endphp
 
