@@ -63,10 +63,19 @@ class NotaController extends Controller
         $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
-        // Si es admin, ver todos los cursos del aula
+        // Obtener el aula y su nivel
+        $aula = Aula::with('nivel')->find($aulaId);
+        if (!$aula) {
+            return response()->json([]);
+        }
+        
+        $nivelId = $aula->nivel_id;
+        
+        // Si es admin, ver todos los cursos del nivel del aula
         if ($rol === 'admin') {
             $cursos = Curso::with('nivel')
                 ->where('activo', true)
+                ->where('nivel_id', $nivelId)
                 ->ordered()
                 ->get();
             
@@ -257,12 +266,12 @@ class NotaController extends Controller
                     }
                 }
 
-                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'B') {
+                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'C') {
                     if (!$tieneConclusion && !$existingConclusion) {
                         DB::rollBack();
                         return response()->json([
                             'success' => false,
-                            'message' => 'La nota B en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión en el icono de comentario antes de guardar.'
+                            'message' => 'La nota C en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión en el icono de comentario antes de guardar.'
                         ], 422);
                     }
                 }

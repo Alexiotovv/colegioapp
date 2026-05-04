@@ -83,11 +83,12 @@
         box-shadow: 0 0 0 2px rgba(26, 71, 42, 0.25);
     }
 
-    .nota-select.modified {
+    .select-wrapper {
+        display: inline-block;
         position: relative;
     }
 
-    .nota-select.modified::after {
+    .select-wrapper.modified::after {
         content: '';
         position: absolute;
         top: 6px;
@@ -96,7 +97,8 @@
         height: 8px;
         background: #dc3545;
         border-radius: 50%;
-        box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.85);
+        pointer-events: none;
     }
     
     .nota-guardada {
@@ -390,7 +392,7 @@
             </div>
             <div class="col-md-4">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
@@ -408,9 +410,6 @@
         
         <div class="row mt-3">
             <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarNotas">
-                    <i class="fas fa-search me-2"></i> Cargar Notas
-                </button>
             </div>
         </div>
     </div>
@@ -459,8 +458,8 @@
             <span>Guardar todas las notas</span>
         </button>
         <button class="fab-menu-item" id="btnImprimirTodo">
-            <i class="fas fa-print"></i>
-            <span>Imprimir reporte</span>
+            <i class="fas fa-file-excel"></i>
+            <span>Descargar notas</span>
         </button>
     </div>
 </div>
@@ -561,60 +560,77 @@ $(document).ready(function() {
     $('#fabMenu').on('click', function(e) {
         e.stopPropagation();
     });
-    
-    // ==================== CARGAR CURSOS POR AULA ====================
-    $('#aula_id').on('change', function() {
-        let aulaId = $(this).val();
-        let cursoSelect = $('#curso_id');
-        
-        if (aulaId) {
-            cursoSelect.html('<option value="">Cargando...</option>');
-            cursoSelect.prop('disabled', true);
-            
-            $.ajax({
-                url: '{{ route("admin.notas.cursos-by-aula") }}',
-                method: 'GET',
-                data: { aula_id: aulaId },
-                success: function(response) {
-                    cursosData = response;
-                    cursoSelect.html('<option value="">Seleccionar curso</option>');
-                    
-                    if (response.length > 0) {
-                        for (let curso of response) {
-                            cursoSelect.append(`<option value="${curso.id}">${curso.nombre} (${curso.nivel ? curso.nivel.nombre : ''})</option>`);
-                        }
-                        cursoSelect.prop('disabled', false);
-                    } else {
-                        cursoSelect.html('<option value="">No hay cursos asignados</option>');
-                        cursoSelect.prop('disabled', true);
-                    }
-                },
-                error: function() {
-                    cursoSelect.html('<option value="">Error al cargar cursos</option>');
-                    cursoSelect.prop('disabled', true);
-                }
-            });
-        } else {
-            cursoSelect.html('<option value="">Primero seleccione un aula</option>');
-            cursoSelect.prop('disabled', true);
-        }
-    });
-    
-    // ==================== CARGAR NOTAS ====================
-    $('#btnCargarNotas').on('click', function() {
+
+    function limpiarTablaNotas() {
+        matriculasData = [];
+        competenciasData = [];
+        notasData = {};
+        notasHabilitadas = false;
+        aulaEsPrimaria = false;
+        aulaEsSecundaria = false;
+        requiereConclusionBCPrimaria = false;
+        requiereConclusionBSecundaria = false;
+        window.requerirConclusionBCPrimaria = false;
+        window.requerirConclusionBSecundaria = false;
+        window.aulaEsPrimaria = false;
+        window.aulaEsSecundaria = false;
+
+        $('#tablaHeader').empty();
+        $('#tablaBody').empty();
+        $('#tablaContainer').hide();
+        $('#infoPeriodo').hide();
+        $('#infoConclusionRegla').hide();
+        $('#curso_id').val('').html('<option value="">Primero seleccione un aula</option>').prop('disabled', true);
+        $('#periodo_id').val('').prop('disabled', true);
+        $('#toggleHabilitacion').prop('checked', false);
+        $('#habilitacionLabel').text('Habilitar registro');
+        $('#totalCount').text('0');
+        $('#completedCount').text('0');
+        $('#pendingCount').text('0');
+        $('#progressPercentage').text('0%');
+        $('#progressBarFill').css('width', '0%');
+        $('#btnGuardarTodas').prop('disabled', true);
+    }
+
+    function limpiarSoloResultadosNotas() {
+        matriculasData = [];
+        competenciasData = [];
+        notasData = {};
+        notasHabilitadas = false;
+        aulaEsPrimaria = false;
+        aulaEsSecundaria = false;
+        requiereConclusionBCPrimaria = false;
+        requiereConclusionBSecundaria = false;
+        window.requerirConclusionBCPrimaria = false;
+        window.requerirConclusionBSecundaria = false;
+        window.aulaEsPrimaria = false;
+        window.aulaEsSecundaria = false;
+
+        $('#tablaHeader').empty();
+        $('#tablaBody').empty();
+        $('#tablaContainer').hide();
+        $('#infoPeriodo').hide();
+        $('#infoConclusionRegla').hide();
+        $('#toggleHabilitacion').prop('checked', false);
+        $('#habilitacionLabel').text('Habilitar registro');
+        $('#totalCount').text('0');
+        $('#completedCount').text('0');
+        $('#pendingCount').text('0');
+        $('#progressPercentage').text('0%');
+        $('#progressBarFill').css('width', '0%');
+        $('#btnGuardarTodas').prop('disabled', true);
+    }
+
+    function cargarNotasAutomaticamente() {
         let aulaId = $('#aula_id').val();
         let cursoId = $('#curso_id').val();
         let periodoId = $('#periodo_id').val();
-        
+
         if (!aulaId || !cursoId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
+            limpiarSoloResultadosNotas();
             return;
         }
-        
-        const $btn = $('#btnCargarNotas');
-        $btn.prop('disabled', true);
-        $btn.html('<span class="loading-spinner me-2"></span> Cargando...');
-        
+
         $.ajax({
             url: '{{ route("admin.notas.get-data") }}',
             method: 'GET',
@@ -636,12 +652,12 @@ $(document).ready(function() {
                 window.requerirConclusionBSecundaria = requiereConclusionBSecundaria;
                 window.aulaEsPrimaria = aulaEsPrimaria;
                 window.aulaEsSecundaria = aulaEsSecundaria;
-                
+
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', notasHabilitadas);
                     $('#habilitacionLabel').text(notasHabilitadas ? 'Registro habilitado' : 'Registro deshabilitado');
                 }
-                
+
                 let periodoSelect = $('#periodo_id option:selected');
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${notasHabilitadas ? '<span class="badge-habilitado">HABILITADO</span>' : '<span class="badge-deshabilitado">DESHABILITADO</span>'}`);
@@ -651,7 +667,9 @@ $(document).ready(function() {
                 } else {
                     $('#infoConclusionRegla').hide();
                 }
-                
+
+                $('#btnGuardarTodas').prop('disabled', !(notasHabilitadas && matriculasData.length > 0 && competenciasData.length > 0));
+
                 renderTabla();
                 $('#tablaContainer').show();
             },
@@ -659,13 +677,63 @@ $(document).ready(function() {
                 console.error('Error detallado:', xhr);
                 let errorMsg = xhr.responseJSON?.message || 'Error al cargar datos';
                 Swal.fire('Error', errorMsg, 'error');
-            },
-            complete: function() {
-                $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-search me-2"></i> Cargar Notas');
             }
         });
+    }
+    
+    // ==================== CARGAR CURSOS POR AULA ====================
+    $('#aula_id').on('change', function() {
+        let aulaId = $(this).val();
+        let cursoSelect = $('#curso_id');
+        let periodoSelect = $('#periodo_id');
+        periodoSelect.val('').prop('disabled', true);
+        limpiarTablaNotas();
+        
+        if (aulaId) {
+            cursoSelect.html('<option value="">Cargando...</option>');
+            cursoSelect.prop('disabled', true);
+            
+            $.ajax({
+                url: '{{ route("admin.notas.cursos-by-aula") }}',
+                method: 'GET',
+                data: { aula_id: aulaId },
+                success: function(response) {
+                    cursosData = response;
+                    cursoSelect.html('<option value="">Seleccionar curso</option>');
+                    
+                    if (response.length > 0) {
+                        for (let curso of response) {
+                            cursoSelect.append(`<option value="${curso.id}">${curso.nombre} (${curso.nivel ? curso.nivel.nombre : ''})</option>`);
+                        }
+                        cursoSelect.prop('disabled', false);
+                        periodoSelect.prop('disabled', false);
+                    } else {
+                        cursoSelect.html('<option value="">No hay cursos asignados</option>');
+                        cursoSelect.prop('disabled', true);
+                        periodoSelect.prop('disabled', true);
+                    }
+                },
+                error: function() {
+                    cursoSelect.html('<option value="">Error al cargar cursos</option>');
+                    cursoSelect.prop('disabled', true);
+                    periodoSelect.prop('disabled', true);
+                }
+            });
+        } else {
+            cursoSelect.html('<option value="">Primero seleccione un aula</option>');
+            cursoSelect.prop('disabled', true);
+            periodoSelect.val('').prop('disabled', true);
+        }
     });
+
+    $('#curso_id').on('change', function() {
+        cargarNotasAutomaticamente();
+    });
+
+    $('#periodo_id').on('change', function() {
+        cargarNotasAutomaticamente();
+    });
+    
     
     // ==================== RENDER TABLA ====================
     function renderTabla() {
@@ -692,6 +760,8 @@ $(document).ready(function() {
             `);
             return;
         }
+
+        $('#btnGuardarTodas').prop('disabled', !(notasHabilitadas && matriculasData.length > 0 && competenciasData.length > 0));
         
         // Renderizar header
         let headerHtml = `
@@ -729,20 +799,22 @@ $(document).ready(function() {
                 let notaId = nota ? nota.id : '';
                 let tieneConclusion = nota && nota.tiene_conclusion;
                 let requerirConclusion = (requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(notaValue)) ||
-                                         (requiereConclusionBSecundaria && aulaEsSecundaria && notaValue === 'B');
+                                         (requiereConclusionBSecundaria && aulaEsSecundaria && notaValue === 'C');
                 let commentColor = tieneConclusion ? '#28a745' : (requerirConclusion ? '#dc3545' : '#6c757d');
                 
                 bodyHtml += `
                     <td style="text-align: center; vertical-align: middle;">
-                        <select class="form-select form-select-sm nota-select ${notaGuardada}"
-                                data-matricula="${matricula.id}"
-                                data-competencia="${competencia.id}"
-                                data-nota-id="${notaId}"
-                                ${!notasHabilitadas ? 'disabled' : ''}
-                                style="width: 110px; margin: 0 auto; display: inline-block;">
-                            <option value="">Seleccionar</option>
-                            ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
-                        </select>
+                        <div class="select-wrapper" style="display:inline-block; position:relative;">
+                            <select class="form-select form-select-sm nota-select ${notaGuardada}"
+                                    data-matricula="${matricula.id}"
+                                    data-competencia="${competencia.id}"
+                                    data-nota-id="${notaId}"
+                                    ${!notasHabilitadas ? 'disabled' : ''}
+                                    style="width: 110px; margin: 0 auto; display: inline-block;">
+                                <option value="">Seleccionar</option>
+                                ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
+                            </select>
+                        </div>
                         <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-nota-id="${notaId}" value="${notaValue}">
                         <button class="btn-message" 
                             data-matricula="${matricula.id}"
@@ -841,12 +913,12 @@ $(document).ready(function() {
             
             const requiereConclusionAhora =
                 (ruleActivePrimaria && isPrimaria && ['B', 'C'].includes(valor)) ||
-                (ruleActiveSecundaria && isSecundaria && valor === 'B');
+                (ruleActiveSecundaria && isSecundaria && valor === 'C');
 
             if (requiereConclusionAhora) {
                 let mensaje = ruleActivePrimaria && isPrimaria ? 
                     'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.' :
-                    'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
+                    'La nota C en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
                 // Swal.fire('Atención', mensaje, 'info');
                 $btnMensaje.find('i').css('color', '#dc3545');
             } else {
@@ -854,10 +926,21 @@ $(document).ready(function() {
                 $btnMensaje.find('i').css('color', '#6c757d');
             }
 
-            if (valor) {
-                $select.addClass('modified');
+            // Toggle modified marker on the wrapper so the dot displays reliably
+            let $wrapper = $select.closest('.select-wrapper');
+            if ($wrapper.length === 0) {
+                // fallback: if wrapper not present, toggle on select (backwards compatibility)
+                if (valor) {
+                    $select.addClass('modified');
+                } else {
+                    $select.removeClass('modified');
+                }
             } else {
-                $select.removeClass('modified');
+                if (valor) {
+                    $wrapper.addClass('modified');
+                } else {
+                    $wrapper.removeClass('modified');
+                }
             }
             
             // Actualizar progress bar si existe
@@ -925,7 +1008,9 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success) {
                     Swal.fire('Éxito', response.message, 'success');
-                    $('#btnCargarNotas').click();
+                    // Recargar datos automáticamente (antes se usaba un botón que fue eliminado)
+                    conclusionesPendientes = {}; // limpiar conclusiones pendientes locales
+                    cargarNotasAutomaticamente();
                 }
             },
             error: function(xhr) {
@@ -939,9 +1024,28 @@ $(document).ready(function() {
         });
     }
     
-    // ==================== IMPRIMIR ====================
-    function imprimirReporte() {
-        Swal.fire('Información', 'Funcionalidad de impresión en desarrollo', 'info');
+    // ==================== DESCARGAR EXCEL ====================
+    function descargarNotasExcel() {
+        const aulaId = $('#aula_id').val();
+        const cursoId = $('#curso_id').val();
+        const periodoId = $('#periodo_id').val();
+        if (!aulaId || !cursoId || !periodoId) {
+            toastr.warning('Seleccione aula, curso y periodo.');
+            return;
+        }
+        const form = $('<form>', {
+            method: 'POST',
+            action: '/admin/notas/export-excel',
+            style: 'display:none',
+        });
+        form.append($('<input>', {type: 'hidden', name: 'aula_id', value: aulaId}));
+        form.append($('<input>', {type: 'hidden', name: 'curso_id', value: cursoId}));
+        form.append($('<input>', {type: 'hidden', name: 'periodo_id', value: periodoId}));
+        // CSRF
+        form.append($('<input>', {type: 'hidden', name: '_token', value: $('meta[name="csrf-token"]').attr('content')}));
+        $('body').append(form);
+        form[0].submit();
+        setTimeout(() => form.remove(), 1000);
         $('#fabMenu').removeClass('show');
     }
     
@@ -1025,7 +1129,7 @@ $(document).ready(function() {
     
     // ==================== ASIGNAR EVENTOS ====================
     $('#btnGuardarTodas').on('click', guardarTodasLasNotas);
-    $('#btnImprimirTodo').on('click', imprimirReporte);
+    $('#btnImprimirTodo').on('click', descargarNotasExcel);
     
     // ==================== TOGGLE HABILITACIÓN (SOLO ADMIN) ====================
     $('#toggleHabilitacion').on('change', function() {

@@ -317,7 +317,7 @@
             </div>
             <div class="col-md-6">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
@@ -335,9 +335,7 @@
         
         <div class="row mt-3">
             <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarApreciaciones">
-                    <i class="fas fa-search me-2"></i> Cargar Apreciaciones
-                </button>
+                <!-- Botón de carga eliminado: la carga ahora se realiza automáticamente al seleccionar el periodo -->
             </div>
         </div>
     </div>
@@ -429,19 +427,33 @@ $(document).ready(function() {
         e.stopPropagation();
     });
     
-    // Cargar datos para el registro de apreciaciones
-    $('#btnCargarApreciaciones').on('click', function() {
+    // Habilitar periodo al seleccionar aula y auto-cargar al escoger periodo
+    $('#aula_id').on('change', function() {
+        let aulaId = $(this).val();
+        // Reset periodo selection and disable table until periodo chosen
+        $('#periodo_id').prop('disabled', aulaId ? false : true);
+        $('#periodo_id').val('');
+        $('#infoPeriodo').hide();
+        $('#tablaContainer').hide();
+        matriculasData = [];
+        apreciacionesData = {};
+    });
+
+    $('#periodo_id').on('change', function() {
+        cargarApreciacionesAutomaticamente();
+    });
+
+    function cargarApreciacionesAutomaticamente() {
         let aulaId = $('#aula_id').val();
         let periodoId = $('#periodo_id').val();
-        
+
         if (!aulaId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
             return;
         }
-        
-        $('#btnCargarApreciaciones').prop('disabled', true);
-        $('#btnCargarApreciaciones').html('<span class="loading-spinner me-2"></span> Cargando...');
-        
+
+        // Indicar carga
+        $('#tablaContainer').hide();
+
         $.ajax({
             url: '{{ route("admin.apreciaciones.get-data") }}',
             method: 'GET',
@@ -454,29 +466,25 @@ $(document).ready(function() {
                 apreciacionesData = response.apreciaciones || {};
                 apreciacionesHabilitadas = response.apreciaciones_habilitadas || false;
                 maxCaracteres = response.max_caracteres || {{ $maxCaracteres }};
-                
+
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', apreciacionesHabilitadas);
                     $('#habilitacionLabel').text(apreciacionesHabilitadas ? 'Registro habilitado' : 'Registro deshabilitado');
                 }
-                
+
                 let periodoSelect = $('#periodo_id option:selected');
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${apreciacionesHabilitadas ? '<span class="badge-habilitado">HABILITADO</span>' : '<span class="badge-deshabilitado">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
-                
+
                 renderTabla();
                 $('#tablaContainer').show();
             },
             error: function(xhr) {
                 Swal.fire('Error', xhr.responseJSON?.message || 'Error al cargar datos', 'error');
-            },
-            complete: function() {
-                $('#btnCargarApreciaciones').prop('disabled', false);
-                $('#btnCargarApreciaciones').html('<i class="fas fa-search me-2"></i> Cargar Apreciaciones');
             }
         });
-    });
+    }
     
     function renderTabla() {
         if (!matriculasData || matriculasData.length === 0) {
@@ -634,7 +642,9 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success) {
                     Swal.fire('Éxito', response.message, 'success');
-                    $('#btnCargarApreciaciones').click();
+                    // Limpiar marcas modificadas y recargar automáticamente
+                    $('.apreciacion-wrapper').removeClass('modified');
+                    cargarApreciacionesAutomaticamente();
                 }
             },
             error: function(xhr) {

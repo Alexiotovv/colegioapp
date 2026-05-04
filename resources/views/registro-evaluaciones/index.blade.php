@@ -394,7 +394,7 @@
             </div>
             <div class="col-md-6">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
@@ -412,9 +412,7 @@
         
         <div class="row mt-3">
             <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarRegistros">
-                    <i class="fas fa-search me-2"></i> Cargar Evaluaciones
-                </button>
+                {{-- Carga automática: seleccione Aula y luego Periodo para listar registros --}}
             </div>
         </div>
     </div>
@@ -517,6 +515,8 @@ $(document).ready(function() {
 
     // Cargar valoraciones al inicio
     cargarValoraciones();
+    // Estado inicial: limpiar tabla y deshabilitar guardar
+    limpiarTablaEvaluaciones();
     
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
@@ -527,46 +527,64 @@ $(document).ready(function() {
         $('#fabMenu').removeClass('show');
     });
     
-    $('#fabMenu').on('click', function(e) {
-        e.stopPropagation();
-    });
-    
-    $('#btnCargarRegistros').on('click', function() {
+    // Limpia la tabla y el estado cuando cambia el aula
+    function limpiarTablaEvaluaciones() {
+        matriculasData = [];
+        evaluacionesData = [];
+        registrosData = {};
+        registrosHabilitados = false;
+        $('#tablaBody').html('');
+        $('#tablaHeader').html(`
+            <tr>
+                <th style="min-width: 60px;">N°</th>
+                <th style="min-width: 150px;">Código</th>
+                <th style="min-width: 250px;">Alumno</th>
+                <th style="min-width: 250px;">Comentario General</th>
+            </tr>
+        `);
+        $('#tablaContainer').hide();
+        $('#infoPeriodo').hide();
+        progressBar.hide();
+        actualizarEstadoBotonGuardar();
+    }
+
+    function cargarEvaluacionesAutomaticamente() {
         let aulaId = $('#aula_id').val();
         let periodoId = $('#periodo_id').val();
-        
-        if (!aulaId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
-            return;
-        }
-        
-        $('#btnCargarRegistros').prop('disabled', true);
-        $('#btnCargarRegistros').html('<span class="loading-spinner me-2"></span> Cargando...');
-        
+
+        if (!aulaId || !periodoId) return;
+
+        let $loadingCellCount = 3; // columnas fijas mínimas
+        $('#tablaBody').html(`
+            <tr>
+                <td colspan="${$loadingCellCount}" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </td>
+            </tr>
+        `);
+
         $.ajax({
             url: '{{ route("admin.registro-evaluaciones.get-data") }}',
             method: 'GET',
-            data: {
-                aula_id: aulaId,
-                periodo_id: periodoId
-            },
+            data: { aula_id: aulaId, periodo_id: periodoId },
             success: function(response) {
-
                 matriculasData = response.matriculas || [];
                 evaluacionesData = response.evaluaciones || [];
                 registrosData = response.registros || {};
                 registrosHabilitados = response.registros_habilitados || false;
-                
+
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', registrosHabilitados);
                     $('#habilitacionLabel').text(registrosHabilitados ? 'Registro habilitado' : 'Registro deshabilitado');
                 }
-                
+
                 let periodoSelect = $('#periodo_id option:selected');
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${registrosHabilitados ? '<span class="badge bg-success">HABILITADO</span>' : '<span class="badge bg-secondary">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
-                
+
                 renderTabla();
                 progressBar.show().update();
                 $('#tablaContainer').show();
@@ -576,11 +594,37 @@ $(document).ready(function() {
                 Swal.fire('Error', xhr.responseJSON?.message || 'Error al cargar datos', 'error');
             },
             complete: function() {
-                $('#btnCargarRegistros').prop('disabled', false);
-                $('#btnCargarRegistros').html('<i class="fas fa-search me-2"></i> Cargar Evaluaciones');
+                actualizarEstadoBotonGuardar();
             }
         });
+    }
+
+    // Cuando cambia el aula: resetear periodo, limpiar tabla y habilitar el select de periodo
+    $('#aula_id').on('change', function() {
+        $('#periodo_id').val('');
+        $('#periodo_id').prop('disabled', !$(this).val());
+        limpiarTablaEvaluaciones();
     });
+
+    // Cuando cambia el periodo: cargar automáticamente
+    $('#periodo_id').on('change', function() {
+        if (!$('#aula_id').val()) return;
+        if (!$(this).val()) {
+            limpiarTablaEvaluaciones();
+            return;
+        }
+        cargarEvaluacionesAutomaticamente();
+    });
+
+    function actualizarEstadoBotonGuardar() {
+        let btn = $('#btnGuardarTodas');
+        // Habilitar solo si el registro está habilitado y hay datos cargados
+        if (registrosHabilitados && matriculasData.length > 0 && evaluacionesData.length > 0) {
+            btn.prop('disabled', false);
+        } else {
+            btn.prop('disabled', true);
+        }
+    }
     
     // Inicializar Progress Bar
     progressBar
@@ -713,6 +757,9 @@ $(document).ready(function() {
                 $(this).removeClass('registro-guardado');
             }
         });
+        
+        // Actualizar estado del botón Guardar según los datos
+        actualizarEstadoBotonGuardar();
     }
     
     function guardarTodasLasEvaluaciones() {
@@ -892,6 +939,7 @@ $(document).ready(function() {
                     registrosHabilitados = response.habilitado;
                     $('#habilitacionLabel').text(registrosHabilitados ? 'Registro habilitado' : 'Registro deshabilitado');
                     $('.valoracion-select, .comentario-input').prop('disabled', !registrosHabilitados);
+                        actualizarEstadoBotonGuardar();
                     Swal.fire('Éxito', response.message, 'success');
                 }
             },

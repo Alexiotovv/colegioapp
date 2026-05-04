@@ -320,7 +320,7 @@
             </div>
             <div class="col-md-6">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
@@ -338,9 +338,7 @@
         
         <div class="row mt-3">
             <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarRegistros">
-                    <i class="fas fa-search me-2"></i> Cargar Registros
-                </button>
+                {{-- Carga automática: seleccione Aula y luego Periodo para listar registros --}}
             </div>
         </div>
     </div>
@@ -419,53 +417,97 @@ $(document).ready(function() {
         e.stopPropagation();
     });
     
-    $('#btnCargarRegistros').on('click', function() {
+    // Estado inicial: limpiar tabla y deshabilitar periodo/guardar
+    limpiarTablaAsistencias();
+    
+    // Limpia la tabla y el estado cuando cambia el aula
+    function limpiarTablaAsistencias() {
+        matriculasData = [];
+        tiposData = [];
+        registrosData = {};
+        registrosHabilitados = false;
+        $('#tablaBody').html('');
+        $('#tablaHeader').html('');
+        $('#tablaContainer').hide();
+        $('#infoPeriodo').hide();
+        progressBar.hide();
+        actualizarEstadoBotonGuardar();
+    }
+
+    function cargarAsistenciasAutomaticamente() {
         let aulaId = $('#aula_id').val();
         let periodoId = $('#periodo_id').val();
-        
-        if (!aulaId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
-            return;
-        }
-        
-        $('#btnCargarRegistros').prop('disabled', true);
-        $('#btnCargarRegistros').html('<span class="loading-spinner me-2"></span> Cargando...');
-        
+        if (!aulaId || !periodoId) return;
+
+        $('#tablaBody').html(`
+            <tr>
+                <td colspan="3" class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </td>
+            </tr>
+        `);
+
         $.ajax({
             url: '{{ route("admin.registro-asistencias.get-data") }}',
             method: 'GET',
-            data: {
-                aula_id: aulaId,
-                periodo_id: periodoId
-            },
+            data: { aula_id: aulaId, periodo_id: periodoId },
             success: function(response) {
                 matriculasData = response.matriculas || [];
                 tiposData = response.tipos_inasistencia || [];
                 registrosData = response.registros || {};
                 registrosHabilitados = response.registros_habilitados || false;
-                
+
                 if (esAdmin) {
                     $('#toggleHabilitacion').prop('checked', registrosHabilitados);
                     $('#habilitacionLabel').text(registrosHabilitados ? 'Registro habilitado' : 'Registro deshabilitado');
                 }
-                
+
                 let periodoSelect = $('#periodo_id option:selected');
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${registrosHabilitados ? '<span class="badge bg-success">HABILITADO</span>' : '<span class="badge bg-secondary">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
-                
+
                 renderTabla();
                 $('#tablaContainer').show();
+                actualizarEstadoBotonGuardar();
             },
             error: function(xhr) {
                 Swal.fire('Error', xhr.responseJSON?.message || 'Error al cargar datos', 'error');
             },
             complete: function() {
-                $('#btnCargarRegistros').prop('disabled', false);
-                $('#btnCargarRegistros').html('<i class="fas fa-search me-2"></i> Cargar Registros');
+                actualizarEstadoBotonGuardar();
             }
         });
+    }
+
+    // Al cambiar aula: resetear periodo, limpiar tabla y habilitar/deshabilitar periodo
+    $('#aula_id').on('change', function() {
+        let aulaId = $(this).val();
+        $('#periodo_id').val('');
+        $('#periodo_id').prop('disabled', !aulaId);
+        limpiarTablaAsistencias();
     });
+
+    // Al cambiar periodo: cargar automáticamente
+    $('#periodo_id').on('change', function() {
+        if (!$('#aula_id').val()) return;
+        if (!$(this).val()) {
+            limpiarTablaAsistencias();
+            return;
+        }
+        cargarAsistenciasAutomaticamente();
+    });
+
+    function actualizarEstadoBotonGuardar() {
+        let btn = $('#btnGuardarTodas');
+        if (registrosHabilitados && matriculasData.length > 0 && tiposData.length > 0) {
+            btn.prop('disabled', false);
+        } else {
+            btn.prop('disabled', true);
+        }
+    }
     
     function renderTabla() {
         if (!matriculasData || matriculasData.length === 0) {
@@ -709,6 +751,7 @@ $(document).ready(function() {
                 registrosHabilitados = response.registros_habilitados || false;
                 
                 renderTabla();
+                actualizarEstadoBotonGuardar();
             },
             error: function(xhr) {
                 Swal.fire('Error', xhr.responseJSON?.message || 'Error al recargar datos', 'error');
@@ -754,6 +797,7 @@ $(document).ready(function() {
                     registrosHabilitados = response.habilitado;
                     $('#habilitacionLabel').text(registrosHabilitados ? 'Registro habilitado' : 'Registro deshabilitado');
                     $('.cantidad-input, .observacion-input').prop('disabled', !registrosHabilitados);
+                    actualizarEstadoBotonGuardar();
                     Swal.fire('Éxito', response.message, 'success');
                 }
             },

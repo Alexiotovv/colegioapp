@@ -99,6 +99,12 @@ class Nivel extends Model
     {
         return $this->hasMany(CompetenciaTransversal::class, 'nivel_id');
     }
+
+    public function tiposOrdenMerito()
+    {
+        return $this->hasMany(TipoOrdenMerito::class, 'nivel_id');
+    }
+
     public function evaluacionesActitudinales()
     {
         return $this->hasMany(\App\Models\EvaluacionActitudinal::class, 'nivel_id');

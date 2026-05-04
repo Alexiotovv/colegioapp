@@ -107,7 +107,7 @@
             </div>
             <div class="col-md-6">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}">
@@ -118,14 +118,32 @@
             </div>
         </div>
         
-        <div class="row mt-3">
-            <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarAlumnos">
-                    <i class="fas fa-search me-2"></i> Cargar Alumnos
-                </button>
-                {{-- <button class="btn btn-success" id="btnExportarAula" style="display: none;">
-                    <i class="fas fa-download me-2"></i> Exportar Todo el Aula
-                </button> --}}
+        <div class="row mt-3 align-items-end">
+            <div class="col-md-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="soloPagosAlDia" name="soloPagosAlDia">
+                    <label class="form-check-label" for="soloPagosAlDia">
+                        Solo pagos al día
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="mesLimite" class="form-label mb-2">Mes límite</label>
+                <select class="form-select" id="mesLimite" disabled>
+                    <option value="">Seleccionar mes</option>
+                    <option value="marzo">Marzo</option>
+                    <option value="abril">Abril</option>
+                    <option value="mayo">Mayo</option>
+                    <option value="junio">Junio</option>
+                    <option value="julio">Julio</option>
+                    <option value="agosto">Agosto</option>
+                    <option value="setiembre">Setiembre</option>
+                    <option value="octubre">Octubre</option>
+                    <option value="noviembre">Noviembre</option>
+                    <option value="diciembre">Diciembre</option>
+                </select>
+            </div>
+            <div class="col-md-6 text-end">
                 <button class="btn btn-info" id="btnPrevisualizarAula" style="display: none;">
                     <i class="fas fa-eye me-2"></i> Previsualizar Todo el Aula
                 </button>
@@ -152,18 +170,47 @@
 @section('scripts')
 <script>
 $(document).ready(function() {
-    $('#btnCargarAlumnos').on('click', function() {
+    // Disable periodo by default; enable/reset when aula changes. Automatic load when periodo changes.
+    $('#periodo_id').prop('disabled', true);
+    $('#mesLimite').prop('disabled', true);
+
+    // Habilitar/deshabilitar el select de mes según el checkbox
+    $('#soloPagosAlDia').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#mesLimite').prop('disabled', false);
+        } else {
+            $('#mesLimite').prop('disabled', true).val('');
+        }
+    });
+
+    $('#aula_id').on('change', function() {
+        // Reset periodo selection to force user to reselect after aula change
+        $('#periodo_id').val('');
+        $('#periodo_id').prop('disabled', false);
+        $('#soloPagosAlDia').prop('checked', false);
+        $('#mesLimite').prop('disabled', true).val('');
+        $('#studentsList').hide();
+        $('#studentsContainer').html('');
+        $('#totalCount').text('0');
+        $('#btnExportarAula').hide();
+        $('#btnPrevisualizarAula').hide();
+    });
+
+    $('#periodo_id').on('change', function() {
         let aulaId = $('#aula_id').val();
         let periodoId = $('#periodo_id').val();
-        
+
         if (!aulaId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
             return;
         }
-        
-        $('#btnCargarAlumnos').prop('disabled', true);
-        $('#btnCargarAlumnos').html('<span class="loading-spinner me-2"></span> Cargando...');
-        
+
+        cargarAlumnosAutomaticamente(aulaId, periodoId);
+    });
+
+    function cargarAlumnosAutomaticamente(aulaId, periodoId) {
+        // Show temporary loading state in the list area
+        $('#studentsContainer').html('<div class="text-center py-3"><span class="loading-spinner"></span></div>');
+
         $.ajax({
             url: '{{ route("admin.libretas.alumnos-by-aula") }}',
             method: 'GET',
@@ -171,7 +218,7 @@ $(document).ready(function() {
             success: function(response) {
                 let html = '';
                 let total = response.length;
-                
+
                 for (let i = 0; i < response.length; i++) {
                     let matricula = response[i];
                     let numero = i + 1;
@@ -191,17 +238,11 @@ $(document).ready(function() {
                                     <button class="btn btn-sm btn-info" onclick="previsualizar(${matricula.id})">
                                         <i class="fas fa-eye me-1"></i> Previsualizar
                                     </button>
-                                    
                                 </div>
                             </div>
                         </div>
                     `;
                 }
-                
-                //Este bloque estabadespues de Previsualizar, lo moví porque aun no está funcionanado:
-                // <button class="btn btn-sm btn-success" onclick="exportarAlumno(${matricula.id})">
-                //     <i class="fas fa-download me-1"></i> Exportar PDF
-                // </button>
 
                 $('#studentsContainer').html(html);
                 $('#totalCount').text(total);
@@ -211,13 +252,11 @@ $(document).ready(function() {
             },
             error: function() {
                 Swal.fire('Error', 'Error al cargar alumnos', 'error');
-            },
-            complete: function() {
-                $('#btnCargarAlumnos').prop('disabled', false);
-                $('#btnCargarAlumnos').html('<i class="fas fa-search me-2"></i> Cargar Alumnos');
+                $('#studentsContainer').html('');
+                $('#studentsList').hide();
             }
         });
-    });
+    }
     
     $('#btnExportarAula').on('click', function() {
         let aulaId = $(this).data('aula-id');
@@ -248,7 +287,16 @@ $(document).ready(function() {
     $('#btnPrevisualizarAula').on('click', function() {
         let aulaId = $(this).data('aula-id');
         let periodoId = $(this).data('periodo-id');
-        window.open('/admin/libretas/previsualizar-aula?aula_id=' + aulaId + '&periodo_id=' + periodoId, '_blank');
+        let soloPagosAlDia = $('#soloPagosAlDia').is(':checked');
+        let mesLimite = $('#mesLimite').val();
+        
+        let url = '/admin/libretas/previsualizar-aula?aula_id=' + aulaId + '&periodo_id=' + periodoId;
+        
+        if (soloPagosAlDia && mesLimite) {
+            url += '&solo_pagos_al_dia=true&mes_limite=' + mesLimite;
+        }
+        
+        window.open(url, '_blank');
     });
 });
 

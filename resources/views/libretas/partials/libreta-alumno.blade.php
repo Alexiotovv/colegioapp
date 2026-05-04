@@ -136,9 +136,11 @@
 @php
     // Obtener configuración de cuadros por nivel (si existe). Si es null => mostrar todos por defecto
     $cuadrosForNivel = \App\Models\ConfiguracionLibretaCuadro::getCuadrosForNivel($nivelId);
-    function __cuadro_enabled($key, $cuadrosForNivel) {
-        if ($cuadrosForNivel === null) return true; // no hay configuración -> mostrar todo
-        return is_array($cuadrosForNivel) && in_array($key, $cuadrosForNivel);
+    if (!function_exists('__cuadro_enabled')) {
+        function __cuadro_enabled($key, $cuadrosForNivel) {
+            if ($cuadrosForNivel === null) return true; // no hay configuración -> mostrar todo
+            return is_array($cuadrosForNivel) && in_array($key, $cuadrosForNivel);
+        }
     }
 @endphp
 
@@ -422,15 +424,16 @@
 
 </div>
 
-<!-- ==================== OTRAS EVALUACIONES ==================== -->
 <div class="two-columns">
-
+    
+    <!-- ==================== OTRAS EVALUACIONES ==================== -->
     @if(__cuadro_enabled('otras_evaluaciones', $cuadrosForNivel) && $otrasEvaluaciones && $otrasEvaluaciones->count() > 0)
     <!-- OTRAS EVALUACIONES -->
         <div class="column">
-            <h5>COMPORTAMIENTO Y OTROS</h5>
+            
             <table class="tabla-evaluacion-padres">
                 <thead>
+                    <tr><th colspan="5">COMPORTAMIENTO</th></tr>
                     <tr>
                         <th>DESCRIPCIÓN</th>
                         @foreach($periodos as $periodo)
@@ -456,10 +459,10 @@
         </div>
     @endif
     
-
-
+    
+    <!-- ==================== CLAVE DE EVALUACIÓN ==================== -->
     @php
-        // Render dynamic cuadros after the 'otras evaluaciones' column
+        // Render dynamic cuadros inside the right column (do NOT change styles)
         $cuadrosDinamicos = \App\Models\CuadroDinamico::where('mostrar_en_libreta', true)
             ->where('activo', true)
             ->where(function($q) use ($nivelId) {
@@ -469,11 +472,9 @@
             ->get();
 
         if ($cuadrosDinamicos->count()) {
-            echo '<div class="row" style="margin-top:20px;">';
+            echo '<div class="column">';
             foreach ($cuadrosDinamicos as $cuadro) {
-                $col = $cuadro->ancho ?? 'col-12';
-                echo "<div class=\"${col} mb-3\">";
-                echo "<div class=\"card p-1\">";
+                echo "<div class=\"card p-1 mb-3\">";
                 if ($cuadro->tipo !== 'tabla_generica') {
                     echo "<h6 class=\"mb-2\">" . e($cuadro->nombre) . "</h6>";
                 }
@@ -494,16 +495,16 @@
                             echo '<tr>';
                             echo '<td style="text-align:left;">' . e($d->texto) . '</td>';
                             foreach ($periodos as $periodo) {
-                                echo '<td style="text-align:center;">' . '&nbsp;' . '</td>';
+                                echo '<td style="text-align:center;">&nbsp;</td>';
                             }
                             echo '</tr>';
                         }
                     } else {
                         // empty row placeholder
                         echo '<tr>';
-                        echo '<td style="text-align:left;">' . '&nbsp;' . '</td>';
+                        echo '<td style="text-align:left;">&nbsp;</td>';
                         foreach ($periodos as $periodo) {
-                            echo '<td style="text-align:center;">' . '&nbsp;' . '</td>';
+                            echo '<td style="text-align:center;">&nbsp;</td>';
                         }
                         echo '</tr>';
                     }
@@ -518,7 +519,8 @@
                         $encabezados = isset($op['encabezados']) ? (array)$op['encabezados'] : [];
                         $celdas = isset($op['celdas']) ? (array)$op['celdas'] : [];
 
-                        echo '<table class="tabla-evaluacion-padres" style="width:100%; border-collapse: collapse;">';
+                        // 👇 Aplicar clase para estilo compacto
+                        echo '<table class="tabla-clave-evaluacion" style="width:auto; border-collapse: collapse;">';
                         // Title row that spans all columns (header occupying full width)
                         echo '<thead>';
                         echo '<tr style="background:#f0f0f0;"><th colspan="' . $cols . '" style="text-align:center;padding:6px;border:1px solid #444;font-weight:700;">' . e($cuadro->nombre) . '</th></tr>';
@@ -540,7 +542,8 @@
                                 if (isset($celdas[$r]) && is_array($celdas[$r]) && isset($celdas[$r][$c])) {
                                     $celValue = e($celdas[$r][$c]);
                                 }
-                                echo '<td style="padding:8px;border:1px solid #444;height:28px;vertical-align:middle;">' . $celValue . '</td>';
+                                // 👇 Padding reducido: 4px en lugar de 8px, y height reducido
+                                echo '<td style="padding:4px 6px;border:1px solid #444;vertical-align:middle;font-size:7px;">' . $celValue . '</td>';  
                             }
                             echo '</tr>';
                         }
@@ -551,7 +554,7 @@
                     if ($descripciones->count()) {
                         echo '<ul class="mb-0" style="list-style:none;padding-left:0;">';
                         foreach ($descripciones as $d) {
-                            // echo '<li style="padding:6px 0;border-bottom:1px solid #eee;">' . e($d->texto) . '</li>';
+                            echo '<li style="padding:4px 0;border-bottom:1px solid #eee;">' . e($d->texto) . '</li>';
                         }
                         echo '</ul>';
                     } else {
@@ -561,12 +564,13 @@
                 }
 
                 echo '</div>'; // card
-                echo '</div>'; // col
             }
-            echo '</div>';
+            echo '</div>'; // column
         }
     @endphp
 
+    
+    
     
 </div>
 

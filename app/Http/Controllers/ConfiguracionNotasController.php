@@ -181,7 +181,7 @@ class ConfiguracionNotasController extends Controller
         Configuracion::setValor(
             'notas_requiere_conclusion_b_secundaria',
             $request->valor ? 1 : 0,
-            'Requerir conclusión descriptiva para nota B en Secundaria',
+            'Requerir conclusión descriptiva para nota C en Secundaria',
             'numero'
         );
 

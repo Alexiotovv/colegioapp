@@ -30,6 +30,8 @@ use App\Http\Controllers\EvaluacionJerarquicoController;
 use App\Http\Controllers\EvaluacionController;
 use App\Http\Controllers\TipoInasistenciaJerarquicoController;
 use App\Http\Controllers\RegistroAsistenciaController;
+use App\Http\Controllers\TipoOrdenMeritoJerarquicoController;
+use App\Http\Controllers\RegistroOrdenMeritoController;
 use App\Http\Controllers\TipoOtraEvaluacionJerarquicoController;
 use App\Http\Controllers\RegistroOtraEvaluacionController;
 use App\Http\Controllers\ConfiguracionController;
@@ -47,6 +49,7 @@ use App\Http\Controllers\CuadroNotaController;
 use App\Http\Controllers\RegistroEvaluacionActitudinalController;
 use App\Http\Controllers\EvaluacionActitudinalJerarquicoController;
 use App\Http\Controllers\CuadroDinamicoController;
+use App\Http\Controllers\ImportacionPagosController;
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -223,8 +226,17 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/notas/conclusion/{nota}', [NotaController::class, 'getConclusion'])->name('notas.get-conclusion');
             Route::post('/notas/conclusion', [NotaController::class, 'saveConclusion'])->name('notas.save-conclusion');
             Route::get('/notas/opciones', [NotaController::class, 'getOpcionesNotas'])->name('notas.opciones');
+            Route::post('/notas/export-excel', [\App\Http\Controllers\NotaExportController::class, 'exportExcel'])->name('notas.export-excel');
         });
-        
+
+        Route::middleware(['modulo:pagos'])->group(function () {
+            // Módulo: importación de pagos
+            Route::get('/pagos-importados', [ImportacionPagosController::class, 'index'])->name('pagos-importados.index');
+            Route::post('/pagos-importados', [ImportacionPagosController::class, 'store'])->name('pagos-importados.store');
+            Route::get('/pagos-importados/resumen', [ImportacionPagosController::class, 'resumen'])->name('pagos-importados-resumen.resumen');
+        });
+
+
         // Módulo: notas-habilitar (solo admin)
         Route::middleware(['modulo:notas-habilitar'])->group(function () {
             Route::post('/notas/toggle-habilitacion', [NotaController::class, 'toggleHabilitacion'])->name('notas.toggle-habilitacion');
@@ -278,6 +290,16 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('/tipos-inasistencia-jerarquico/tipo/{tipoInasistencia}/toggle', [TipoInasistenciaJerarquicoController::class, 'toggleActive'])->name('tipos-inasistencia-jerarquico.toggle');
             Route::get('/tipos-inasistencia-jerarquico/tipo/{tipoInasistencia}', [TipoInasistenciaJerarquicoController::class, 'getTipo'])->name('tipos-inasistencia-jerarquico.get');
         });
+
+        // Módulo: tipos-orden-merito-jerarquico
+        Route::middleware(['modulo:tipos-orden-merito-jerarquico'])->group(function () {
+            Route::get('/tipos-orden-merito-jerarquico', [TipoOrdenMeritoJerarquicoController::class, 'index'])->name('tipos-orden-merito-jerarquico.index');
+            Route::post('/tipos-orden-merito-jerarquico/tipo', [TipoOrdenMeritoJerarquicoController::class, 'storeTipo'])->name('tipos-orden-merito-jerarquico.store');
+            Route::put('/tipos-orden-merito-jerarquico/tipo/{tipoOrdenMerito}', [TipoOrdenMeritoJerarquicoController::class, 'updateTipo'])->name('tipos-orden-merito-jerarquico.update');
+            Route::delete('/tipos-orden-merito-jerarquico/tipo/{tipoOrdenMerito}', [TipoOrdenMeritoJerarquicoController::class, 'destroyTipo'])->name('tipos-orden-merito-jerarquico.destroy');
+            Route::patch('/tipos-orden-merito-jerarquico/tipo/{tipoOrdenMerito}/toggle', [TipoOrdenMeritoJerarquicoController::class, 'toggleActive'])->name('tipos-orden-merito-jerarquico.toggle');
+            Route::get('/tipos-orden-merito-jerarquico/tipo/{tipoOrdenMerito}', [TipoOrdenMeritoJerarquicoController::class, 'getTipo'])->name('tipos-orden-merito-jerarquico.get');
+        });
         
         // Módulo: tipos-otras-evaluaciones-jerarquico
         Route::middleware(['modulo:tipos-otras-evaluaciones-jerarquico'])->group(function () {
@@ -320,10 +342,24 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/registro-asistencias/get-data', [RegistroAsistenciaController::class, 'getDataForRegistro'])->name('registro-asistencias.get-data');
             Route::post('/registro-asistencias/save', [RegistroAsistenciaController::class, 'saveRegistros'])->name('registro-asistencias.save');
         });
+
+        // Módulo: registro-orden-meritos
+        Route::middleware(['modulo:registro-orden-meritos'])->group(function () {
+            Route::get('/registro-orden-meritos', [RegistroOrdenMeritoController::class, 'index'])->name('registro-orden-meritos.index');
+            Route::get('/registro-orden-meritos/get-data', [RegistroOrdenMeritoController::class, 'getDataForRegistro'])->name('registro-orden-meritos.get-data');
+            Route::post('/registro-orden-meritos/save', [RegistroOrdenMeritoController::class, 'saveRegistros'])->name('registro-orden-meritos.save');
+            Route::get('/registro-orden-meritos/opciones', [RegistroOrdenMeritoController::class, 'getOpcionesNotas'])->name('registro-orden-meritos.opciones');
+            Route::post('/registro-orden-meritos/calcular-automatico', [RegistroOrdenMeritoController::class, 'calcularOrdenMeritoAutomatico'])->name('registro-orden-meritos.calcular-automatico');
+        });
         
         // Módulo: registro-asistencias-habilitar
         Route::middleware(['modulo:registro-asistencias-habilitar'])->group(function () {
             Route::post('/registro-asistencias/toggle-habilitacion', [RegistroAsistenciaController::class, 'toggleHabilitacion'])->name('registro-asistencias.toggle-habilitacion');
+        });
+
+        // Módulo: registro-orden-meritos-habilitar
+        Route::middleware(['modulo:registro-orden-meritos-habilitar'])->group(function () {
+            Route::post('/registro-orden-meritos/toggle-habilitacion', [RegistroOrdenMeritoController::class, 'toggleHabilitacion'])->name('registro-orden-meritos.toggle-habilitacion');
         });
         
         // Módulo: registro-otras-evaluaciones

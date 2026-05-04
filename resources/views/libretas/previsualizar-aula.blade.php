@@ -15,6 +15,7 @@
             font-family: Arial, Helvetica, sans-serif;
             font-size: 9px;
             background: #ececec;
+            color: #000; /* Ensure readable text color */
         }
 
         .container {

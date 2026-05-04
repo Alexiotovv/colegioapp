@@ -208,11 +208,11 @@
                             </div>
                         </div>
                         <div class="config-card">
-                            <h5 class="mb-3">Regla para nota B en Secundaria</h5>
+                            <h5 class="mb-3">Regla para nota C en Secundaria</h5>
                             <p class="text-muted">Si esta regla está activada, la nota B registrada en aulas de Secundaria requerirá una conclusión descriptiva.</p>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="toggleReglaConclusionBSecundaria" {{ $requiereConclusionBSecundaria ? 'checked' : '' }}>
-                                <label class="form-check-label" for="toggleReglaConclusionBSecundaria">Requerir conclusión descriptiva para B en Secundaria</label>
+                                <label class="form-check-label" for="toggleReglaConclusionBSecundaria">Requerir conclusión descriptiva para C en Secundaria</label>
                             </div>
                         </div>
                     </div>

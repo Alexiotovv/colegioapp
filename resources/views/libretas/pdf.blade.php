@@ -20,9 +20,25 @@
             width: 100%;
             padding: 15px;
         }
+
+        /* GRID 2 COLUMNAS */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .col-md-6 {
+            width: 50%;
+            float: left;
+        }
+
+        .row::after {
+            content: "";
+            display: table;
+            clear: both;
+        }
         
         /* ENCABEZADO */
-        .header-box {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;

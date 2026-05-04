@@ -256,7 +256,7 @@
             </div>
             <div class="col-md-4">
                 <label for="periodo_id" class="form-label required-field">Periodo</label>
-                <select class="form-select" id="periodo_id" required>
+                <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
                         <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
@@ -272,13 +272,6 @@
             </div>
         </div>
         
-        <div class="row mt-3">
-            <div class="col-md-12 text-end">
-                <button class="btn btn-primary" id="btnCargarEvaluaciones">
-                    <i class="fas fa-search me-2"></i> Cargar Evaluaciones
-                </button>
-            </div>
-        </div>
     </div>
     
     <!-- Tabla -->
@@ -354,18 +347,40 @@ $(document).ready(function() {
         }
     };
     
-    $('#btnCargarEvaluaciones').on('click', function() {
+    function limpiarTablaEvaluaciones() {
+        matriculasData = [];
+        evaluacionesData = [];
+        registrosData = {};
+        registroHabilitado = false;
+
+        $('#tablaHeader').empty();
+        $('#tablaBody').empty();
+        $('#tablaContainer').hide();
+        $('#infoPeriodo').hide();
+        $('#toggleHabilitacion').prop('checked', false);
+        $('#habilitacionLabel').text('Habilitar registro');
+        $('#totalCount').text('0');
+        $('#completedCount').text('0');
+        $('#pendingCount').text('0');
+        $('#progressPercentage').text('0%');
+        $('#progressBarFill').css('width', '0%');
+        $('#btnGuardarTodas').prop('disabled', true);
+    }
+
+    function actualizarEstadoBotonGuardar() {
+        let puedeGuardar = registroHabilitado && matriculasData.length > 0 && evaluacionesData.length > 0;
+        $('#btnGuardarTodas').prop('disabled', !puedeGuardar);
+    }
+
+    function cargarEvaluacionesAutomaticamente() {
         let aulaId = $('#aula_id').val();
+        let periodoSelect = $('#periodo_id');
         let periodoId = $('#periodo_id').val();
         
         if (!aulaId || !periodoId) {
-            Swal.fire('Error', 'Complete todos los campos', 'error');
+            limpiarTablaEvaluaciones();
             return;
         }
-        
-        const $btn = $('#btnCargarEvaluaciones');
-        $btn.prop('disabled', true);
-        $btn.html('<span class="loading-spinner me-2"></span> Cargando...');
         
         $.ajax({
             url: '{{ route("admin.registro-evaluaciones-actitudinales.get-data") }}',
@@ -390,15 +405,21 @@ $(document).ready(function() {
                 
                 renderTabla();
                 $('#tablaContainer').show();
+                actualizarEstadoBotonGuardar();
             },
             error: function(xhr) {
                 Swal.fire('Error', xhr.responseJSON?.message || 'Error al cargar datos', 'error');
-            },
-            complete: function() {
-                $btn.prop('disabled', false);
-                $btn.html('<i class="fas fa-search me-2"></i> Cargar Evaluaciones');
             }
         });
+    }
+
+    $('#aula_id').on('change', function() {
+        $('#periodo_id').val('').prop('disabled', !$(this).val());
+        limpiarTablaEvaluaciones();
+    });
+
+    $('#periodo_id').on('change', function() {
+        cargarEvaluacionesAutomaticamente();
     });
     
     function renderTabla() {
@@ -560,6 +581,7 @@ $(document).ready(function() {
                 if (response.success) {
                     registroHabilitado = response.habilitado;
                     $('#habilitacionLabel').text(registroHabilitado ? 'Registro habilitado' : 'Registro deshabilitado');
+                    actualizarEstadoBotonGuardar();
                     Swal.fire('Éxito', response.message, 'success');
                 }
             },

@@ -14,6 +14,7 @@ use App\Models\RegistroOtraEvaluacion;
 use App\Models\ConfiguracionInstitucion;
 use App\Models\ConfiguracionLibreta;
 use App\Models\AnioAcademico;
+use App\Models\PagoImportado;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
@@ -169,6 +170,8 @@ class LibretaController extends Controller
     {
         $aulaId = $request->aula_id;
         $periodoId = $request->periodo_id;
+        $soloPagosAlDia = $request->boolean('solo_pagos_al_dia', false);
+        $mesLimite = $request->input('mes_limite', null);
         
         $aula = Aula::with(['grado.nivel', 'seccion', 'anioAcademico', 'docente'])
             ->find($aulaId);
@@ -187,9 +190,75 @@ class LibretaController extends Controller
             ->orderBy('alumnos.nombres', 'ASC')
             ->get();
         
+        // Filtrar por pagos al día si está habilitado
+        if ($soloPagosAlDia && $mesLimite) {
+            $matriculas = $this->filtrarPorPagosAlDia($matriculas, $mesLimite);
+        }
+        
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
         
         return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta'));
+    }
+    
+    /**
+     * Filtra las matrículas según los pagos al día en la tabla pagos_importados
+     * Valida doc_facturacion_dni vs dni_est
+     */
+    private function filtrarPorPagosAlDia($matriculas, $mesLimite)
+    {
+        $mesesOrdenados = ['marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+        $mesIndex = array_search($mesLimite, $mesesOrdenados);
+        
+        if ($mesIndex === false) {
+            return $matriculas;
+        }
+        
+        $mesesRequeridos = array_slice($mesesOrdenados, 0, $mesIndex + 1);
+        
+        // Obtener todos los pagos importados de una vez
+        $pagosImportados = PagoImportado::where('anio_emision', 2026)->get();
+        
+        // Crear un mapa de DNI => pagos para búsqueda rápida
+        $pagosMap = [];
+        foreach ($pagosImportados as $pago) {
+            $dniPago = null;
+            
+            // Validar doc_facturacion_dni
+            if (strlen($pago->doc_facturacion_dni) > 8) {
+                // Si supera 8 caracteres, obtener dni_est
+                $dniPago = $pago->dni_est;
+            } else {
+                // Si no, usar doc_facturacion_dni
+                $dniPago = $pago->doc_facturacion_dni;
+            }
+            
+            if ($dniPago) {
+                // Convertir a string para asegurar consistencia
+                $pagosMap[(string) $dniPago] = $pago;
+            }
+        }
+        
+        // Filtrar las matrículas
+        return $matriculas->filter(function ($matricula) use ($mesesRequeridos, $pagosMap) {
+            $dni = (string) $matricula->alumno->dni;
+            
+            // Buscar si existe un pago para este DNI
+            if (!isset($pagosMap[$dni])) {
+                return false;
+            }
+            
+            $pago = $pagosMap[$dni];
+            
+            // Verificar si el alumno tiene pagos hasta el mes límite
+            foreach ($mesesRequeridos as $mes) {
+                $monto = (float) ($pago->{$mes} ?? 0);
+                if ($monto <= 0) {
+                    return false;
+                }
+            }
+            
+            return true;
+        })->values();
     }
 }
