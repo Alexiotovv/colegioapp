@@ -157,11 +157,11 @@
             @foreach($periodos as $periodo)
                 <th colspan="2" style="text-align: center;">{{ $periodo->nombre }}</th>
             @endforeach
-            <th rowspan="2" style="width: 8%; max-width: 50px;">NL alcanzado</th>
+            <th rowspan="2" style="width: 38px; min-width: 38px; max-width: 38px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; font-size: 6px; line-height: 1.05; padding: 2px 1px; text-align: center;">NL alcanzado</th>
         </tr>
         <tr>
             @foreach($periodos as $periodo)
-                <th style="width: 5%; max-width: 40px;">NL</th>
+                <th style="width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">NL</th>
                 <th style="width: 20%;">Conclusión descriptiva</th>
             @endforeach
         </tr>
@@ -203,7 +203,7 @@
                             }
                         @endphp
 
-                        <td style="text-align: center;">
+                        <td style="text-align: center; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">
                             <strong>{{ $valor }}</strong>
                         </td>
                         <td style="text-align: left; font-size: 9px;">
@@ -222,7 +222,7 @@
                         }
                     @endphp
 
-                    <td style="text-align: center;">
+                    <td style="text-align: center; width: 34px; min-width: 34px; max-width: 34px; white-space: nowrap;">
                         {{ $nivelLogro }}
                     </td>
                 </tr>
@@ -272,7 +272,7 @@
         </tr>
         <tr>
             @foreach($periodos as $periodo)
-                <th style="width: 8%;">NL</th>
+                <th style="width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">NL</th>
                 <th style="width: 20%;">Conclusión Descriptiva</th>
             @endforeach
         </tr>
@@ -292,7 +292,7 @@
                         $nota = $registro ? $registro->nota : '-';
                         $conclusion = $registro ? $registro->conclusion : '';
                     @endphp
-                    <td style="text-align: center;">
+                    <td style="text-align: center; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">
                         <strong>{{ $nota }}</strong>
                     </td>
                     <td style="text-align: left; font-size: 9px;">

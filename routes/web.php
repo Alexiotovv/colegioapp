@@ -50,6 +50,7 @@ use App\Http\Controllers\RegistroEvaluacionActitudinalController;
 use App\Http\Controllers\EvaluacionActitudinalJerarquicoController;
 use App\Http\Controllers\CuadroDinamicoController;
 use App\Http\Controllers\ImportacionPagosController;
+use App\Http\Controllers\OrdenMeritoExportController;
 // Rutas públicas (sin autenticación)
 Route::middleware(['guest'])->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -456,6 +457,8 @@ Route::middleware(['auth'])->group(function () {
         // Módulo: libretas
         Route::middleware(['modulo:libretas'])->group(function () {
             Route::get('/libretas', [LibretaController::class, 'index'])->name('libretas.index');
+            Route::get('/libretas/orden-merito/reporte', [OrdenMeritoExportController::class, 'index'])->name('libretas.orden-merito.index');
+            Route::post('/libretas/orden-merito/reporte/exportar', [OrdenMeritoExportController::class, 'exportar'])->name('libretas.orden-merito-reporte.exportar');
             Route::get('/libretas/alumnos-by-aula', [LibretaController::class, 'getAlumnosByAula'])->name('libretas.alumnos-by-aula');
             Route::post('/libretas/exportar-aula', [LibretaController::class, 'exportarAula'])->name('libretas.exportar-aula');
             Route::post('/libretas/exportar-alumno', [LibretaController::class, 'exportarAlumno'])->name('libretas.exportar-alumno');

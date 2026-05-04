@@ -304,7 +304,7 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('D14', 'COMPETENCIAS');
         $sheet->setCellValue('E14', 'ALUMNOS');
         $sheet->setCellValue('F14', 'OBSERVACIÓN');
-        $sheet->getStyle('A14:F14')->applyFromArray($this->headerStyle('#0f766e'));
+        $sheet->getStyle('A14:F14')->applyFromArray($this->headerStyle('#065f46'));
 
         $row = 15;
         foreach ($cargas as $carga) {
@@ -387,7 +387,7 @@ class ReporteNotasController extends Controller
                 $col += 2;
             }
 
-            $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#1d4ed8'));
+            $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#065f46'));
             $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
             $sheet->getStyle('A4:' . $lastCol . '5')->getAlignment()->setWrapText(true);

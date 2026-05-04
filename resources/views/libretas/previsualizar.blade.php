@@ -306,11 +306,26 @@
             </div>
         </div>
 
-        <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - 2025</h1>
+        @php
+            // Obtener año desde la matrícula (si existe) o fallback a año activo / actual
+            $anio = null;
+            if(isset($matricula)) {
+                $anioObj = $matricula->aula->anioAcademico ?? null;
+                if($anioObj && isset($anioObj->anio) && $anioObj->anio) {
+                    $anio = $anioObj->anio;
+                }
+            }
+            if(!$anio) {
+                $activo = \App\Models\AnioAcademico::where('activo', true)->first();
+                $anio = $activo ? $activo->anio : date('Y');
+            }
+        @endphp
 
-        <div class="libreta-content">
 
-            @if ($matricula)
+            <div class="libreta-content">
+                
+                @if ($matricula)
+                <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - {{ $anio }}</h1>
 
                 <div class="header-box">
 
@@ -350,13 +365,6 @@
                                     {{ $matricula->alumno->apellido_materno }},
                                     {{ $matricula->alumno->nombres }}
                                 </td>
-                            </tr>
-
-                            <tr>
-                                <td class="label">Código del estudiante:</td>
-                                <td>{{ $matricula->alumno->codigo_estudiante }}</td>
-                                <td class="label">DNI:</td>
-                                <td>{{ $matricula->alumno->dni }}</td>
                             </tr>
 
                             <tr>

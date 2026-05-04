@@ -88,6 +88,9 @@
             <i class="fas fa-print me-2" style="color: var(--primary-color);"></i>
             Exportar Libretas
         </h4>
+        <a href="{{ route('admin.libretas.orden-merito.index') }}" class="btn btn-outline-success">
+            <i class="fas fa-file-excel me-2"></i> Exportar Orden de Mérito
+        </a>
     </div>
     
     <div class="filter-card">

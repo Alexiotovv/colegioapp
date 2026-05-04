@@ -307,9 +307,27 @@
                 </button>
             </div>
         </div>
-        <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - 2025</h1>
-        
-        @foreach($matriculas as $index => $matricula)
+        @php
+            // Obtener año preferente desde las matrículas (primer matrícula con año), si no existe usar el año activo o el año actual
+            $anio = null;
+            if(isset($matriculas) && is_countable($matriculas) && count($matriculas) > 0) {
+                foreach($matriculas as $m) {
+                    $anioObj = $m->aula->anioAcademico ?? null;
+                    if($anioObj && isset($anioObj->anio) && $anioObj->anio) {
+                        $anio = $anioObj->anio;
+                        break;
+                    }
+                }
+            }
+            if(!$anio) {
+                $activo = \App\Models\AnioAcademico::where('activo', true)->first();
+                $anio = $activo ? $activo->anio : date('Y');
+            }
+        @endphp
+
+
+            @foreach($matriculas as $index => $matricula)
+            <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - {{ $anio }}</h1>
             <div class="header-box">
 
                 <div class="logo-side">
@@ -348,13 +366,6 @@
                                 {{ $matricula->alumno->apellido_materno }},
                                 {{ $matricula->alumno->nombres }}
                             </td>
-                        </tr>
-
-                        <tr>
-                            <td class="label">Código del estudiante:</td>
-                            <td>{{ $matricula->alumno->codigo_estudiante }}</td>
-                            <td class="label">DNI:</td>
-                            <td>{{ $matricula->alumno->dni }}</td>
                         </tr>
 
                         <tr>

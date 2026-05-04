@@ -76,7 +76,7 @@
     </div>
     
 
-    @if (!isset($user) || !$user->isAdmin())
+    @if (Auth::user() && Auth::user()->isAdmin())
         <!-- Stats Cards -->
         <div class="row">
             <div class="col-md-3">
@@ -181,6 +181,7 @@
                 </div>
             </div>
             
+            @if (Auth::user() && Auth::user()->isAdmin())
             <div class="col-md-6">
                 <div class="table-container">
                     <h5 class="mb-3">
@@ -219,6 +220,7 @@
                     </div>
                 </div>
             </div>
+            @endif
         </div>
     @endif
 </div>
