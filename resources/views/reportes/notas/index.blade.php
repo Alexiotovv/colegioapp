@@ -3,6 +3,7 @@
 @section('title', 'Reporte de Notas')
 
 @section('css')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
     .reporte-notas-page {
         min-height: 80vh;
@@ -56,6 +57,31 @@
         border-radius: 8px;
     }
 
+    /* Select2 styling */
+    .select2-container--default .select2-selection--single {
+        border-radius: 8px !important;
+        border: 1px solid #ced4da !important;
+        height: 38px !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 36px !important;
+        padding-left: 12px !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+    }
+
+    .select2-dropdown {
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .select2-container--default.select2-container--open .select2-selection--single {
+        border-color: #2563eb !important;
+    }
+
     .btn-descargar {
         background: #2563eb;
         border: none;
@@ -107,6 +133,11 @@
             <div>
                 <h4>Reporte de Notas</h4>
                 <p class="reporte-subtitle mb-0">Descarga un archivo Excel con una hoja por curso, competencias, NL y conclusiones descriptivas.</p>
+                @if(!auth()->user()->isAdmin())
+                    <small class="text-muted mt-2 d-block">
+                        <strong>Solo ves:</strong> Las aulas a las que tienes asignados cursos activos.
+                    </small>
+                @endif
             </div>
         </div>
 
@@ -142,7 +173,7 @@
 
                 <div>
                     <label for="aula_id">Aula</label>
-                    <select id="aula_id" name="aula_id" class="form-select" required>
+                    <select id="aula_id" name="aula_id" class="form-select select2-aula" required>
                         @forelse($aulas as $aula)
                             <option value="{{ $aula->id }}" {{ $aulaSeleccionada && $aulaSeleccionada->id === $aula->id ? 'selected' : '' }}>
                                 {{ $aula->nombre_completo }}
@@ -157,7 +188,11 @@
                     <button type="submit" id="btnDescargar" class="btn-descargar">
                         <i class="fas fa-file-excel me-2"></i> Descargar Excel
                     </button>
-                    <span class="small-note">Los docentes solo verán sus aulas asignadas. Los administradores pueden descargar cualquier aula.</span>
+                    @if(auth()->user()->isAdmin())
+                        <span class="small-note">Como administrador, puedes descargar reportes de cualquier aula del sistema.</span>
+                    @else
+                        <span class="small-note">Solo puedes descargar reportes de las aulas en las que tienes cursos asignados.</span>
+                    @endif
                 </div>
             </div>
         </form>
@@ -170,6 +205,7 @@
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     (function () {
         const endpointFiltros = '{{ route('admin.reportes-notas.filtros') }}';
@@ -178,6 +214,18 @@
         const aulaSelect = document.getElementById('aula_id');
         const btnDescargar = document.getElementById('btnDescargar');
 
+        // Inicializar Select2 para el aula
+        const select2Instance = $('#aula_id').select2({
+            placeholder: 'Selecciona un aula',
+            allowClear: false,
+            language: {
+                searching: function() { return 'Buscando...'; },
+                noResults: function() { return 'No hay resultados'; }
+            },
+            width: '100%',
+            dropdownParent: $('#aula_id').closest('.form-group, div'),
+        });
+
         function cargarOpciones(select, items, placeholder) {
             select.innerHTML = '';
             if (!items || items.length === 0) {
@@ -185,6 +233,10 @@
                 option.value = '';
                 option.textContent = placeholder;
                 select.appendChild(option);
+                // Refresca Select2 si es el aula
+                if (select === aulaSelect) {
+                    $(aulaSelect).trigger('change.select2');
+                }
                 return;
             }
 
@@ -194,6 +246,11 @@
                 option.textContent = item.text || item.nombre || item.nombre_completo || item.nombreCompleto || item.grado || '';
                 select.appendChild(option);
             });
+
+            // Refresca Select2 si es el aula
+            if (select === aulaSelect) {
+                $(aulaSelect).trigger('change.select2');
+            }
         }
 
         function actualizarFiltros(anioId) {
@@ -211,6 +268,7 @@
                 }
                 if (data.aula_default_id) {
                     aulaSelect.value = String(data.aula_default_id);
+                    $(aulaSelect).val(String(data.aula_default_id)).trigger('change.select2');
                 }
 
                 btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
@@ -230,7 +288,7 @@
             btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
         });
 
-        aulaSelect.addEventListener('change', function () {
+        $(aulaSelect).on('change.select2', function () {
             btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
         });
 

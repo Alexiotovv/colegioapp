@@ -237,7 +237,7 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>
-            <i class="fas fa-heart me-2" style="color: var(--primary-color);"></i>
+            <i class="me-2" style="color: var(--primary-color);"></i>
             Registro de Evaluaciones Actitudinales
         </h4>
     </div>
@@ -250,7 +250,11 @@
                 <select class="form-select" id="aula_id" required>
                     <option value="">Seleccionar aula</option>
                     @foreach($aulas as $aula)
-                        <option value="{{ $aula->id }}">{{ $aula->nombre }}</option>
+                        <option value="{{ $aula->id }}">
+                            {{ $aula->nombre }}
+                            "{{ $aula->seccion->nombre ?? '' }}" ({{ $aula->turno_nombre }}) - {{ $aula->anioAcademico->anio ?? '' }}
+
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -312,6 +316,10 @@
         <button class="fab-menu-item" id="btnGuardarTodas">
             <i class="fas fa-save"></i>
             <span>Guardar todas las evaluaciones</span>
+        </button>
+        <button class="fab-menu-item" id="btnDescargarExcelActitudinal">
+            <i class="fas fa-file-excel"></i>
+            <span>Descargar Excel</span>
         </button>
     </div>
 </div>
@@ -559,8 +567,34 @@ $(document).ready(function() {
             }
         });
     }
+
+    function descargarEvaluacionesExcel() {
+        const aulaId = $('#aula_id').val();
+        const periodoId = $('#periodo_id').val();
+
+        if (!aulaId || !periodoId) {
+            Swal.fire('Advertencia', 'Seleccione aula y periodo.', 'warning');
+            return;
+        }
+
+        const form = $('<form>', {
+            method: 'POST',
+            action: '{{ route("admin.registro-evaluaciones-actitudinales.export-excel") }}',
+            style: 'display:none',
+        });
+
+        form.append($('<input>', { type: 'hidden', name: 'aula_id', value: aulaId }));
+        form.append($('<input>', { type: 'hidden', name: 'periodo_id', value: periodoId }));
+        form.append($('<input>', { type: 'hidden', name: '_token', value: $('meta[name="csrf-token"]').attr('content') }));
+
+        $('body').append(form);
+        form[0].submit();
+        setTimeout(() => form.remove(), 1000);
+        $('#fabMenu').removeClass('show');
+    }
     
     $('#btnGuardarTodas').on('click', guardarTodas);
+    $('#btnDescargarExcelActitudinal').on('click', descargarEvaluacionesExcel);
     
     $('#toggleHabilitacion').on('change', function() {
         if (!esAdmin) {

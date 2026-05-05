@@ -330,6 +330,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/registro-evaluaciones/get-data', [RegistroEvaluacionController::class, 'getDataForRegistro'])->name('registro-evaluaciones.get-data');
             Route::post('/registro-evaluaciones/save', [RegistroEvaluacionController::class, 'saveRegistros'])->name('registro-evaluaciones.save');
             Route::get('/registro-evaluaciones/opciones', [RegistroEvaluacionController::class, 'getOpcionesValoraciones'])->name('registro-evaluaciones.opciones');
+            Route::post('/registro-evaluaciones/export-excel', [RegistroEvaluacionController::class, 'exportExcel'])->name('registro-evaluaciones.export-excel');
         });
         
         // Módulo: registro-evaluaciones-habilitar
@@ -342,6 +343,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/registro-asistencias', [RegistroAsistenciaController::class, 'index'])->name('registro-asistencias.index');
             Route::get('/registro-asistencias/get-data', [RegistroAsistenciaController::class, 'getDataForRegistro'])->name('registro-asistencias.get-data');
             Route::post('/registro-asistencias/save', [RegistroAsistenciaController::class, 'saveRegistros'])->name('registro-asistencias.save');
+            Route::post('/registro-asistencias/export-excel', [RegistroAsistenciaController::class, 'exportExcel'])->name('registro-asistencias.export-excel');
         });
 
         // Módulo: registro-orden-meritos
@@ -351,6 +353,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/registro-orden-meritos/save', [RegistroOrdenMeritoController::class, 'saveRegistros'])->name('registro-orden-meritos.save');
             Route::get('/registro-orden-meritos/opciones', [RegistroOrdenMeritoController::class, 'getOpcionesNotas'])->name('registro-orden-meritos.opciones');
             Route::post('/registro-orden-meritos/calcular-automatico', [RegistroOrdenMeritoController::class, 'calcularOrdenMeritoAutomatico'])->name('registro-orden-meritos.calcular-automatico');
+            Route::post('/registro-orden-meritos/export-excel', [RegistroOrdenMeritoController::class, 'exportExcel'])->name('registro-orden-meritos.export-excel');
         });
         
         // Módulo: registro-asistencias-habilitar
@@ -368,6 +371,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/registro-otras-evaluaciones', [RegistroOtraEvaluacionController::class, 'index'])->name('registro-otras-evaluaciones.index');
             Route::get('/registro-otras-evaluaciones/get-data', [RegistroOtraEvaluacionController::class, 'getDataForRegistro'])->name('registro-otras-evaluaciones.get-data');
             Route::post('/registro-otras-evaluaciones/save', [RegistroOtraEvaluacionController::class, 'saveRegistros'])->name('registro-otras-evaluaciones.save');
+            Route::post('/registro-otras-evaluaciones/export-excel', [RegistroOtraEvaluacionController::class, 'exportExcel'])->name('registro-otras-evaluaciones.export-excel');
         });
         
         // Módulo: registro-otras-evaluaciones-habilitar
@@ -382,6 +386,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/registro-competencias-transversales/save', [RegistroCompetenciaTransversalController::class, 'saveRegistros'])->name('registro-competencias-transversales.save');
             Route::post('/registro-competencias-transversales/save-conclusion', [RegistroCompetenciaTransversalController::class, 'saveConclusion'])->name('registro-competencias-transversales.save-conclusion');
             Route::get('/registro-competencias-transversales/opciones', [RegistroCompetenciaTransversalController::class, 'getOpcionesNotas'])->name('registro-competencias-transversales.opciones');
+            Route::post('/registro-competencias-transversales/export-excel', [RegistroCompetenciaTransversalController::class, 'exportExcel'])->name('registro-competencias-transversales.export-excel');
         });
         
         // Módulo: registro-competencias-transversales-habilitar
@@ -406,6 +411,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/registro-evaluaciones-actitudinales/get-data', [RegistroEvaluacionActitudinalController::class, 'getDataForRegistro'])->name('registro-evaluaciones-actitudinales.get-data');
             Route::post('/registro-evaluaciones-actitudinales/save', [RegistroEvaluacionActitudinalController::class, 'saveRegistros'])->name('registro-evaluaciones-actitudinales.save');
             Route::get('/registro-evaluaciones-actitudinales/opciones', [RegistroEvaluacionActitudinalController::class, 'getOpcionesValoraciones'])->name('registro-evaluaciones-actitudinales.opciones');
+            Route::post('/registro-evaluaciones-actitudinales/export-excel', [RegistroEvaluacionActitudinalController::class, 'exportExcel'])->name('registro-evaluaciones-actitudinales.export-excel');
             Route::post('/registro-evaluaciones-actitudinales/toggle-habilitacion', [RegistroEvaluacionActitudinalController::class, 'toggleHabilitacion'])->name('registro-evaluaciones-actitudinales.toggle-habilitacion');
         });
 

@@ -13,6 +13,12 @@ use App\Models\RegistroOrdenMerito;
 use App\Models\TipoOrdenMerito;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class RegistroOrdenMeritoController extends Controller
 {
@@ -384,6 +390,141 @@ class RegistroOrdenMeritoController extends Controller
         })->values();
 
         return response()->json($result);
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $request->validate([
+            'aula_id' => 'required|exists:aulas,id',
+            'periodo_id' => 'required|exists:periodos,id',
+        ]);
+
+        $aulaId = (int) $request->input('aula_id');
+        $periodoId = (int) $request->input('periodo_id');
+
+        $user = auth()->user();
+        $rol = $user->role->nombre ?? $user->rol;
+        $docenteId = auth()->id();
+
+        if ($rol !== 'admin') {
+            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
+                ->where('docente_id', $docenteId)
+                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                ->exists();
+
+            abort_if(!$tieneAcceso, 403, 'No tienes acceso a este aula.');
+        }
+
+        $aula = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])->findOrFail($aulaId);
+        $periodo = Periodo::with('anioAcademico')->findOrFail($periodoId);
+
+        $matriculas = Matricula::with(['alumno'])
+            ->select('matriculas.*')
+            ->where('matriculas.aula_id', $aulaId)
+            ->where('matriculas.estado', 'activa')
+            ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
+            ->orderBy('alumnos.apellido_paterno', 'ASC')
+            ->orderBy('alumnos.apellido_materno', 'ASC')
+            ->orderBy('alumnos.nombres', 'ASC')
+            ->get();
+
+        $registros = collect();
+        if ($matriculas->isNotEmpty()) {
+            $registros = RegistroOrdenMerito::where('periodo_id', $periodoId)
+                ->whereIn('matricula_id', $matriculas->pluck('id'))
+                ->get()
+                ->keyBy('matricula_id');
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setShowGridLines(false);
+
+        $totalColumns = 4;
+        $lastCol = Coordinate::stringFromColumnIndex($totalColumns);
+
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->setCellValue('A1', 'REGISTRO DE ORDEN DE MÉRITOS');
+        $sheet->getStyle('A1')->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle('A1')->getFont()->setSize(14);
+
+        $aulaTexto = ($aula->grado?->nivel?->nombre ?? '-') . ' - ' . ($aula->grado?->nombre ?? '-') . ' "' . ($aula->seccion?->nombre ?? '-') . '" (' . ($aula->turno_nombre ?? '-') . ') - ' . ($aula->anioAcademico?->anio ?? '-');
+        $sheet->setCellValue('A3', 'Aula:');
+        $sheet->mergeCells("B3:{$lastCol}3");
+        $sheet->setCellValue('B3', $aulaTexto);
+        $sheet->setCellValue('A4', 'Periodo:');
+        $sheet->mergeCells("B4:{$lastCol}4");
+        $sheet->setCellValue('B4', ($periodo->nombre ?? '-') . ' - ' . ($periodo->anioAcademico?->anio ?? '-'));
+        $sheet->setCellValue('A5', 'Nivel:');
+        $sheet->mergeCells("B5:{$lastCol}5");
+        $sheet->setCellValue('B5', $aula->grado?->nivel?->nombre ?? '-');
+        $sheet->getStyle('A3:A5')->getFont()->setBold(true);
+
+        $row = 7;
+        $sheet->setCellValue('A' . $row, 'N°');
+        $sheet->setCellValue('B' . $row, 'Código');
+        $sheet->setCellValue('C' . $row, 'Alumno');
+        $sheet->setCellValue('D' . $row, 'Orden de Mérito');
+        $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getAlignment()->setWrapText(true);
+        $row++;
+
+        $dataStartRow = $row;
+        $num = 1;
+        foreach ($matriculas as $matricula) {
+            $alumno = $matricula->alumno;
+            $registro = $registros[$matricula->id] ?? null;
+
+            $sheet->setCellValue('A' . $row, $num);
+            $sheet->setCellValue('B' . $row, $alumno->codigo_estudiante ?? 'N/A');
+            $sheet->setCellValue('C' . $row, trim(($alumno->apellido_paterno ?? '') . ' ' . ($alumno->apellido_materno ?? '') . ' ' . ($alumno->nombres ?? '')));
+            $sheet->setCellValue('D' . $row, $registro?->nota_valor ?? '');
+
+            $num++;
+            $row++;
+        }
+
+        $lastDataRow = max($row - 1, $dataStartRow);
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastDataRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("A{$dataStartRow}:B{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("D{$dataStartRow}:D{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->freezePane('D8');
+        foreach (range(1, $totalColumns) as $i) {
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+        }
+
+        $fileName = 'registro_orden_merito_' . $aula->id . '_' . $periodo->id . '_' . date('Ymd_His') . '.xlsx';
+        $tempFile = tempnam(sys_get_temp_dir(), 'ord_mer_');
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $fileName)->deleteFileAfterSend(true);
+    }
+
+    private function headerStyle(string $fillColor): array
+    {
+        return [
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => ltrim($fillColor, '#')],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+            ],
+        ];
     }
 
     private function obtenerNotasParaOrdenMerito(int $periodoId, $matriculas, $cargas)

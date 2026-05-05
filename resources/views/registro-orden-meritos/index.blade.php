@@ -337,6 +337,10 @@
             <i class="fas fa-save"></i>
             <span>Guardar todos los registros</span>
         </button>
+        <button class="fab-menu-item" id="btnDescargarExcelOrdenMerito">
+            <i class="fas fa-file-excel"></i>
+            <span>Descargar Excel</span>
+        </button>
     </div>
 </div>
 @endsection
@@ -760,7 +764,33 @@ $(document).ready(function() {
         });
     }
 
+    function descargarOrdenMeritoExcel() {
+        const aulaId = $('#aula_id').val();
+        const periodoId = $('#periodo_id').val();
+
+        if (!aulaId || !periodoId) {
+            Swal.fire('Advertencia', 'Seleccione aula y periodo.', 'warning');
+            return;
+        }
+
+        const form = $('<form>', {
+            method: 'POST',
+            action: '{{ route("admin.registro-orden-meritos.export-excel") }}',
+            style: 'display:none',
+        });
+
+        form.append($('<input>', { type: 'hidden', name: 'aula_id', value: aulaId }));
+        form.append($('<input>', { type: 'hidden', name: 'periodo_id', value: periodoId }));
+        form.append($('<input>', { type: 'hidden', name: '_token', value: $('meta[name="csrf-token"]').attr('content') }));
+
+        $('body').append(form);
+        form[0].submit();
+        setTimeout(() => form.remove(), 1000);
+        $('#fabMenu').removeClass('show');
+    }
+
     $('#btnGuardarTodos').on('click', guardarTodosLosRegistros);
+    $('#btnDescargarExcelOrdenMerito').on('click', descargarOrdenMeritoExcel);
 
     $('#btnCalcularOrdenAutomatico').on('click', function() {
         if (!aulaEsSecundaria) {

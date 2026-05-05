@@ -465,9 +465,9 @@
             <i class="fas fa-save"></i>
             <span>Guardar todas las evaluaciones</span>
         </button>
-        <button class="fab-menu-item" id="btnImprimirTodo">
-            <i class="fas fa-print"></i>
-            <span>Imprimir reporte</span>
+        <button class="fab-menu-item" id="btnDescargarExcelRegistroEvaluaciones">
+            <i class="fas fa-file-excel"></i>
+            <span>Descargar Excel</span>
         </button>
     </div>
 </div>
@@ -878,6 +878,31 @@ $(document).ready(function() {
         Swal.fire('Información', 'Funcionalidad de impresión en desarrollo', 'info');
         $('#fabMenu').removeClass('show');
     }
+
+    function descargarEvaluacionesExcel() {
+        const aulaId = $('#aula_id').val();
+        const periodoId = $('#periodo_id').val();
+
+        if (!aulaId || !periodoId) {
+            Swal.fire('Advertencia', 'Seleccione aula y periodo.', 'warning');
+            return;
+        }
+
+        const form = $('<form>', {
+            method: 'POST',
+            action: '{{ route("admin.registro-evaluaciones.export-excel") }}',
+            style: 'display:none',
+        });
+
+        form.append($('<input>', { type: 'hidden', name: 'aula_id', value: aulaId }));
+        form.append($('<input>', { type: 'hidden', name: 'periodo_id', value: periodoId }));
+        form.append($('<input>', { type: 'hidden', name: '_token', value: $('meta[name="csrf-token"]').attr('content') }));
+
+        $('body').append(form);
+        form[0].submit();
+        setTimeout(() => form.remove(), 1000);
+        $('#fabMenu').removeClass('show');
+    }
     
     // function actualizarProgreso() {
     //     let totalInputs = 0;
@@ -913,6 +938,7 @@ $(document).ready(function() {
 
 
     $('#btnGuardarTodas').on('click', guardarTodasLasEvaluaciones);
+    $('#btnDescargarExcelRegistroEvaluaciones').on('click', descargarEvaluacionesExcel);
     $('#btnImprimirTodo').on('click', imprimirReporte);
     
     $('#toggleHabilitacion').on('change', function() {
