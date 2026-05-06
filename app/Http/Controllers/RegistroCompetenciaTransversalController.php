@@ -26,29 +26,20 @@ class RegistroCompetenciaTransversalController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
         
         // Obtener aulas según el rol
-        if ($rol === 'admin') {
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('activo', true)
-                ->orderBy('nombre')
-                ->get();
-        } else {
-            $aulaIdsAsignadas = CargaHoraria::where('docente_id', $docenteId)
-                ->where('estado', 'activo')
-                ->whereNotNull('aula_id')
-                ->pluck('aula_id')
-                ->unique()
-                ->values();
-
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('activo', true)
-                ->whereIn('id', $aulaIdsAsignadas)
-                ->orderBy('nombre')
-                ->get();
-        }
+        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+            ->when(!$esAdmin, function ($query) use ($docenteId) {
+                $query->where('docente_id', $docenteId)
+                    ->whereHas('grado.nivel', function ($q) {
+                        $q->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                    });
+            })
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
         
         // Obtener todas las competencias transversales activas
         $competencias = CompetenciaTransversal::with('nivel')
@@ -71,14 +62,17 @@ class RegistroCompetenciaTransversalController extends Controller
         $periodoId = $request->periodo_id;
         
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
         
         // Verificar permisos
-        if ($rol !== 'admin') {
-            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('docente_id', $docenteId)
-                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -157,7 +151,23 @@ class RegistroCompetenciaTransversalController extends Controller
     public function saveRegistros(Request $request)
     {
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
+        $docenteId = auth()->id();
+        
+        // Verificar acceso al aula
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $request->aula_id)
+                ->where('docente_id', $docenteId)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
+                ->exists();
+            
+            if (!$tieneAcceso) {
+                return response()->json(['error' => 'No tienes acceso a este aula'], 403);
+            }
+        }
         
         
         $request->validate([
@@ -309,7 +319,28 @@ class RegistroCompetenciaTransversalController extends Controller
         ]);
         
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
+        $docenteId = auth()->id();
+        
+        // Verificar acceso al aula
+        if (!$esAdmin) {
+            $matricula = Matricula::with('aula')->find($request->matricula_id);
+            if (!$matricula) {
+                return response()->json(['error' => 'Matrícula no encontrada'], 404);
+            }
+            
+            $tieneAcceso = Aula::where('id', $matricula->aula_id)
+                ->where('docente_id', $docenteId)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
+                ->exists();
+            
+            if (!$tieneAcceso) {
+                return response()->json(['error' => 'No tienes acceso a este aula'], 403);
+            }
+        }
         
         
         $periodo = Periodo::find($request->periodo_id);
@@ -391,13 +422,16 @@ class RegistroCompetenciaTransversalController extends Controller
         $periodoId = (int) $request->input('periodo_id');
 
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
 
-        if ($rol !== 'admin') {
-            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('docente_id', $docenteId)
-                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
                 ->exists();
 
             abort_if(!$tieneAcceso, 403, 'No tienes acceso a este aula.');

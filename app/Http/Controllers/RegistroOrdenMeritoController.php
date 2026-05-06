@@ -25,24 +25,19 @@ class RegistroOrdenMeritoController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
 
-        if ($rol === 'admin') {
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('activo', true)
-                ->orderBy('nombre')
-                ->get();
-        } else {
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->whereHas('cargaHoraria', function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)->where('estado', 'activo');
-                })
-                ->where('activo', true)
-                ->distinct()
-                ->orderBy('nombre')
-                ->get();
-        }
+        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+            ->when(!$esAdmin, function ($query) use ($docenteId) {
+                $query->where('docente_id', $docenteId)
+                    ->whereHas('grado.nivel', function ($q) {
+                        $q->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                    });
+            })
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
 
         $tiposOrdenMerito = TipoOrdenMerito::with('nivel')
             ->where('activo', true)
@@ -66,13 +61,16 @@ class RegistroOrdenMeritoController extends Controller
         $periodoId = $request->periodo_id;
 
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
 
-        if ($rol !== 'admin') {
-            $tieneAcceso = CargaHoraria::where('aula_id', $aulaId)
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('docente_id', $docenteId)
-                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
                 ->exists();
 
             if (!$tieneAcceso) {
@@ -146,13 +144,16 @@ class RegistroOrdenMeritoController extends Controller
         }
 
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
 
-        if ($rol !== 'admin') {
-            $tieneAcceso = CargaHoraria::where('aula_id', $request->aula_id)
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $request->aula_id)
                 ->where('docente_id', $docenteId)
-                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                ->where('activo', true)
+                ->whereHas('grado.nivel', function ($query) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
+                })
                 ->exists();
 
             if (!$tieneAcceso) {
