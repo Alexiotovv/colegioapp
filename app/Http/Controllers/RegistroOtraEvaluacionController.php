@@ -33,9 +33,14 @@ class RegistroOtraEvaluacionController extends Controller
                 ->orderBy('nombre')
                 ->get();
         } else {
+            // Docente: solo las aulas donde tiene carga horaria (incluyendo las sin curso asignado)
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('docente_id', $docenteId)
+                ->whereHas('cargaHoraria', function($query) use ($docenteId) {
+                    $query->where('docente_id', $docenteId)
+                        ->where('estado', 'activo');
+                })
                 ->where('activo', true)
+                ->distinct()
                 ->orderBy('nombre')
                 ->get();
         }
@@ -67,7 +72,10 @@ class RegistroOtraEvaluacionController extends Controller
         // Verificar permisos
         if ($rol !== 'admin') {
             $tieneAcceso = Aula::where('id', $aulaId)
-                ->where('docente_id', $docenteId)
+                ->whereHas('cargaHoraria', function($query) use ($docenteId) {
+                    $query->where('docente_id', $docenteId)
+                        ->where('estado', 'activo');
+                })
                 ->where('activo', true)
                 ->exists();
             

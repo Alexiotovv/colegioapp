@@ -225,17 +225,8 @@
                                 </div>
                                 <div class="col-md-3 d-flex align-items-end">
                                     <button type="button" id="btnGuardarCursos" class="btn btn-primary w-100" onclick="guardarCursosSeleccionados()" disabled>
-                                        <i class="fas fa-arrow-right me-2"></i> Guardar cursos
+                                        <i class="fas fa-arrow-right me-2"></i> Asignar
                                     </button>
-                                </div>
-                                <div class="col-12 mt-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="aulaSinCursoCheck">
-                                        <label class="form-check-label" for="aulaSinCursoCheck">
-                                            Asignar aula sin curso (registro automático en `carga_horaria` con `curso_id = null`)
-                                        </label>
-                                    </div>
-                                    <input type="hidden" id="aulaSinCursoCargaId" value="">
                                 </div>
                             </div>
                         </div>
@@ -262,7 +253,7 @@
                         <div class="d-flex justify-content-center align-items-center mb-3">
                             <button type="button" id="btnGuardarCursosFlecha" class="btn btn-primary d-flex align-items-center" onclick="guardarCursosSeleccionados()" disabled>
                                 <i class="fas fa-arrow-right flecha-icono me-2"></i>
-                                Guardar cursos
+                                Asignar
                             </button>
                         </div>
                         
@@ -351,7 +342,6 @@ let selectedCourseIds = [];
 let todosLosCursos = [];
 let cursosAsignados = [];
 let aulasSinCursoAsignadas = [];
-let modoAulaSinCurso = false;
 
 $(document).ready(function() {
     // Inicializar Select2
@@ -393,16 +383,6 @@ $(document).ready(function() {
         });
     });
 
-    $('#aulaSinCursoCheck').on('change', function() {
-        modoAulaSinCurso = $(this).is(':checked');
-
-        if (modoAulaSinCurso) {
-            guardarAulaSinCurso();
-        } else {
-            eliminarAulaSinCurso();
-        }
-    });
-    
     // Cuando se selecciona un docente
     $('#docente_id').on('change', function() {
         let docenteId = $(this).val();
@@ -442,9 +422,6 @@ $(document).ready(function() {
             $('#botonesAccion').hide();
             $('#aulaSelectorContainer').hide();
             aulasSinCursoAsignadas = [];
-            modoAulaSinCurso = false;
-            $('#aulaSinCursoCheck').prop('checked', false);
-            $('#aulaSinCursoCargaId').val('');
         }
     });
 
@@ -457,10 +434,10 @@ $(document).ready(function() {
             selectedCourseIds = [];
             actualizarCursosDisponibles();
             renderizarCursos();
-            sincronizarAulaSinCursoEstado();
+            $('#btnGuardarCursos').prop('disabled', false);
+            $('#btnGuardarCursosFlecha').prop('disabled', false);
         } else {
             $('#aulaSeleccionadaNombre').text('');
-            sincronizarAulaSinCursoEstado();
             $('#cursosDisponiblesList').html(`
                 <div class="empty-cursos">
                     <i class="fas fa-info-circle fa-2x mb-2 d-block"></i>
@@ -495,7 +472,7 @@ $(document).ready(function() {
 
                 console.log('RAW cursos-asignados:', raw);
 
-                // Normalizar cada elemento a { id, nombre, nivel, aula }
+                // Normalizar cada elemento a { id, nombre, nivel, aula, seccion }
                 cursosAsignados = raw.map(item => {
                     // Caso: el elemento ya es un curso
                     if (item && (item.id || item.curso_id) && (item.nombre || item.name || item.titulo || item.curso_nombre)) {
@@ -505,7 +482,8 @@ $(document).ready(function() {
                             aula_id: item.aula_id || item.aulaId || null,
                             nombre: item.nombre || item.name || item.titulo || item.curso_nombre,
                             nivel: item.nivel || item.nivel_nombre || item.nivelId || '',
-                            aula: item.aula || item.aula_nombre || item.aula_id || ''
+                            aula: item.aula || item.aula_nombre || item.aula_id || '',
+                            seccion: item.seccion || item.aula_seccion || ''
                         };
                     }
 
@@ -518,7 +496,8 @@ $(document).ready(function() {
                             aula_id: item.aula_id || item.aulaId || item.aula?.id || null,
                             nombre: c.nombre || c.name || c.titulo || '',
                             nivel: c.nivel || c.nivel_nombre || '',
-                            aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : '')
+                            aula: item.aula || item.aula_nombre || (c.aula ? (c.aula.nombre || c.aula) : ''),
+                            seccion: item.seccion || item.aula_seccion || ''
                         };
                     }
 
@@ -529,7 +508,8 @@ $(document).ready(function() {
                         aula_id: item.aula_id || item.aulaId || null,
                         nombre: item.nombre || item.name || item.titulo || item.curso_nombre || 'Sin nombre',
                         nivel: item.nivel || item.nivel_nombre || '',
-                        aula: item.aula || item.aula_nombre || ''
+                        aula: item.aula || item.aula_nombre || '',
+                        seccion: item.seccion || item.aula_seccion || ''
                     };
                 });
 
@@ -544,7 +524,6 @@ $(document).ready(function() {
 
                 console.log('Cursos asignados procesados:', cursosAsignados.length);
                 renderizarCursos();
-                sincronizarAulaSinCursoEstado();
                 $('#cursosSection').show();
                 mostrarLoading(false);
             },
@@ -632,6 +611,7 @@ function renderizarCursos() {
             let cursoNombre = curso.nombre || curso.name || curso.titulo || 'Sin nombre';
             let cursoNivel = curso.nivel || curso.nivel_nombre || 'Sin nivel';
             let cursoAula = curso.aula || curso.aula_nombre || 'No asignada';
+            let cursoSeccion = curso.seccion ? ` - ${curso.seccion}` : '';
             let cursoId = curso.id || curso.curso_id || '';
             let cargaId = curso.carga_id || curso.cargaId || curso.asignacion_id || curso.asignacionId || '';
             htmlAsignados += `
@@ -644,9 +624,8 @@ function renderizarCursos() {
                         ${cursoNombre}
                     </div>
                     <div class="curso-info">
-                            <i class="fas fa-layer-group me-1"></i> ${cursoNivel}
-                            ${curso.seccion ? `<span class="badge bg-info ms-2">${curso.seccion}</span>` : ''}<br>
-                            <i class="fas fa-door-open me-1"></i> Aula: ${cursoAula}
+                            <i class="fas fa-layer-group me-1"></i> ${cursoNivel}<br>
+                            <i class="fas fa-door-open me-1"></i> Aula: ${cursoAula}${cursoSeccion}
                     </div>
                     <span class="badge-asignado">Asignado</span>
                 </div>
@@ -673,31 +652,6 @@ function renderizarCursos() {
     }
 }
 
-function sincronizarAulaSinCursoEstado() {
-    if (!aulaSeleccionadaId) {
-        modoAulaSinCurso = false;
-        $('#aulaSinCursoCheck').prop('checked', false);
-        $('#aulaSinCursoCargaId').val('');
-        $('#cursosSection .card-body > .cursos-container').show();
-        return;
-    }
-
-    let asignacion = aulasSinCursoAsignadas.find(item => String(item.aula_id) === String(aulaSeleccionadaId));
-
-    if (asignacion) {
-        modoAulaSinCurso = true;
-        $('#aulaSinCursoCheck').prop('checked', true);
-        $('#aulaSinCursoCargaId').val(asignacion.carga_id || '');
-        $('#cursosSection .card-body > .cursos-container').hide();
-        $('#btnGuardarCursos').prop('disabled', true);
-        $('#btnGuardarCursosFlecha').prop('disabled', true);
-    } else {
-        modoAulaSinCurso = false;
-        $('#aulaSinCursoCheck').prop('checked', false);
-        $('#aulaSinCursoCargaId').val('');
-        $('#cursosSection .card-body > .cursos-container').show();
-    }
-}
 
 function actualizarCursosDisponibles() {
     if (!aulaSeleccionadaId) {
@@ -773,7 +727,7 @@ function renderizarCursosDisponibles(cursos) {
             selectedCourseIds.push(cursoId);
             $(this).addClass('seleccionado');
         }
-        let activo = selectedCourseIds.length > 0;
+        let activo = Boolean(aulaSeleccionadaId);
         $('#btnGuardarCursos').prop('disabled', !activo);
         $('#btnGuardarCursosFlecha').prop('disabled', !activo);
     });
@@ -797,11 +751,6 @@ function mostrarLoading(mostrar) {
 }
 
 function guardarCursosSeleccionados() {
-    if (modoAulaSinCurso) {
-        guardarAulaSinCurso();
-        return;
-    }
-
     let docenteId = $('#docente_id').val();
     let aulaId = $('#aula_id').val();
     let horasSem = $('#horas_semanales').val();
@@ -811,32 +760,37 @@ function guardarCursosSeleccionados() {
     let observaciones = $('#observaciones').val();
 
     if (!docenteId || !aulaId) {
-        toast.error('Seleccione docente y aula antes de guardar');
+        toast.error('Seleccione docente y aula antes de asignar');
         return;
     }
+
+    let isAulaSinCurso = selectedCourseIds.length === 0;
     let docenteNombre = $('#docente_id option:selected').text();
     let aulaNombre = $('#aula_id option:selected').text();
-    if (selectedCourseIds.length === 0) {
-        toast.error('Seleccione al menos un curso disponible');
-        return;
+
+    let btn = $('#btnGuardarCursos');
+    let btnFlecha = $('#btnGuardarCursosFlecha');
+    btn.prop('disabled', true);
+    btnFlecha.prop('disabled', true);
+    btn.html('<span class="loading-spinner me-2"></span> Asignando...');
+    btnFlecha.html('<span class="loading-spinner me-2"></span> Asignando...');
+
+    let data = {
+        _token: '{{ csrf_token() }}',
+        docente_id: docenteId,
+        aula_id: aulaId,
+        horas_semanales: horasSem,
+        dia_semana: diaSemana,
+        hora_inicio: horaInicio,
+        hora_fin: horaFin,
+        observaciones: observaciones
+    };
+
+    if (isAulaSinCurso) {
+        data.aula_sin_curso = true;
     }
 
-    verificarDuplicadoAsignacion(docenteId, aulaId, selectedCourseIds, function(conflictos) {
-        if (conflictos.length > 0) {
-            let docenteConflicto = conflictos[0]?.docente_nombre || conflictos[0]?.docenteName || conflictos[0]?.docente || 'otro docente';
-            toast.error(`No se puede guardar. ${docenteNombre} no puede asignar ese curso en ${aulaNombre} porque ya está asignado a ${docenteConflicto}.`);
-            $('#btnGuardarCursos').prop('disabled', false);
-            $('#btnGuardarCursosFlecha').prop('disabled', false);
-            return;
-        }
-
-        let btn = $('#btnGuardarCursos');
-        let btnFlecha = $('#btnGuardarCursosFlecha');
-        btn.prop('disabled', true);
-        btnFlecha.prop('disabled', true);
-        btn.html('<span class="loading-spinner me-2"></span> Guardando...');
-        btnFlecha.html('<span class="loading-spinner me-2"></span> Guardar cursos');
-
+    if (!isAulaSinCurso) {
         let asignaciones = selectedCourseIds.map(cursoId => ({
             docente_id: docenteId,
             curso_id: cursoId,
@@ -848,146 +802,59 @@ function guardarCursosSeleccionados() {
             observaciones: observaciones
         }));
 
-        $.ajax({
-            url: '{{ route("admin.carga-horaria.store") }}',
-            method: 'POST',
-            data: {
-                _token: '{{ csrf_token() }}',
-                asignaciones: JSON.stringify(asignaciones)
-            },
-            dataType: 'json',
-            success: function(response) {
-                if (response.success) {
-                        toast.success(response.message || `Asignación guardada para ${docenteNombre} en ${aulaNombre}`);
-                    
-                    // Resetear estado local inmediatamente
-                    selectedCourseIds = [];
-                    $('#buscarCursosDisponibles').val('');
-                    $('#buscarCursosAsignados').val('');
-                    
-                    // Restaurar botones
-                    $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                    $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                    $('#btnGuardarCursos').prop('disabled', true);
-                    $('#btnGuardarCursosFlecha').prop('disabled', true);
-                    
-                    // Recargar datos del servidor (esto ocurre en paralelo, sin esperar)
-                    recargarCursosAsignados(docenteId);
-                } else {
-                    toast.error(response.message || 'Error al guardar las asignaciones');
-                    $('#btnGuardarCursos').prop('disabled', false);
-                    $('#btnGuardarCursosFlecha').prop('disabled', false);
-                    $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                    $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                }
-            },
-            error: function(xhr) {
-                let errorMsg = xhr.responseJSON?.message || 'Error al guardar las asignaciones';
-                toast.error(errorMsg);
-                $('#btnGuardarCursos').prop('disabled', false);
-                $('#btnGuardarCursosFlecha').prop('disabled', false);
-                $('#btnGuardarCursos').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-                $('#btnGuardarCursosFlecha').html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+        data.asignaciones = JSON.stringify(asignaciones);
+        verificarDuplicadoAsignacion(docenteId, aulaId, selectedCourseIds, function(conflictos) {
+            if (conflictos.length > 0) {
+                let docenteConflicto = conflictos[0]?.docente_nombre || conflictos[0]?.docenteName || conflictos[0]?.docente || 'otro docente';
+                toast.error(`No se puede asignar. ${docenteNombre} no puede asignar ese curso en ${aulaNombre} porque ya está asignado a ${docenteConflicto}.`);
+                btn.prop('disabled', false);
+                btnFlecha.prop('disabled', false);
+                btn.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+                btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+                return;
             }
+            enviarAsignacion(data, docenteId);
         });
-    });
+    } else {
+        enviarAsignacion(data, docenteId);
+    }
 }
 
-function guardarAulaSinCurso() {
-    let docenteId = $('#docente_id').val();
-    let aulaId = $('#aula_id').val();
-
-    if (!docenteId || !aulaId) {
-        toast.error('Seleccione docente y aula antes de activar el registro sin curso');
-        $('#aulaSinCursoCheck').prop('checked', false);
-        modoAulaSinCurso = false;
-        $('#cursosSection .card-body > .cursos-container').show();
-        return;
-    }
+function enviarAsignacion(data, docenteId) {
+    let btn = $('#btnGuardarCursos');
+    let btnFlecha = $('#btnGuardarCursosFlecha');
 
     $.ajax({
         url: '{{ route("admin.carga-horaria.store") }}',
         method: 'POST',
-        data: {
-            docente_id: docenteId,
-            aula_id: aulaId,
-            aula_sin_curso: 1,
-            horas_semanales: $('#horas_semanales').val(),
-            dia_semana: $('#dia_semana').val(),
-            hora_inicio: $('#hora_inicio').val(),
-            hora_fin: $('#hora_fin').val(),
-            observaciones: $('#observaciones').val(),
-            _token: '{{ csrf_token() }}'
-        },
+        data: data,
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                $('#aulaSinCursoCargaId').val(response.data?.id || '');
-                let aulaAsignada = response.data?.aula_id || aulaId;
-                aulasSinCursoAsignadas = aulasSinCursoAsignadas.filter(item => String(item.aula_id) !== String(aulaAsignada));
-                aulasSinCursoAsignadas.push({
-                    id: response.data?.id || '',
-                    carga_id: response.data?.id || '',
-                    aula_id: aulaAsignada,
-                    aula: response.data?.aula?.nombre || $('#aula_id option:selected').text() || ''
-                });
+                toast.success(response.message || `Asignación guardada para ${$('#docente_id option:selected').text()} en ${$('#aula_id option:selected').text()}`);
                 selectedCourseIds = [];
-                modoAulaSinCurso = true;
-                $('#btnGuardarCursos').prop('disabled', true);
-                $('#btnGuardarCursosFlecha').prop('disabled', true);
-                $('#cursosSection .card-body > .cursos-container').hide();
-                toast.success(response.message || 'Aula asignada sin curso');
+                $('#buscarCursosDisponibles').val('');
+                $('#buscarCursosAsignados').val('');
+                btn.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+                btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+                btn.prop('disabled', true);
+                btnFlecha.prop('disabled', true);
+                recargarCursosAsignados(docenteId);
+            } else {
+                toast.error(response.message || 'Error al guardar la asignación');
+                btn.prop('disabled', false);
+                btnFlecha.prop('disabled', false);
+                btn.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+                btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
             }
         },
         error: function(xhr) {
-            let errorMsg = xhr.responseJSON?.message || 'No se pudo guardar el aula sin curso';
+            let errorMsg = xhr.responseJSON?.message || 'Error al guardar la asignación';
             toast.error(errorMsg);
-            $('#aulaSinCursoCheck').prop('checked', false);
-            modoAulaSinCurso = false;
-            $('#cursosSection .card-body > .cursos-container').show();
-        }
-    });
-}
-
-function eliminarAulaSinCurso() {
-    let cargaId = $('#aulaSinCursoCargaId').val();
-    let aulaId = $('#aula_id').val();
-
-    if (!aulaId) {
-        $('#aulaSinCursoCargaId').val('');
-        return;
-    }
-
-    if (!cargaId) {
-        let asignacion = aulasSinCursoAsignadas.find(item => String(item.aula_id) === String(aulaId));
-        cargaId = asignacion?.carga_id || asignacion?.id || '';
-    }
-
-    if (!cargaId) {
-        $('#aulaSinCursoCheck').prop('checked', false);
-        modoAulaSinCurso = false;
-        $('#cursosSection .card-body > .cursos-container').show();
-        return;
-    }
-
-    $.ajax({
-        url: '/admin/carga-horaria/' + cargaId,
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        },
-        dataType: 'json',
-        success: function(response) {
-            $('#aulaSinCursoCargaId').val('');
-            aulasSinCursoAsignadas = aulasSinCursoAsignadas.filter(item => String(item.aula_id) !== String(aulaId));
-            modoAulaSinCurso = false;
-            $('#aulaSinCursoCheck').prop('checked', false);
-            $('#cursosSection .card-body > .cursos-container').show();
-            toast.success(response.message || 'Asignación sin curso eliminada');
-        },
-        error: function(xhr) {
-            let errorMsg = xhr.responseJSON?.message || 'No se pudo eliminar el aula sin curso';
-            toast.error(errorMsg);
+            btn.prop('disabled', false);
+            btnFlecha.prop('disabled', false);
+            btn.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+            btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
         }
     });
 }
@@ -1078,7 +945,6 @@ function recargarCursosAsignados(docenteId) {
             
             console.log('Cursos asignados recargados:', cursosAsignados.length);
             renderizarCursos();
-            sincronizarAulaSinCursoEstado();
             if (aulaSeleccionadaId) {
                 actualizarCursosDisponibles();
             }
@@ -1120,6 +986,8 @@ function eliminarCursoAsignado(cargaId) {
                         if (aulaSeleccionadaId) {
                             actualizarCursosDisponibles();
                         }
+                    } else {
+                        toast.error(response.message || 'No se puede eliminar: el curso tiene datos enlazados o ya está en uso');
                     }
                 },
                 error: function(xhr) {
@@ -1135,9 +1003,6 @@ function limpiarFormulario() {
     aulaSeleccionadaId = null;
     aulaSeleccionadaNivelId = null;
     selectedCourseIds = [];
-    modoAulaSinCurso = false;
-    $('#aulaSinCursoCheck').prop('checked', false);
-    $('#aulaSinCursoCargaId').val('');
     $('#aulaSeleccionadaId').val('');
     $('#aula_id').html('<option value="">-- Seleccionar aula --</option>').prop('disabled', true);
     $('#horas_semanales').val('4');
@@ -1153,8 +1018,8 @@ function limpiarFormulario() {
     let btnFlecha = $('#btnGuardarCursosFlecha');
     btn.prop('disabled', true);
     btnFlecha.prop('disabled', true);
-    btn.html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
-    btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Guardar cursos');
+    btn.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
+    btnFlecha.html('<i class="fas fa-arrow-right me-2"></i> Asignar');
 }
 </script>
 @endsection

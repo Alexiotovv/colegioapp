@@ -27,25 +27,21 @@ class NotaController extends Controller
         $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
-        // Si es admin, ver todas las aulas
-        // Si es docente, solo ver sus aulas asignadas por carga horaria
-        if ($rol === 'admin') {
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('activo', true)
-                ->orderBy('nombre')
-                ->get();
-        } else {
-            // Docente: solo las aulas donde tiene carga horaria
-            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->whereHas('cargaHoraria', function($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->where('estado', 'activo');
-                })
-                ->where('activo', true)
-                ->distinct()
-                ->orderBy('nombre')
-                ->get();
-        }
+        // Mostrar solo aulas que tienen carga horaria con curso asignado.
+        // Para admin se muestran todas esas aulas; para docente solo las suyas.
+        $queryAulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+            ->whereHas('cargaHoraria', function($query) use ($docenteId, $rol) {
+                if ($rol !== 'admin') {
+                    $query->where('docente_id', $docenteId);
+                }
+                $query->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                    ->whereNotNull('curso_id');
+            })
+            ->where('activo', true)
+            ->distinct()
+            ->orderBy('nombre');
+
+        $aulas = $queryAulas->get();
         
         $periodos = Periodo::with('anioAcademico')
                         ->orderBy('orden')
@@ -92,13 +88,18 @@ class NotaController extends Controller
             return response()->json([]);
         }
         
-        // Obtener cursos asignados al docente para esta aula
+        // Obtener cursos asignados al docente para esta aula y descartar asignaciones incompletas.
         $cursos = CargaHoraria::with(['curso.nivel'])
             ->where('docente_id', $docenteId)
             ->where('aula_id', $aulaId)
-            ->where('estado', 'activo')
+            ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+            ->whereNotNull('curso_id')
+            ->whereHas('curso', function ($query) {
+                $query->where('activo', true);
+            })
             ->get()
             ->pluck('curso')
+            ->filter()
             ->unique('id')
             ->values();
         

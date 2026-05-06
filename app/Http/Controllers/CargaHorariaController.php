@@ -283,10 +283,11 @@ class CargaHorariaController extends Controller
                 'message' => 'Carga horaria eliminada exitosamente'
             ]);
         } catch (\Exception $e) {
+            // Si hay restricciones de foreign key, Laravel lanzará una excepción
             return response()->json([
                 'success' => false,
-                'message' => 'Error al eliminar: ' . $e->getMessage()
-            ], 500);
+                'message' => 'No se puede eliminar: el registro tiene datos asociados o está en uso'
+            ], 422);
         }
     }
     
