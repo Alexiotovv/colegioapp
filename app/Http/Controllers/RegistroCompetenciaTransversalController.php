@@ -33,26 +33,14 @@ class RegistroCompetenciaTransversalController extends Controller
         // Obtener aulas según el rol
         $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
             ->when(!$esAdmin, function ($query) use ($docenteId) {
-                $query->where(function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($query) use ($docenteId) {
-                            $query->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                        });
-                });
+                // Para docentes no-admin, solo mostrar aulas donde es tutor (docente_id)
+                $query->where('docente_id', $docenteId);
             })
             ->where('activo', true)
             ->distinct()
             ->orderBy('nombre')
             ->get();
 
-        // 🔥 DEBUG - Ver qué aulas está obteniendo
-        // dd([
-        //     'es_admin' => $esAdmin,
-        //     'docente_id' => $docenteId,
-        //     'total_aulas' => $aulas->count(),
-        //     'aulas' => $aulas->toArray()
-        // ]);
 
         // Obtener competencias transversales activas con filtro de asignación
         $competenciasQuery = CompetenciaTransversal::with('nivel')
@@ -97,13 +85,7 @@ class RegistroCompetenciaTransversalController extends Controller
         if (!$esAdmin) {
             $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('activo', true)
-                ->where(function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($query) use ($docenteId) {
-                            $query->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                        });
-                })
+                ->where('docente_id', $docenteId)
                 ->exists();
             
             if (!$tieneAcceso) {
