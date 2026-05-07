@@ -424,6 +424,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
             Route::put('/configuracion/institucion', [ConfiguracionController::class, 'updateInstitucion'])->name('configuracion.update-institucion');
             Route::put('/configuracion/libreta', [ConfiguracionController::class, 'updateLibreta'])->name('configuracion.update-libreta');
+            Route::put('/configuracion/caracteres', [ConfiguracionController::class, 'updateCaracteres'])->name('configuracion.update-caracteres');
+            Route::post('/configuracion/asignar-competencias-transversales', [ConfiguracionController::class, 'asignarCompetenciasTransversales'])->name('configuracion.asignar-competencias-transversales');
+            Route::post('/configuracion/eliminar-asignacion-competencia-transversal', [ConfiguracionController::class, 'eliminarAsignacionCompetenciaTransversal'])->name('configuracion.eliminar-asignacion-competencia-transversal');
             Route::post('/configuracion/libreta-cuadros', [ConfiguracionController::class, 'saveLibretaCuadros'])->name('configuracion.save-libreta-cuadros');
             Route::post('/configuracion/delete-logo', [ConfiguracionController::class, 'deleteLogo'])->name('configuracion.delete-logo');
             Route::post('/configuracion/delete-libreta-image', [ConfiguracionController::class, 'deleteLibretaImage'])->name('configuracion.delete-libreta-image');

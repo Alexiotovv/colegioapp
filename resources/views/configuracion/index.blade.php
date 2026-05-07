@@ -3,6 +3,10 @@
 @section('title', 'Configuración del Sistema')
 
 @section('css')
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+
 <style>
     .config-card {
         background: white;
@@ -116,6 +120,16 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="cuadros-tab" data-bs-toggle="tab" data-bs-target="#cuadros" type="button" role="tab">
                     <i class="fas fa-th-large me-2"></i>Cuadros de Libreta
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="caracteres-tab" data-bs-toggle="tab" data-bs-target="#caracteres" type="button" role="tab">
+                    <i class="fas fa-keyboard me-2"></i>Límite de Caracteres
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="competencias-transversales-tab" data-bs-toggle="tab" data-bs-target="#competencias-transversales" type="button" role="tab">
+                    <i class="fas fa-users-cog me-2"></i>Asignar Comp. Transversales
                 </button>
             </li>
         </ul>
@@ -494,12 +508,187 @@
                     @endforeach
                 </form>
             </div>
+
+            <!-- ==================== TAB CARACTERES ==================== -->
+            <div class="tab-pane fade" id="caracteres" role="tabpanel">
+                <form method="POST" action="{{ route('admin.configuracion.update-caracteres') }}">
+                    @csrf
+                    @method('PUT')
+                    
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Configure la cantidad máxima de caracteres permitidos para las conclusiones descriptivas y apreciaciones en el sistema.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="conclusiones_caracteres_max" class="form-label required-field">Caracteres máx. en Conclusiones Descriptivas (Notas)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control @error('conclusiones_caracteres_max') is-invalid @enderror" 
+                                       id="conclusiones_caracteres_max" name="conclusiones_caracteres_max" 
+                                       value="{{ old('conclusiones_caracteres_max', $caracteresConfig['conclusiones_caracteres_max']) }}" 
+                                       min="100" max="5000" required>
+                                <span class="input-group-text">caracteres</span>
+                                @error('conclusiones_caracteres_max')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <small class="text-muted d-block mt-2">Rango: 100 - 5000 caracteres</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="competencias_transversales_caracteres_max" class="form-label required-field">Caracteres máx. en Competencias Transversales</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control @error('competencias_transversales_caracteres_max') is-invalid @enderror" 
+                                       id="competencias_transversales_caracteres_max" name="competencias_transversales_caracteres_max" 
+                                       value="{{ old('competencias_transversales_caracteres_max', $caracteresConfig['competencias_transversales_caracteres_max']) }}" 
+                                       min="100" max="5000" required>
+                                <span class="input-group-text">caracteres</span>
+                                @error('competencias_transversales_caracteres_max')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <small class="text-muted d-block mt-2">Rango: 100 - 5000 caracteres</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="apreciaciones_caracteres_max" class="form-label required-field">Caracteres máx. en Apreciaciones del Tutor</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control @error('apreciaciones_caracteres_max') is-invalid @enderror" 
+                                       id="apreciaciones_caracteres_max" name="apreciaciones_caracteres_max" 
+                                       value="{{ old('apreciaciones_caracteres_max', $caracteresConfig['apreciaciones_caracteres_max']) }}" 
+                                       min="100" max="5000" required>
+                                <span class="input-group-text">caracteres</span>
+                                @error('apreciaciones_caracteres_max')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <small class="text-muted d-block mt-2">Rango: 100 - 5000 caracteres</small>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Nota:</strong> Estos límites se aplicarán inmediatamente en los formularios de registro y mostrará un contador de caracteres disponibles.
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i> Guardar Configuración
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ==================== TAB ASIGNAR COMPETENCIAS TRANSVERSALES ==================== -->
+            <div class="tab-pane fade" id="competencias-transversales" role="tabpanel">
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <p class="text-muted">Configure qué profesores pueden ver cada competencia transversal en el Registro de Competencias Transversales. Los administradores ven todas las competencias sin restricciones.</p>
+                    </div>
+                </div>
+
+                @foreach($competenciasTransversales->groupBy('nivel.nombre') as $nivelNombre => $competencias)
+                    <div class="config-card mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-layer-group me-2"></i>
+                            {{ $nivelNombre }}
+                        </h5>
+
+                        @foreach($competencias as $competencia)
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <strong>{{ $competencia->nombre }}</strong>
+                                        @if($competencia->descripcion)
+                                            <br><small class="text-muted">{{ $competencia->descripcion }}</small>
+                                        @endif
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            onclick="editarAsignacion(this, {{ $competencia->id }}, '{{ addslashes($competencia->nombre) }}')"
+                                            data-asignados="{{ $competencia->usuariosAsignados->pluck('id')->join(',') }}">
+                                        <i class="fas fa-edit me-1"></i> Asignar Profesores
+                                    </button>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-12">
+                                        <small class="text-muted">Profesores asignados:</small>
+                                        <div class="mt-1">
+                                            @if($competencia->usuariosAsignados->count() > 0)
+                                                @foreach($competencia->usuariosAsignados as $usuario)
+                                                    <span class="badge bg-success text-white me-1 mb-1">
+                                                        {{ $usuario->name }}
+                                                        <a href="javascript:void(0)" class="text-white ms-2" title="Eliminar profesor" onclick="eliminarAsignacionProfesor({{ $competencia->id }}, {{ $usuario->id }}, '{{ addslashes($usuario->name) }}')">
+                                                            <i class="fas fa-times"></i>
+                                                        </a>
+                                                    </span>
+                                                @endforeach
+                                            @else
+                                                <span class="text-muted">Ningún profesor asignado (solo administradores verán esta competencia)</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Modal Asignar Profesores -->
+<div class="modal fade" id="modalAsignarProfesores" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-users-cog me-2"></i>
+                    Asignar Profesores - <span id="competenciaNombre"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAsignarProfesores">
+                    @csrf
+                    <input type="hidden" id="competencia_id" name="competencia_id">
+                    
+                    <div class="mb-3">
+                        <label for="selectProfesores" class="form-label">Seleccionar Profesores</label>
+                        <select class="form-select" id="selectProfesores" name="profesores[]" multiple="multiple" style="width: 100%;">
+                            @foreach($profesores as $profesor)
+                                <option value="{{ $profesor->id }}">
+                                    {{ $profesor->name }}
+                                    @if($profesor->docente)
+                                        - {{ $profesor->docente->codigo }}
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted d-block mt-2">Los profesores seleccionados podrán ver esta competencia en el Registro de Competencias Transversales.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarAsignacion">
+                    <i class="fas fa-save me-2"></i> Guardar Asignación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 function deleteImage(campo, tipo) {
     Swal.fire({
@@ -564,5 +753,110 @@ function deleteLibretaImage(campo) {
         }
     });
 }
+
+// ==================== ASIGNAR COMPETENCIAS TRANSVERSALES ====================
+
+function editarAsignacion(button, competenciaId, competenciaNombre) {
+    // Establecer valores en el formulario
+    $('#competencia_id').val(competenciaId);
+    $('#competenciaNombre').text(competenciaNombre);
+
+    // Cargar profesores asignados si los hay
+    let asignados = $(button).data('asignados') || '';
+    let selectedProfesores = [];
+    if (asignados) {
+        selectedProfesores = asignados.toString().split(',').filter(function(item) {
+            return item !== '';
+        });
+    }
+    $('#selectProfesores').val(selectedProfesores).trigger('change');
+
+    // Mostrar el modal
+    let modal = new bootstrap.Modal(document.getElementById('modalAsignarProfesores'));
+    modal.show();
+}
+
+function eliminarAsignacionProfesor(competenciaId, userId, userName) {
+    Swal.fire({
+        title: 'Eliminar profesor asignado',
+        text: `¿Deseas quitar a ${userName} de esta competencia transversal?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '{{ route("admin.configuracion.eliminar-asignacion-competencia-transversal") }}',
+                method: 'POST',
+                data: {
+                    competencia_id: competenciaId,
+                    user_id: userId,
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire('Eliminado', response.message, 'success').then(function() {
+                            location.reload();
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = xhr.responseJSON?.message || 'Error al eliminar la asignación';
+                    Swal.fire('Error', errorMsg, 'error');
+                }
+            });
+        }
+    });
+}
+
+$(document).ready(function() {
+    // Inicializar Select2 para el modal
+    $('#selectProfesores').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Buscar y seleccionar profesores...',
+        allowClear: true,
+        language: {
+            noResults: function() {
+                return "No se encontraron profesores";
+            },
+            searching: function() {
+                return "Buscando...";
+            }
+        }
+    });
+    
+    // Guardar asignación de profesores
+    $('#btnGuardarAsignacion').on('click', function() {
+        let competenciaId = $('#competencia_id').val();
+        let profesoresSeleccionados = $('#selectProfesores').val() || [];
+        
+        if (competenciaId && profesoresSeleccionados.length >= 0) {
+            $.ajax({
+                url: '{{ route("admin.configuracion.asignar-competencias-transversales") }}',
+                method: 'POST',
+                data: {
+                    competencia_id: competenciaId,
+                    profesores: profesoresSeleccionados,
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire('Éxito', response.message, 'success').then(function() {
+                            location.reload();
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = xhr.responseJSON?.message || 'Error al guardar la asignación';
+                    Swal.fire('Error', errorMsg, 'error');
+                }
+            });
+        }
+    });
+});
 </script>
 @endsection

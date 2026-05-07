@@ -7,6 +7,9 @@ use App\Models\ConfiguracionInstitucion;
 use App\Models\ConfiguracionLibreta;
 use App\Models\ConfiguracionLibretaCuadro;
 use App\Models\Nivel;
+use App\Models\CompetenciaTransversal;
+use App\Models\User;
+use App\Models\AsignacionCompetenciaTransversal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -19,7 +22,25 @@ class ConfiguracionController extends Controller
         $niveles = Nivel::orderBy('orden')->get();
         $cuadrosPorNivel = ConfiguracionLibretaCuadro::all()->pluck('cuadros', 'nivel_id')->toArray();
         
-        return view('configuracion.index', compact('configInstitucion', 'configLibreta', 'niveles', 'cuadrosPorNivel'));
+        // Obtener competencias transversales con asignaciones
+        $competenciasTransversales = CompetenciaTransversal::with(['nivel', 'usuariosAsignados'])
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+        
+        // Obtener profesores (usuarios con rol diferente a admin)
+        $profesores = User::whereHas('role', function($query) {
+            $query->where('nombre', '!=', 'admin');
+        })->where('activo', true)->orderBy('name')->get();
+        
+        // Obtener configuraciones de caracteres
+        $caracteresConfig = [
+            'conclusiones_caracteres_max' => \App\Models\Configuracion::getValor('conclusiones_caracteres_max', 500),
+            'competencias_transversales_caracteres_max' => \App\Models\Configuracion::getValor('competencias_transversales_caracteres_max', 500),
+            'apreciaciones_caracteres_max' => \App\Models\Configuracion::getValor('apreciaciones_caracteres_max', 500),
+        ];
+        
+        return view('configuracion.index', compact('configInstitucion', 'configLibreta', 'niveles', 'cuadrosPorNivel', 'competenciasTransversales', 'profesores', 'caracteresConfig'));
     }
     
     public function updateInstitucion(Request $request)
@@ -194,6 +215,85 @@ class ConfiguracionController extends Controller
         return redirect()->route('admin.configuracion.index')->with('success', 'Cuadros de libreta guardados');
     }
 
+
+    public function updateCaracteres(Request $request)
+    {
+        $request->validate([
+            'conclusiones_caracteres_max' => 'required|integer|min:100|max:5000',
+            'competencias_transversales_caracteres_max' => 'required|integer|min:100|max:5000',
+            'apreciaciones_caracteres_max' => 'required|integer|min:100|max:5000',
+        ]);
+
+        // Usar el modelo Configuracion para actualizar
+        \App\Models\Configuracion::setValor(
+            'conclusiones_caracteres_max',
+            $request->conclusiones_caracteres_max,
+            'Cantidad máxima de caracteres en conclusiones descriptivas',
+            'numero'
+        );
+
+        \App\Models\Configuracion::setValor(
+            'competencias_transversales_caracteres_max',
+            $request->competencias_transversales_caracteres_max,
+            'Cantidad máxima de caracteres en competencias transversales',
+            'numero'
+        );
+
+        \App\Models\Configuracion::setValor(
+            'apreciaciones_caracteres_max',
+            $request->apreciaciones_caracteres_max,
+            'Cantidad máxima de caracteres en apreciaciones',
+            'numero'
+        );
+
+        return redirect()->route('admin.configuracion.index')
+            ->with('success', 'Límites de caracteres actualizados exitosamente');
+    }
+    
+    public function asignarCompetenciasTransversales(Request $request)
+    {
+        $request->validate([
+            'competencia_id' => 'required|exists:competencias_transversales,id',
+            'profesores' => 'array',
+            'profesores.*' => 'exists:users,id',
+        ]);
+        
+        $competenciaId = $request->competencia_id;
+        $profesoresSeleccionados = $request->profesores ?? [];
+        
+        // Eliminar asignaciones existentes para esta competencia
+        AsignacionCompetenciaTransversal::where('competencia_transversal_id', $competenciaId)->delete();
+        
+        // Crear nuevas asignaciones
+        foreach ($profesoresSeleccionados as $userId) {
+            AsignacionCompetenciaTransversal::create([
+                'competencia_transversal_id' => $competenciaId,
+                'user_id' => $userId,
+            ]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Asignaciones actualizadas correctamente'
+        ]);
+    }
+
+    public function eliminarAsignacionCompetenciaTransversal(Request $request)
+    {
+        $request->validate([
+            'competencia_id' => 'required|exists:competencias_transversales,id',
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        AsignacionCompetenciaTransversal::where('competencia_transversal_id', $request->competencia_id)
+            ->where('user_id', $request->user_id)
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profesor eliminado de la asignación correctamente'
+        ]);
+    }
 
     private function deleteOldFile($path)
     {

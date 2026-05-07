@@ -46,7 +46,7 @@ class ApreciacionController extends Controller
         
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
-        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 255);
+        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 500);
         
         return view('apreciaciones.index', compact('aulas', 'periodos', 'anioActivo', 'maxCaracteres'));
     }
@@ -102,7 +102,7 @@ class ApreciacionController extends Controller
         $periodo = Periodo::find($periodoId);
         $apreciacionesHabilitadas = $periodo ? $periodo->activo : false;
         
-        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 255);
+        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 500);
         
         return response()->json([
             'matriculas' => $matriculas,
@@ -132,7 +132,7 @@ class ApreciacionController extends Controller
             ], 422);
         }
         
-        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 255);
+        $maxCaracteres = Configuracion::getValor('apreciaciones_caracteres_max', 500);
         $docenteId = auth()->id();
         
         DB::beginTransaction();

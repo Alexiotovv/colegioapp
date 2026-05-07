@@ -553,6 +553,10 @@
                     <textarea class="form-control" id="conclusion_texto" rows="5" 
                               placeholder="Escriba aquí la conclusión descriptiva..."></textarea>
                     <small class="text-muted">Describe el nivel de logro y recomendaciones.</small>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted"></small>
+                        <small class="text-muted"><span id="conclusion_char_count">0</span>/<span id="conclusion_char_max">500</span> caracteres</small>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -583,6 +587,9 @@ $(document).ready(function() {
     let requiereConclusionBSecundaria = false;
     let aulaEsPrimaria = false;
     let aulaEsSecundaria = false;
+    
+    // ==================== CONFIGURACIÓN DE CARACTERES ====================
+    let competenciasTransversalesCaracteresMax = 500; // Valor por defecto
 
     // Función para cargar opciones de notas desde el servidor
     function cargarOpcionesNotas() {
@@ -603,8 +610,43 @@ $(document).ready(function() {
         });
     }
 
+    // ==================== INICIALIZACIÓN DE CONTADOR DE CARACTERES ====================
+    function inicializarContadorCaracteres() {
+        // Obtener el máximo de caracteres del data attribute o usar valor por defecto
+        competenciasTransversalesCaracteresMax = {{ $caracteresConfig['competencias_transversales_caracteres_max'] ?? 500 }};
+        $('#conclusion_char_max').text(competenciasTransversalesCaracteresMax);
+        
+        // Event listener para actualizar el contador mientras se escribe
+        $(document).on('input', '#conclusion_texto', function() {
+            let currentLength = $(this).val().length;
+            $('#conclusion_char_count').text(currentLength);
+            
+            // Cambiar color según el porcentaje de uso
+            let percentage = (currentLength / competenciasTransversalesCaracteresMax) * 100;
+            if (percentage >= 100) {
+                $(this).addClass('is-invalid');
+                $(this).removeClass('is-valid');
+                // Truncar el texto si excede el límite
+                let text = $(this).val();
+                if (text.length > competenciasTransversalesCaracteresMax) {
+                    $(this).val(text.substring(0, competenciasTransversalesCaracteresMax));
+                    $('#conclusion_char_count').text(competenciasTransversalesCaracteresMax);
+                }
+            } else if (percentage >= 80) {
+                $(this).addClass('is-invalid');
+                $(this).removeClass('is-valid');
+            } else {
+                $(this).removeClass('is-invalid');
+                $(this).addClass('is-valid');
+            }
+        });
+    }
+
     // Cargar opciones de notas al inicio
     cargarOpcionesNotas();
+    
+    // Inicializar contador de caracteres
+    inicializarContadorCaracteres();
 
     $('#fabButton').on('click', function(e) {
         e.stopPropagation();
@@ -1187,13 +1229,20 @@ $(document).ready(function() {
         $('#conclusion_texto').val('');
         $('#btnGuardarConclusion').data('nota', notaValor || '');
         
+        // Inicializar contador de caracteres
+        $('#conclusion_char_count').text('0');
+        $('#conclusion_char_max').text(competenciasTransversalesCaracteresMax);
+        
         // Si ya existe un registro, cargar la conclusión existente
         if (registroId) {
             // Buscar en los datos existentes
             for (let matId in registrosData) {
                 for (let compId in registrosData[matId]) {
                     if (registrosData[matId][compId].id == registroId && registrosData[matId][compId].conclusion) {
-                        $('#conclusion_texto').val(registrosData[matId][compId].conclusion);
+                        let conclusionText = registrosData[matId][compId].conclusion;
+                        $('#conclusion_texto').val(conclusionText);
+                        // Actualizar contador
+                        $('#conclusion_char_count').text(conclusionText.length);
                         break;
                     }
                 }

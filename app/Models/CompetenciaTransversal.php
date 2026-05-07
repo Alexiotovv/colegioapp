@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompetenciaTransversal extends Model
 {
@@ -32,6 +33,16 @@ class CompetenciaTransversal extends Model
     public function nivel(): BelongsTo
     {
         return $this->belongsTo(Nivel::class, 'nivel_id');
+    }
+    
+    public function asignaciones(): HasMany
+    {
+        return $this->hasMany(AsignacionCompetenciaTransversal::class, 'competencia_transversal_id');
+    }
+    
+    public function usuariosAsignados()
+    {
+        return $this->belongsToMany(User::class, 'ct_asignaciones', 'competencia_transversal_id', 'user_id');
     }
     
     public function scopeActivo($query)

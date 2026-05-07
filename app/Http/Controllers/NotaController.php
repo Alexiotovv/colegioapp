@@ -49,7 +49,12 @@ class NotaController extends Controller
         
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
-        return view('notas.index', compact('aulas', 'periodos', 'anioActivo'));
+        // Obtener configuraciones de caracteres
+        $caracteresConfig = [
+            'conclusiones_caracteres_max' => Configuracion::getValor('conclusiones_caracteres_max', 500),
+        ];
+        
+        return view('notas.index', compact('aulas', 'periodos', 'anioActivo', 'caracteresConfig'));
     }
     
     public function getCursosByAula(Request $request)

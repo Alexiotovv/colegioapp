@@ -485,6 +485,10 @@
                     <textarea class="form-control" id="conclusion_texto" rows="5" 
                               placeholder="Escriba aquí la conclusión descriptiva del logro del estudiante..."></textarea>
                     <small class="text-muted">Describe el nivel de logro, dificultades y recomendaciones para el estudiante.</small>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted"></small>
+                        <small class="text-muted"><span id="conclusion_char_count">0</span>/<span id="conclusion_char_max">500</span> caracteres</small>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -521,6 +525,9 @@ $(document).ready(function() {
     window.requerirConclusionBSecundaria = false;
     window.aulaEsPrimaria = false;
     window.aulaEsSecundaria = false;
+    
+    // ==================== CONFIGURACIÓN DE CARACTERES ====================
+    let conclusionesCaracteresMax = 500; // Valor por defecto
 
     // ==================== CARGAR OPCIONES DE NOTAS ====================
     function cargarOpcionesNotas() {
@@ -541,11 +548,61 @@ $(document).ready(function() {
         });
     }
 
+    // ==================== CARGAR CONFIGURACIÓN DE CARACTERES ====================
+    function cargarConfiguracionCaracteres() {
+        return $.ajax({
+            url: '{{ route("admin.configuracion.index") }}',
+            method: 'GET',
+            async: true,
+            success: function(response) {
+                // La configuración viene en la página
+            },
+            error: function(xhr) {
+                console.error('Error al cargar configuración:', xhr);
+            }
+        });
+    }
+
+    // ==================== INICIALIZACIÓN DE CONTADOR DE CARACTERES ====================
+    function inicializarContadorCaracteres() {
+        // Obtener el máximo de caracteres del data attribute o usar valor por defecto
+        conclusionesCaracteresMax = {{ $caracteresConfig['conclusiones_caracteres_max'] ?? 500 }};
+        $('#conclusion_char_max').text(conclusionesCaracteresMax);
+        
+        // Event listener para actualizar el contador mientras se escribe
+        $(document).on('input', '#conclusion_texto', function() {
+            let currentLength = $(this).val().length;
+            $('#conclusion_char_count').text(currentLength);
+            
+            // Cambiar color según el porcentaje de uso
+            let percentage = (currentLength / conclusionesCaracteresMax) * 100;
+            if (percentage >= 100) {
+                $(this).addClass('is-invalid');
+                $(this).removeClass('is-valid');
+                // Truncar el texto si excede el límite
+                let text = $(this).val();
+                if (text.length > conclusionesCaracteresMax) {
+                    $(this).val(text.substring(0, conclusionesCaracteresMax));
+                    $('#conclusion_char_count').text(conclusionesCaracteresMax);
+                }
+            } else if (percentage >= 80) {
+                $(this).addClass('is-invalid');
+                $(this).removeClass('is-valid');
+            } else {
+                $(this).removeClass('is-invalid');
+                $(this).addClass('is-valid');
+            }
+        });
+    }
+
     // ==================== INICIALIZACIÓN ASÍNCRONA ====================
     // Cargar opciones y luego continuar
     cargarOpcionesNotas().always(function() {
         console.log('Inicialización completada');
     });
+
+    // Inicializar contador de caracteres
+    inicializarContadorCaracteres();
 
     // ==================== TOGGLE BOTÓN FLOTANTE ====================
     $('#fabButton').on('click', function(e) {
@@ -1061,6 +1118,10 @@ $(document).ready(function() {
         $('#conclusion_matricula_id').val(matriculaId || '');
         $('#conclusion_competencia_id').val(competenciaId || '');
         $('#conclusion_texto').val('');
+        
+        // Inicializar contador de caracteres
+        $('#conclusion_char_count').text('0');
+        $('#conclusion_char_max').text(conclusionesCaracteresMax);
 
         if (notaId) {
             $.ajax({
@@ -1069,6 +1130,8 @@ $(document).ready(function() {
                 success: function(response) {
                     if (response.success && response.conclusion) {
                         $('#conclusion_texto').val(response.conclusion);
+                        // Actualizar contador
+                        $('#conclusion_char_count').text(response.conclusion.length);
                     }
                 },
                 error: function() {
@@ -1079,6 +1142,7 @@ $(document).ready(function() {
             let pendingKey = `${matriculaId}_${competenciaId}`;
             if (conclusionesPendientes[pendingKey]) {
                 $('#conclusion_texto').val(conclusionesPendientes[pendingKey]);
+                $('#conclusion_char_count').text(conclusionesPendientes[pendingKey].length);
             }
         }
         

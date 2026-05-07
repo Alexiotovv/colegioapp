@@ -97,6 +97,12 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+    // Relación con competencias transversales asignadas
+    public function competenciasTransversalesAsignadas(): BelongsToMany
+    {
+        return $this->belongsToMany(CompetenciaTransversal::class, 'ct_asignaciones', 'user_id', 'competencia_transversal_id');
+    }
+
     // Obtener todos los módulos permitidos para el usuario (rol + extras)
     public function getModulosPermitidos()
     {
