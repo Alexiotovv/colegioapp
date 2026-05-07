@@ -95,9 +95,17 @@ class RegistroOtraEvaluacionController extends Controller
             ->orderBy('alumnos.nombres', 'ASC')
             ->get();
         
-        // Obtener todos los tipos de otras evaluaciones activos
+        // Obtener el nivel del aula seleccionada
+        $aula = Aula::with('grado.nivel')->find($aulaId);
+        if (!$aula || !$aula->grado || !$aula->grado->nivel) {
+            return response()->json(['error' => 'El aula seleccionada no tiene un nivel válido'], 400);
+        }
+        $nivelId = $aula->grado->nivel->id;
+        
+        // Obtener tipos de otras evaluaciones activos para el nivel del aula
         $tiposEvaluacion = TipoOtraEvaluacion::with('nivel')
             ->where('activo', true)
+            ->where('nivel_id', $nivelId)
             ->orderBy('orden')
             ->get();
         
