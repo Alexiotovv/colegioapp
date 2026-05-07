@@ -46,10 +46,13 @@ class RegistroCompetenciaTransversalController extends Controller
         $competenciasQuery = CompetenciaTransversal::with('nivel')
             ->where('activo', true);
         
-        // Si no es admin, filtrar por asignaciones
+        // Si no es admin, filtrar por asignaciones solo si existen asignaciones
         if (!$esAdmin) {
-            $totalAsignaciones = AsignacionCompetenciaTransversal::count();
-            if ($totalAsignaciones > 0) {
+            // Verificar si hay asignaciones para cualquier competencia transversal
+            $hayAsignaciones = AsignacionCompetenciaTransversal::exists();
+            
+            // Solo filtrar si hay asignaciones en el sistema
+            if ($hayAsignaciones) {
                 $competenciasQuery->whereHas('usuariosAsignados', function($query) use ($docenteId) {
                     $query->where('user_id', $docenteId);
                 });
@@ -120,10 +123,20 @@ class RegistroCompetenciaTransversalController extends Controller
                 });
             });
         
-        // Si no es admin, filtrar por asignaciones
-        if (!$esAdmin) {
-            $totalAsignaciones = AsignacionCompetenciaTransversal::count();
-            if ($totalAsignaciones > 0) {
+        // Si no es admin, filtrar por asignaciones solo si existen asignaciones en el nivel
+        if (!$esAdmin && $nivelId !== null) {
+            // Verificar si hay asignaciones para competencias del nivel específico
+            $hayAsignacionesEnNivel = AsignacionCompetenciaTransversal::whereHas(
+                'competenciaTransversal',
+                function ($query) use ($nivelId) {
+                    $query->where(function ($q) use ($nivelId) {
+                        $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
+                    });
+                }
+            )->exists();
+            
+            // Solo filtrar si hay asignaciones en el nivel
+            if ($hayAsignacionesEnNivel) {
                 $competenciasQuery->whereHas('usuariosAsignados', function($query) use ($docenteId) {
                     $query->where('user_id', $docenteId);
                 });
