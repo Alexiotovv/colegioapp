@@ -71,9 +71,6 @@ class RegistroOrdenMeritoController extends Controller
             $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('docente_id', $docenteId)
                 ->where('activo', true)
-                ->whereHas('grado.nivel', function ($query) {
-                    $query->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
-                })
                 ->exists();
 
             if (!$tieneAcceso) {
