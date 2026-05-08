@@ -33,8 +33,15 @@ class RegistroCompetenciaTransversalController extends Controller
         // Obtener aulas según el rol
         $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
             ->when(!$esAdmin, function ($query) use ($docenteId) {
-                // Para docentes no-admin, solo mostrar aulas donde es tutor (docente_id)
-                $query->where('docente_id', $docenteId);
+                // Para docentes no-admin: aulas donde es tutor asignado (docente_id)
+                // o donde tiene carga horaria activa asignada
+                $query->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                          $q2->where('docente_id', $docenteId)
+                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
+                      });
+                });
             })
             ->where('activo', true)
             ->distinct()
@@ -88,7 +95,13 @@ class RegistroCompetenciaTransversalController extends Controller
         if (!$esAdmin) {
             $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('activo', true)
-                ->where('docente_id', $docenteId)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                          $q2->where('docente_id', $docenteId)
+                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
+                      });
+                })
                 ->exists();
             
             if (!$tieneAcceso) {
