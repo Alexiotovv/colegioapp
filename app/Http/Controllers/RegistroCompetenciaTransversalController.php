@@ -134,27 +134,27 @@ class RegistroCompetenciaTransversalController extends Controller
                 });
             });
         
-        // Si no es admin, filtrar por asignaciones solo si existen asignaciones en el nivel
-        if (!$esAdmin && $nivelId !== null) {
-            // Verificar si hay asignaciones para competencias del nivel específico
-            $hayAsignacionesEnNivel = AsignacionCompetenciaTransversal::whereHas(
-                'competenciaTransversal',
-                function ($query) use ($nivelId) {
-                    $query->where(function ($q) use ($nivelId) {
-                        $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
-                    });
-                }
-            )->exists();
-            
-            // Solo filtrar si hay asignaciones en el nivel
-            if ($hayAsignacionesEnNivel) {
-                $competenciasQuery->whereHas('usuariosAsignados', function($query) use ($docenteId) {
-                    $query->where('user_id', $docenteId);
-                });
-            }
-        }
-        
         $competencias = $competenciasQuery->orderBy('orden')->get();
+        
+        // Para docentes no-admin, marcar cuáles competencias están asignadas
+        if (!$esAdmin) {
+            $competenciasAsignadasIds = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
+                ->pluck('competencia_transversal_id')
+                ->toArray();
+            
+            $competencias = $competencias->map(function ($competencia) use ($competenciasAsignadasIds) {
+                $data = $competencia->toArray();
+                $data['asignada'] = in_array($competencia->id, $competenciasAsignadasIds);
+                return $data;
+            });
+        } else {
+            // Para admins, todas están asignadas
+            $competencias = $competencias->map(function ($competencia) {
+                $data = $competencia->toArray();
+                $data['asignada'] = true;
+                return $data;
+            });
+        }
 
         // Obtener registros existentes
         $matriculaIds = $matriculas->pluck('id')->toArray();

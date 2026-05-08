@@ -825,7 +825,8 @@ $(document).ready(function() {
         `;
         
         for (let competencia of competenciasData) {
-            headerHtml += `<th colspan="1">${competencia.nombre}<br><small class="text-muted">${competencia.nivel ? competencia.nivel.nombre : ''}</small></th>`;
+            let asignadaIcon = competencia.asignada ? '' : '<i class="fas fa-lock text-muted" title="No asignada"></i> ';
+            headerHtml += `<th colspan="1">${asignadaIcon}${competencia.nombre}<br><small class="text-muted">${competencia.nivel ? competencia.nivel.nombre : ''}</small></th>`;
         }
         headerHtml += `</tr>`;
         
@@ -860,6 +861,7 @@ $(document).ready(function() {
                     let notaGuardada = notaValue ? 'registro-guardado' : '';
                     let tieneConclusion = registro && registro.conclusion;
                     let registroId = registro ? registro.id : '';
+                    let disabledAttr = (!registrosHabilitados || !competencia.asignada) ? 'disabled' : '';
                     
                     bodyHtml += `
                         <td style="text-align: center;">
@@ -868,7 +870,7 @@ $(document).ready(function() {
                                         data-matricula="${matricula.id}"
                                         data-competencia="${competencia.id}"
                                         data-registro-id="${registroId}"
-                                        ${!registrosHabilitados ? 'disabled' : ''}
+                                        ${disabledAttr}
                                         style="width: 110px; margin: 0 auto; display: inline-block;">
                                     <option value="">Seleccionar</option>
                                     ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
@@ -884,10 +886,10 @@ $(document).ready(function() {
                                     data-matricula-id="${matricula.id}"
                                     data-competencia-id="${competencia.id}"
                                     data-tiene-conclusion="${tieneConclusion ? 1 : 0}"
-                                    data-alumno="${matricula.alumno.nombre_completo}"
+                                    data-alumno="${alumno.nombre_completo}"
                                     data-competencia="${competencia.nombre}"
                                     data-nota="${notaValue}"
-                                    ${!registrosHabilitados ? 'disabled' : ''}>
+                                    ${disabledAttr}>
                                 <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
                             </button>
                         </td>
