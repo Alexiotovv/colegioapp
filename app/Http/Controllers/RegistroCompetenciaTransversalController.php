@@ -56,11 +56,6 @@ class RegistroCompetenciaTransversalController extends Controller
                 $competenciasQuery->whereHas('usuariosAsignados', function($query) use ($docenteId) {
                     $query->where('user_id', $docenteId);
                 });
-            } else {
-                // Si no tiene asignaciones específicas, mostrar todas las competencias de primaria
-                $competenciasQuery->whereHas('nivel', function($query) {
-                    $query->where('nombre', 'Primaria');
-                });
             }
         }
         
@@ -133,18 +128,35 @@ class RegistroCompetenciaTransversalController extends Controller
                     $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
                 });
             });
+
+        $tieneAsignacionesEspecificas = false;
+        if (!$esAdmin) {
+            $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
+            if ($tieneAsignacionesEspecificas) {
+                // Si tiene asignaciones específicas, limitar el listado solo a las asignadas
+                $competenciasQuery->whereHas('usuariosAsignados', function ($query) use ($docenteId) {
+                    $query->where('user_id', $docenteId);
+                });
+            }
+        }
         
         $competencias = $competenciasQuery->orderBy('orden')->get();
         
         // Para docentes no-admin, marcar cuáles competencias están asignadas
         if (!$esAdmin) {
-            $competenciasAsignadasIds = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
-                ->pluck('competencia_transversal_id')
-                ->toArray();
-            
-            $competencias = $competencias->map(function ($competencia) use ($competenciasAsignadasIds) {
+            $competenciasAsignadasIds = [];
+            if ($tieneAsignacionesEspecificas) {
+                $competenciasAsignadasIds = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
+                    ->pluck('competencia_transversal_id')
+                    ->toArray();
+            }
+
+            $competencias = $competencias->map(function ($competencia) use ($competenciasAsignadasIds, $tieneAsignacionesEspecificas) {
                 $data = $competencia->toArray();
-                $data['asignada'] = in_array($competencia->id, $competenciasAsignadasIds);
+                // Regla: si el docente NO tiene asignaciones registradas, puede ver/registrar todas.
+                $data['asignada'] = $tieneAsignacionesEspecificas
+                    ? in_array($competencia->id, $competenciasAsignadasIds)
+                    : true;
                 return $data;
             });
         } else {
@@ -241,6 +253,24 @@ class RegistroCompetenciaTransversalController extends Controller
         
         $matriculaIds = collect($request->registros)->pluck('matricula_id')->unique()->toArray();
         $competenciaIds = collect($request->registros)->pluck('competencia_transversal_id')->unique()->toArray();
+
+        if (!$esAdmin) {
+            $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
+            if ($tieneAsignacionesEspecificas) {
+                $competenciasPermitidas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
+                    ->pluck('competencia_transversal_id')
+                    ->unique()
+                    ->toArray();
+
+                $competenciasNoPermitidas = array_values(array_diff($competenciaIds, $competenciasPermitidas));
+                if (!empty($competenciasNoPermitidas)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No tienes permiso para registrar una o más competencias transversales seleccionadas.'
+                    ], 403);
+                }
+            }
+        }
 
         $existingRegistros = RegistroCompetenciaTransversal::where('periodo_id', $request->periodo_id)
             ->whereIn('matricula_id', $matriculaIds)
@@ -374,6 +404,22 @@ class RegistroCompetenciaTransversalController extends Controller
         $user = auth()->user();
         $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
+
+        if (!$esAdmin) {
+            $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
+            if ($tieneAsignacionesEspecificas) {
+                $permitida = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
+                    ->where('competencia_transversal_id', $request->competencia_id)
+                    ->exists();
+
+                if (!$permitida) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No tienes permiso para registrar conclusión en esta competencia transversal.'
+                    ], 403);
+                }
+            }
+        }
         
         // Verificar acceso al aula
         if (!$esAdmin) {
@@ -510,15 +556,24 @@ class RegistroCompetenciaTransversalController extends Controller
             ->get();
 
         $nivelId = $aula->grado?->nivel?->id;
-        $competencias = CompetenciaTransversal::with('nivel')
+        $competenciasQuery = CompetenciaTransversal::with('nivel')
             ->where('activo', true)
             ->when($nivelId !== null, function ($query) use ($nivelId) {
                 $query->where(function ($q) use ($nivelId) {
                     $q->whereNull('nivel_id')->orWhere('nivel_id', $nivelId);
                 });
-            })
-            ->orderBy('orden')
-            ->get();
+            });
+
+        if (!$esAdmin) {
+            $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
+            if ($tieneAsignacionesEspecificas) {
+                $competenciasQuery->whereHas('usuariosAsignados', function ($query) use ($docenteId) {
+                    $query->where('user_id', $docenteId);
+                });
+            }
+        }
+
+        $competencias = $competenciasQuery->orderBy('orden')->get();
 
         $registros = collect();
         if ($matriculas->isNotEmpty() && $competencias->isNotEmpty()) {
