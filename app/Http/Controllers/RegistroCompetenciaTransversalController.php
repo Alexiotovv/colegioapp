@@ -46,15 +46,20 @@ class RegistroCompetenciaTransversalController extends Controller
         $competenciasQuery = CompetenciaTransversal::with('nivel')
             ->where('activo', true);
         
-        // Si no es admin, filtrar por asignaciones solo si existen asignaciones
+        // Si no es admin, aplicar lógica de asignaciones
         if (!$esAdmin) {
-            // Verificar si hay asignaciones para cualquier competencia transversal
-            $hayAsignaciones = AsignacionCompetenciaTransversal::exists();
+            // Verificar si este docente tiene asignaciones específicas
+            $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             
-            // Solo filtrar si hay asignaciones en el sistema
-            if ($hayAsignaciones) {
+            if ($tieneAsignacionesEspecificas) {
+                // Si tiene asignaciones específicas, mostrar solo esas
                 $competenciasQuery->whereHas('usuariosAsignados', function($query) use ($docenteId) {
                     $query->where('user_id', $docenteId);
+                });
+            } else {
+                // Si no tiene asignaciones específicas, mostrar todas las competencias de primaria
+                $competenciasQuery->whereHas('nivel', function($query) {
+                    $query->where('nombre', 'Primaria');
                 });
             }
         }
