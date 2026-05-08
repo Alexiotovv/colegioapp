@@ -28,7 +28,6 @@ class RegistroCompetenciaTransversalController extends Controller
     {
         $user = auth()->user();
         $esAdmin = $user->isAdmin();
-        $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
         // Obtener aulas según el rol
@@ -46,29 +45,26 @@ class RegistroCompetenciaTransversalController extends Controller
                   });
             });
 
-            // Regla adicional (solo rol docente):
-            // si el usuario con rol "docente" tiene aulas de Primaria asignadas,
+            // Regla adicional:
+            // si el usuario (cualquier rol no-admin) tiene aulas de Primaria asignadas,
             // en el registro solo deben mostrarse las de Primaria (nada más).
-            // Para otros roles (ej. "docente_tutor") no aplica.
-            if ($rol === 'docente') {
-                $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                    ->where(function ($q) use ($docenteId) {
-                        $q->where('docente_id', $docenteId)
-                          ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                              $q2->where('docente_id', $docenteId)
-                                 ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                          });
-                    })
-                    ->whereHas('grado.nivel', function ($q) {
-                        $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
-                    })
-                    ->exists();
+            $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                          $q2->where('docente_id', $docenteId)
+                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
+                      });
+                })
+                ->whereHas('grado.nivel', function ($q) {
+                    $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
+                })
+                ->exists();
 
-                if ($tieneAulasPrimariaAsignadas) {
-                    $aulasQuery->whereHas('grado.nivel', function ($q) {
-                        $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
-                    });
-                }
+            if ($tieneAulasPrimariaAsignadas) {
+                $aulasQuery->whereHas('grado.nivel', function ($q) {
+                    $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
+                });
             }
         }
 
@@ -118,39 +114,36 @@ class RegistroCompetenciaTransversalController extends Controller
         
         $user = auth()->user();
         $esAdmin = $user->isAdmin();
-        $rol = $user->role->nombre ?? $user->rol;
         $docenteId = auth()->id();
         
         // Verificar permisos
         if (!$esAdmin) {
-            // Regla adicional (solo rol docente):
-            // si el usuario con rol "docente" tiene aulas de Primaria asignadas,
+            // Regla adicional:
+            // si el usuario tiene aulas de Primaria asignadas,
             // no se permite seleccionar aulas de Secundaria en este módulo.
-            if ($rol === 'docente') {
-                $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                    ->where(function ($q) use ($docenteId) {
-                        $q->where('docente_id', $docenteId)
-                          ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                              $q2->where('docente_id', $docenteId)
-                                 ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                          });
-                    })
+            $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                          $q2->where('docente_id', $docenteId)
+                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
+                      });
+                })
+                ->whereHas('grado.nivel', function ($q) {
+                    $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
+                })
+                ->exists();
+
+            if ($tieneAulasPrimariaAsignadas) {
+                $aulaEsPrimaria = Aula::where('id', $aulaId)
+                    ->where('activo', true)
                     ->whereHas('grado.nivel', function ($q) {
                         $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
                     })
                     ->exists();
 
-                if ($tieneAulasPrimariaAsignadas) {
-                    $aulaEsPrimaria = Aula::where('id', $aulaId)
-                        ->where('activo', true)
-                        ->whereHas('grado.nivel', function ($q) {
-                            $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
-                        })
-                        ->exists();
-
-                    if (!$aulaEsPrimaria) {
-                        return response()->json(['error' => 'No tienes acceso a este aula'], 403);
-                    }
+                if (!$aulaEsPrimaria) {
+                    return response()->json(['error' => 'No tienes acceso a este aula'], 403);
                 }
             }
 
