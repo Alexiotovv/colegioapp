@@ -503,35 +503,79 @@ $(document).ready(function() {
         let contador = 1;
         
         for (let matricula of matriculasData) {
-            let apreciacion = apreciacionesData[matricula.id];
-            let apreciacionValue = apreciacion ? apreciacion.apreciacion : '';
-            let caracteresRestantes = maxCaracteres - apreciacionValue.length;
+            const esRetirado = matricula.estado === 'retirada';
+            const rowClass = esRetirado ? 'class="retirado-row"' : '';
             
-            bodyHtml += `
-                <tr>
-                    <td><strong>${contador}</strong></td>
-                    <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
-                    <td style="text-align: left;">
-                        <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
-                        <small>${matricula.alumno.nombres || ''}</small>
-                     </td>
-                    <td style="text-align: left;">
-                        <div class="apreciacion-wrapper">
-                            <textarea class="apreciacion-textarea" 
-                                      data-matricula="${matricula.id}"
-                                      rows="3"
-                                      maxlength="${maxCaracteres}"
-                                      ${!apreciacionesHabilitadas ? 'disabled' : ''}
-                                      placeholder="Escriba aquí la apreciación del tutor...">${apreciacionValue}</textarea>
-                        </div>
-                        <div class="char-counter ${caracteresRestantes < 50 ? (caracteresRestantes < 10 ? 'danger' : 'warning') : ''}">
-                            ${caracteresRestantes} caracteres restantes
-                        </div>
-                    </td>
-                </tr>
-            `;
+            let apreciacionValue = '';
+            let caracteresRestantes = maxCaracteres;
+            
+            if (!esRetirado) {
+                let apreciacion = apreciacionesData[matricula.id];
+                apreciacionValue = apreciacion ? apreciacion.apreciacion : '';
+                caracteresRestantes = maxCaracteres - apreciacionValue.length;
+            }
+            
+            bodyHtml += `<tr ${rowClass}>
+                <td><strong>${contador}</strong></td>
+                <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
+                <td style="text-align: left;">
+                    <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
+                    <small>${matricula.alumno.nombres || ''}</small>
+                </td>`;
+            
+            if (esRetirado) {
+                bodyHtml += `<td style="text-align: center; vertical-align: middle; background-color: #f5f5f5;">
+                    <span class="badge bg-secondary">Retirado</span>
+                </td>`;
+            } else {
+                bodyHtml += `<td style="text-align: left;">
+                    <div class="apreciacion-wrapper">
+                        <textarea class="apreciacion-textarea" 
+                                data-matricula="${matricula.id}"
+                                rows="3"
+                                maxlength="${maxCaracteres}"
+                                ${!apreciacionesHabilitadas ? 'disabled' : ''}
+                                placeholder="Escriba aquí la apreciación del tutor...">${apreciacionValue}</textarea>
+                    </div>
+                    <div class="char-counter ${caracteresRestantes < 50 ? (caracteresRestantes < 10 ? 'danger' : 'warning') : ''}">
+                        ${caracteresRestantes} caracteres restantes
+                    </div>
+                </td>`;
+            }
+            bodyHtml += `</tr>`;
             contador++;
         }
+
+        // for (let matricula of matriculasData) {
+        //     let apreciacion = apreciacionesData[matricula.id];
+        //     let apreciacionValue = apreciacion ? apreciacion.apreciacion : '';
+        //     let caracteresRestantes = maxCaracteres - apreciacionValue.length;
+            
+        //     bodyHtml += `
+        //         <tr>
+        //             <td><strong>${contador}</strong></td>
+        //             <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
+        //             <td style="text-align: left;">
+        //                 <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
+        //                 <small>${matricula.alumno.nombres || ''}</small>
+        //              </td>
+        //             <td style="text-align: left;">
+        //                 <div class="apreciacion-wrapper">
+        //                     <textarea class="apreciacion-textarea" 
+        //                               data-matricula="${matricula.id}"
+        //                               rows="3"
+        //                               maxlength="${maxCaracteres}"
+        //                               ${!apreciacionesHabilitadas ? 'disabled' : ''}
+        //                               placeholder="Escriba aquí la apreciación del tutor...">${apreciacionValue}</textarea>
+        //                 </div>
+        //                 <div class="char-counter ${caracteresRestantes < 50 ? (caracteresRestantes < 10 ? 'danger' : 'warning') : ''}">
+        //                     ${caracteresRestantes} caracteres restantes
+        //                 </div>
+        //             </td>
+        //         </tr>
+        //     `;
+        //     contador++;
+        // }
         
         $('#tablaBody').html(bodyHtml);
         

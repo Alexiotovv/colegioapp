@@ -28,16 +28,19 @@ class RegistroOrdenMeritoController extends Controller
         $esAdmin = $user->isAdmin();
         $docenteId = auth()->id();
 
-        $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-            ->when(!$esAdmin, function ($query) use ($docenteId) {
-                $query->where('docente_id', $docenteId)
-                    ->whereHas('grado.nivel', function ($q) {
-                        $q->whereRaw('LOWER(nombre) LIKE ?', ['%secundaria%']);
-                    });
-            })
-            ->where('activo', true)
-            ->orderBy('nombre')
-            ->get();
+        if ($esAdmin) {
+            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+                ->where('activo', true)
+                ->orderBy('nombre')
+                ->get();
+        } else {
+            // Los docentes ven solo las aulas donde son tutores
+            $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
+                ->where('docente_id', $docenteId)
+                ->where('activo', true)
+                ->orderBy('nombre')
+                ->get();
+        }
 
         $tiposOrdenMerito = TipoOrdenMerito::with('nivel')
             ->where('activo', true)

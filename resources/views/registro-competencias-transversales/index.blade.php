@@ -826,9 +826,11 @@ $(document).ready(function() {
         let contador = 1;
         
         for (let matricula of matriculasData) {
-            let registrosAlumno = registrosData[matricula.id] || {};
+            const esRetirado = matricula.estado === 'retirada';
+            const rowClass = esRetirado ? 'class="retirado-row"' : '';
+            let registrosAlumno = registrosData[matricula.id] || {};  // <--- DEFINICIÓN NECESARIA
             
-            bodyHtml += `<tr>
+            bodyHtml += `<tr ${rowClass}>
                 <td><strong>${contador}</strong></td>
                 <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
                 <td style="text-align: left;">
@@ -837,43 +839,105 @@ $(document).ready(function() {
                 </td>`;
             
             for (let competencia of competenciasData) {
-                let registro = registrosAlumno[competencia.id];
-                let notaValue = registro ? registro.nota : '';
-                let notaGuardada = notaValue ? 'registro-guardado' : '';
-                let tieneConclusion = registro && registro.conclusion;
-                let registroId = registro ? registro.id : '';
-                
-                bodyHtml += `
-                    <td style="text-align: center;">
-                    <div class="select-wrapper">
-                        <select class="form-select form-select-sm nota-select ${notaGuardada}"
-                                data-matricula="${matricula.id}"
-                                data-competencia="${competencia.id}"
-                                data-registro-id="${registroId}"
-                                ${!registrosHabilitados ? 'disabled' : ''}
-                                style="width: 110px; margin: 0 auto; display: inline-block;">
-                            <option value="">Seleccionar</option>
-                            ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
-                        </select>
-                    </div>
-                    <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-registro-id="${registroId}" value="${notaValue}">
-                    <button class="btn-message" 
-                            data-registro-id="${registroId}"
-                            data-matricula-id="${matricula.id}"
-                            data-competencia-id="${competencia.id}"
-                            data-tiene-conclusion="${tieneConclusion ? 1 : 0}"
-                            data-alumno="${matricula.alumno.nombre_completo}"
-                            data-competencia="${competencia.nombre}"
-                            data-nota="${notaValue}"
-                            ${!registrosHabilitados ? 'disabled' : ''}>
-                        <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
-                    </button>
-                </td>
-            `;
+                if (esRetirado) {
+                    bodyHtml += `<td style="text-align: center; background-color: #f5f5f5;">
+                        <span class="badge bg-secondary">Retirado</span>
+                    </td>`;
+                } else {
+                    let registro = registrosAlumno[competencia.id];
+                    let notaValue = registro ? registro.nota : '';
+                    let notaGuardada = notaValue ? 'registro-guardado' : '';
+                    let tieneConclusion = registro && registro.conclusion;
+                    let registroId = registro ? registro.id : '';
+                    
+                    bodyHtml += `
+                        <td style="text-align: center;">
+                            <div class="select-wrapper">
+                                <select class="form-select form-select-sm nota-select ${notaGuardada}"
+                                        data-matricula="${matricula.id}"
+                                        data-competencia="${competencia.id}"
+                                        data-registro-id="${registroId}"
+                                        ${!registrosHabilitados ? 'disabled' : ''}
+                                        style="width: 110px; margin: 0 auto; display: inline-block;">
+                                    <option value="">Seleccionar</option>
+                                    ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
+                                </select>
+                            </div>
+                            <input type="hidden" class="nota-valor" 
+                                data-matricula="${matricula.id}" 
+                                data-competencia="${competencia.id}" 
+                                data-registro-id="${registroId}" 
+                                value="${notaValue}">
+                            <button class="btn-message" 
+                                    data-registro-id="${registroId}"
+                                    data-matricula-id="${matricula.id}"
+                                    data-competencia-id="${competencia.id}"
+                                    data-tiene-conclusion="${tieneConclusion ? 1 : 0}"
+                                    data-alumno="${matricula.alumno.nombre_completo}"
+                                    data-competencia="${competencia.nombre}"
+                                    data-nota="${notaValue}"
+                                    ${!registrosHabilitados ? 'disabled' : ''}>
+                                <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
+                            </button>
+                        </td>
+                    `;
+                }
+            }
+            bodyHtml += `</tr>`;
+            contador++;
         }
-        bodyHtml += `</tr>`;
-        contador++;
-    }
+
+
+        
+    //     for (let matricula of matriculasData) {
+    //         let registrosAlumno = registrosData[matricula.id] || {};
+            
+    //         bodyHtml += `<tr>
+    //             <td><strong>${contador}</strong></td>
+    //             <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
+    //             <td style="text-align: left;">
+    //                 <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
+    //                 <small>${matricula.alumno.nombres || ''}</small>
+    //             </td>`;
+            
+    //         for (let competencia of competenciasData) {
+    //             let registro = registrosAlumno[competencia.id];
+    //             let notaValue = registro ? registro.nota : '';
+    //             let notaGuardada = notaValue ? 'registro-guardado' : '';
+    //             let tieneConclusion = registro && registro.conclusion;
+    //             let registroId = registro ? registro.id : '';
+                
+    //             bodyHtml += `
+    //                 <td style="text-align: center;">
+    //                 <div class="select-wrapper">
+    //                     <select class="form-select form-select-sm nota-select ${notaGuardada}"
+    //                             data-matricula="${matricula.id}"
+    //                             data-competencia="${competencia.id}"
+    //                             data-registro-id="${registroId}"
+    //                             ${!registrosHabilitados ? 'disabled' : ''}
+    //                             style="width: 110px; margin: 0 auto; display: inline-block;">
+    //                         <option value="">Seleccionar</option>
+    //                         ${opcionesNotas.map(op => `<option value="${op}" ${notaValue === op ? 'selected' : ''}>${op}</option>`).join('')}
+    //                     </select>
+    //                 </div>
+    //                 <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-registro-id="${registroId}" value="${notaValue}">
+    //                 <button class="btn-message" 
+    //                         data-registro-id="${registroId}"
+    //                         data-matricula-id="${matricula.id}"
+    //                         data-competencia-id="${competencia.id}"
+    //                         data-tiene-conclusion="${tieneConclusion ? 1 : 0}"
+    //                         data-alumno="${matricula.alumno.nombre_completo}"
+    //                         data-competencia="${competencia.nombre}"
+    //                         data-nota="${notaValue}"
+    //                         ${!registrosHabilitados ? 'disabled' : ''}>
+    //                     <i class="fas fa-comment-dots" style="font-size: 16px; color: ${tieneConclusion ? '#28a745' : '#6c757d'};"></i>
+    //                 </button>
+    //             </td>
+    //         `;
+    //     }
+    //     bodyHtml += `</tr>`;
+    //     contador++;
+    // }
     
     $('#tablaBody').html(bodyHtml);
     $('.nota-valor').each(function() {

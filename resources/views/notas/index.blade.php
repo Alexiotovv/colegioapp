@@ -353,6 +353,7 @@
     .progress-stats .pending {
         color: #dc3545;
     }
+    
 </style>
 @endsection
 
@@ -840,7 +841,10 @@ $(document).ready(function() {
         let contador = 1;
         
         for (let matricula of matriculasData) {
-            bodyHtml += `<tr>
+            const esRetirado = matricula.estado === 'retirada';
+            const rowClass = esRetirado ? 'class="retirado-row"' : '';
+            
+            bodyHtml += `<tr ${rowClass}>
                 <td><strong>${contador}</strong></td>
                 <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
                 <td style="text-align: left;">
@@ -849,9 +853,16 @@ $(document).ready(function() {
                 </td>`;
             
             for (let competencia of competenciasData) {
-                let notaKey = matricula.id + '_' + competencia.id;
-                let nota = notasData[notaKey];
-                let notaValue = nota ? nota.nota : '';
+                if (esRetirado) {
+                    // Celda con mensaje "Retirado" y sin inputs
+                    bodyHtml += `<td style="text-align: center; vertical-align: middle; background-color: #f5f5f5;">
+                        <span class="badge bg-secondary">Retirado</span>
+                    </td>`;
+                } else {
+                    // Código original para alumnos activos
+                    let notaKey = matricula.id + '_' + competencia.id;
+                    let nota = notasData[notaKey];
+                    let notaValue = nota ? nota.nota : '';
                 let notaGuardada = notaValue ? 'nota-guardada' : '';
                 let notaId = nota ? nota.id : '';
                 let tieneConclusion = nota && nota.tiene_conclusion;
@@ -886,6 +897,7 @@ $(document).ready(function() {
                      </td>
                 `;
             }
+        }
             bodyHtml += `</tr>`;
             contador++;
         }
@@ -1020,6 +1032,8 @@ $(document).ready(function() {
         let periodoId = $('#periodo_id').val();
         
         $('.nota-valor').each(function() {
+            if ($(this).closest('tr').hasClass('retirado-row')) return;
+
             let nota = $(this).val();
             if (nota && nota.trim() !== '') {
                 notas.push({

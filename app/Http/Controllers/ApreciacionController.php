@@ -72,14 +72,10 @@ class ApreciacionController extends Controller
             }
         }
         
-        // Obtener alumnos matriculados en el aula
-        // $matriculas = Matricula::with(['alumno'])
-        //     ->where('aula_id', $aulaId)
-        //     ->where('estado', 'activa')
-        //     ->get();
+
         $matriculas = Matricula::with(['alumno'])
         ->where('aula_id', $aulaId)
-        ->where('estado', 'activa')
+        ->whereIn('estado', ['activa', 'retirada'])
         ->orderBy(
             DB::raw('CONCAT(
                 (SELECT apellido_paterno FROM alumnos WHERE alumnos.id = matriculas.alumno_id), 

@@ -135,7 +135,7 @@ class NotaController extends Controller
 
         $matriculas = Matricula::with(['alumno'])
         ->where('aula_id', $aulaId)
-        ->where('estado', 'activa')
+        ->whereIn('estado', ['activa', 'retirada']) // agregado alexioto
         ->orderBy(
             DB::raw('CONCAT(
                 (SELECT apellido_paterno FROM alumnos WHERE alumnos.id = matriculas.alumno_id), 
