@@ -111,7 +111,12 @@ class RegistroCompetenciaTransversalController extends Controller
             ->orderBy('alumnos.apellido_paterno', 'ASC')
             ->orderBy('alumnos.apellido_materno', 'ASC')
             ->orderBy('alumnos.nombres', 'ASC')
-            ->get();
+            ->get()
+            ->map(function ($matricula) {
+                $data = $matricula->toArray();
+                $data['alumno'] = $matricula->alumno ? $matricula->alumno->toArray() : null;
+                return $data;
+            });
         
         // Obtener el aula y determinar su nivel para filtrar competencias aplicables
         $aula = Aula::with(['grado.nivel'])->find($aulaId);
@@ -161,8 +166,11 @@ class RegistroCompetenciaTransversalController extends Controller
             ->get()
             ->groupBy('matricula_id')
             ->map(function($items) {
-                return $items->keyBy('competencia_transversal_id');
-            });
+                return $items->keyBy('competencia_transversal_id')->map(function($registro) {
+                    return $registro->toArray();
+                });
+            })
+            ->toArray();
         
         $periodo = Periodo::find($periodoId);
         $registrosHabilitados = $periodo ? $periodo->activo : false;

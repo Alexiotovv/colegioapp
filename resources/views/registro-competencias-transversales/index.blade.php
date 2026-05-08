@@ -689,6 +689,16 @@ $(document).ready(function() {
         }
     }
 
+    function normalizeArray(data) {
+        if (Array.isArray(data)) {
+            return data;
+        }
+        if (data && typeof data === 'object') {
+            return Object.values(data);
+        }
+        return [];
+    }
+
     function cargarCompetenciasAutomaticamente() {
         let aulaId = $('#aula_id').val();
         let periodoId = $('#periodo_id').val();
@@ -705,8 +715,8 @@ $(document).ready(function() {
                 periodo_id: periodoId
             },
             success: function(response) {
-                matriculasData = response.matriculas || [];
-                competenciasData = response.competencias || [];
+                matriculasData = normalizeArray(response.matriculas);
+                competenciasData = normalizeArray(response.competencias);
                 registrosData = response.registros || {};
                 registrosHabilitados = response.registros_habilitados || false;
                 aulaEsPrimaria = response.aula_es_primaria || false;
@@ -828,14 +838,15 @@ $(document).ready(function() {
         for (let matricula of matriculasData) {
             const esRetirado = matricula.estado === 'retirada';
             const rowClass = esRetirado ? 'class="retirado-row"' : '';
-            let registrosAlumno = registrosData[matricula.id] || {};  // <--- DEFINICIÓN NECESARIA
+            let registrosAlumno = registrosData[matricula.id] || registrosData[String(matricula.id)] || {};
+            const alumno = matricula.alumno || {};
             
             bodyHtml += `<tr ${rowClass}>
                 <td><strong>${contador}</strong></td>
-                <td>${matricula.alumno.codigo_estudiante || 'N/A'}</td>
+                <td>${alumno.codigo_estudiante || 'N/A'}</td>
                 <td style="text-align: left;">
-                    <strong>${matricula.alumno.apellido_paterno || ''} ${matricula.alumno.apellido_materno || ''}</strong><br>
-                    <small>${matricula.alumno.nombres || ''}</small>
+                    <strong>${alumno.apellido_paterno || ''} ${alumno.apellido_materno || ''}</strong><br>
+                    <small>${alumno.nombres || ''}</small>
                 </td>`;
             
             for (let competencia of competenciasData) {
@@ -1129,11 +1140,11 @@ $(document).ready(function() {
                 periodo_id: periodoId
             },
             success: function(response) {
-                matriculasData = response.matriculas || [];
-                competenciasData = response.competencias || [];
+                matriculasData = normalizeArray(response.matriculas);
+                competenciasData = normalizeArray(response.competencias);
                 registrosData = response.registros || {};
                 registrosHabilitados = response.registros_habilitados || false;
-                
+
                 renderTabla();
             },
             error: function(xhr) {
