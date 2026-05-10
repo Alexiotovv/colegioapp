@@ -6,8 +6,6 @@ namespace App\Http\Controllers;
 use App\Models\Aula;
 use App\Models\Periodo;
 use App\Models\Matricula;
-use App\Models\Competencia;
-use App\Models\Nota;
 use App\Models\Nivel;
 use App\Models\AnioAcademico;
 use App\Models\Curso;
@@ -63,12 +61,17 @@ class AvanceNotasController extends Controller
         $aula = Aula::with(['grado.nivel', 'seccion', 'anioAcademico', 'docente'])
             ->findOrFail($aulaId);
         
-        // Obtener los cursos asignados a esta aula (a través de carga_horaria)
-        $cursosAsignados = CargaHoraria::where('aula_id', $aulaId)
-            ->with(['curso' => function($q) {
-                $q->with(['competencias' => function($cq) {
-                    $cq->where('activo', true);
-                }]);
+        // Obtener cursos asignados (sin duplicar por horario)
+        $cursoIds = CargaHoraria::where('aula_id', $aulaId)
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('curso_id')
+            ->filter()
+            ->values();
+
+        $cursosAsignados = Curso::whereIn('id', $cursoIds)
+            ->with(['competencias' => function($query) {
+                $query->where('activo', true);
             }])
             ->get();
         
@@ -80,13 +83,30 @@ class AvanceNotasController extends Controller
             })
             ->get();
         
+        $matriculaIds = $matriculas->pluck('id');
+        $notasPorCurso = collect();
+
+        if ($matriculaIds->isNotEmpty() && $cursoIds->isNotEmpty()) {
+            $notasPorCurso = DB::table('notas as n')
+                ->join('competencias as c', 'c.id', '=', 'n.competencia_id')
+                ->whereIn('n.matricula_id', $matriculaIds)
+                ->whereIn('c.curso_id', $cursoIds)
+                ->where('n.periodo_id', $periodoId)
+                ->where('n.tipo_evaluacion', 'BIMESTRAL')
+                ->whereNotNull('n.nota')
+                ->where('n.nota', '!=', '')
+                ->where('c.activo', true)
+                ->select('c.curso_id', DB::raw('COUNT(n.id) as total_registrado'))
+                ->groupBy('c.curso_id')
+                ->pluck('total_registrado', 'c.curso_id');
+        }
+
         $detalleAvance = [];
         $totalEsperadoGlobal = 0;
         $totalRegistradoGlobal = 0;
         $totalCursos = $cursosAsignados->count();
         
-        foreach ($cursosAsignados as $carga) {
-            $curso = $carga->curso;
+        foreach ($cursosAsignados as $curso) {
             $competencias = $curso->competencias ?? collect();
             
             if ($competencias->isEmpty()) {
@@ -95,22 +115,7 @@ class AvanceNotasController extends Controller
             
             $totalCompetencias = $competencias->count();
             $totalEsperadoCurso = $matriculas->count() * $totalCompetencias;
-            $totalRegistradoCurso = 0;
-            
-            // Contar notas registradas para este curso
-            foreach ($matriculas as $matricula) {
-                foreach ($competencias as $competencia) {
-                    $nota = Nota::where('matricula_id', $matricula->id)
-                        ->where('competencia_id', $competencia->id)
-                        ->where('periodo_id', $periodoId)
-                        ->where('tipo_evaluacion', 'BIMESTRAL')
-                        ->first();
-                    
-                    if ($nota && $nota->nota && $nota->nota !== '') {
-                        $totalRegistradoCurso++;
-                    }
-                }
-            }
+            $totalRegistradoCurso = (int) ($notasPorCurso[$curso->id] ?? 0);
             
             $porcentajeCurso = $totalEsperadoCurso > 0 
                 ? round(($totalRegistradoCurso / $totalEsperadoCurso) * 100, 2) 
@@ -188,6 +193,13 @@ class AvanceNotasController extends Controller
         $periodoId = $request->periodo_id;
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
+        if (!$anioActivo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay un año académico activo configurado.'
+            ], 422);
+        }
+
         $query = Aula::where('anio_academico_id', $anioActivo->id)
             ->where('activo', true)
             ->with(['grado.nivel', 'seccion', 'docente']);
@@ -203,105 +215,201 @@ class AvanceNotasController extends Controller
         }
         
         $aulas = $query->orderBy('grado_id')->orderBy('seccion_id')->get();
-        
+
+        if ($aulas->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'data_completitud' => []
+            ]);
+        }
+
+        $aulaIds = $aulas->pluck('id');
+
+        $estudiantesPorAula = DB::table('matriculas as m')
+            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
+            ->whereIn('m.aula_id', $aulaIds)
+            ->where('al.estado', 'activo')
+            ->select('m.aula_id', DB::raw('COUNT(m.id) as total_estudiantes'))
+            ->groupBy('m.aula_id')
+            ->pluck('total_estudiantes', 'm.aula_id');
+
+        $totalCursosPorAula = DB::table('carga_horaria as ch')
+            ->whereIn('ch.aula_id', $aulaIds)
+            ->whereNull('ch.deleted_at')
+            ->select('ch.aula_id', DB::raw('COUNT(DISTINCT ch.curso_id) as total_cursos'))
+            ->groupBy('ch.aula_id')
+            ->pluck('total_cursos', 'ch.aula_id');
+
+        $competenciasPorCursoAula = DB::table('carga_horaria as ch')
+            ->join('competencias as c', function($join) {
+                $join->on('c.curso_id', '=', 'ch.curso_id')
+                    ->where('c.activo', true);
+            })
+            ->whereIn('ch.aula_id', $aulaIds)
+            ->whereNull('ch.deleted_at')
+            ->select(
+                'ch.aula_id',
+                'ch.curso_id',
+                DB::raw('COUNT(DISTINCT c.id) as total_competencias')
+            )
+            ->groupBy('ch.aula_id', 'ch.curso_id')
+            ->get();
+
+        $registradasPorCursoAula = DB::table('notas as n')
+            ->join('matriculas as m', 'm.id', '=', 'n.matricula_id')
+            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
+            ->join('competencias as c', function($join) {
+                $join->on('c.id', '=', 'n.competencia_id')
+                    ->where('c.activo', true);
+            })
+            ->join('carga_horaria as ch', function($join) {
+                $join->on('ch.aula_id', '=', 'm.aula_id')
+                    ->on('ch.curso_id', '=', 'c.curso_id')
+                    ->whereNull('ch.deleted_at');
+            })
+            ->whereIn('m.aula_id', $aulaIds)
+            ->where('al.estado', 'activo')
+            ->where('n.periodo_id', $periodoId)
+            ->where('n.tipo_evaluacion', 'BIMESTRAL')
+            ->whereNotNull('n.nota')
+            ->where('n.nota', '!=', '')
+            ->select(
+                'm.aula_id',
+                'c.curso_id',
+                DB::raw('COUNT(DISTINCT n.id) as total_registrado')
+            )
+            ->groupBy('m.aula_id', 'c.curso_id')
+            ->get();
+
+        $competenciasAgrupadas = $competenciasPorCursoAula->groupBy('aula_id');
+        $registradasMap = $registradasPorCursoAula
+            ->keyBy(function ($row) {
+                return $row->aula_id . '-' . $row->curso_id;
+            });
+
         $aulasConAvance = [];
-        
+        $aulasCompletitud = [];
+
         foreach ($aulas as $aula) {
-            // Obtener cursos asignados a esta aula
-            $cursosAsignados = CargaHoraria::where('aula_id', $aula->id)->get();
-            
-            if ($cursosAsignados->isEmpty()) {
+            $aulaId = $aula->id;
+            $totalCursos = (int) ($totalCursosPorAula[$aulaId] ?? 0);
+            $totalEstudiantes = (int) ($estudiantesPorAula[$aulaId] ?? 0);
+            $cursosConCompetencias = $competenciasAgrupadas->get($aulaId, collect());
+
+            $baseAula = [
+                'id' => $aula->id,
+                'nombre' => $aula->nombre,
+                'codigo' => $aula->codigo,
+                'grado' => $aula->grado->nombre ?? '',
+                'seccion' => $aula->seccion->nombre ?? '',
+                'turno' => $aula->turno,
+                'docente' => $aula->docente ? $aula->docente->name : 'No asignado'
+            ];
+
+            if ($totalCursos === 0) {
                 $aulasConAvance[] = [
-                    'aula' => [
-                        'id' => $aula->id,
-                        'nombre' => $aula->nombre,
-                        'codigo' => $aula->codigo,
-                        'grado' => $aula->grado->nombre ?? '',
-                        'seccion' => $aula->seccion->nombre ?? '',
-                        'turno' => $aula->turno,
-                        'docente' => $aula->docente ? $aula->docente->name : 'No asignado'
-                    ],
+                    'aula' => $baseAula,
                     'porcentaje' => 0,
                     'color' => '#dc3545',
                     'sin_cursos' => true
                 ];
+
+                $aulasCompletitud[] = [
+                    'aula' => $baseAula,
+                    'porcentaje' => 0,
+                    'color' => '#dc3545',
+                    'total_cursos' => 0,
+                    'total_cursos_completos' => 0,
+                    'total_cursos_evaluables' => 0,
+                    'total_esperado' => 0,
+                    'total_registrado' => 0,
+                    'sin_cursos' => true
+                ];
                 continue;
             }
-            
-            // Obtener matrículas
-            $matriculas = Matricula::where('aula_id', $aula->id)
-                ->whereHas('alumno', function($q) {
-                    $q->where('estado', 'activo');
-                })
-                ->get();
-            
-            if ($matriculas->isEmpty()) {
+
+            if ($totalEstudiantes === 0) {
                 $aulasConAvance[] = [
-                    'aula' => [
-                        'id' => $aula->id,
-                        'nombre' => $aula->nombre,
-                        'codigo' => $aula->codigo,
-                        'grado' => $aula->grado->nombre ?? '',
-                        'seccion' => $aula->seccion->nombre ?? '',
-                        'turno' => $aula->turno,
-                        'docente' => $aula->docente ? $aula->docente->name : 'No asignado'
-                    ],
+                    'aula' => $baseAula,
                     'porcentaje' => 0,
                     'color' => '#ffc107',
                     'sin_estudiantes' => true
                 ];
+
+                $aulasCompletitud[] = [
+                    'aula' => $baseAula,
+                    'porcentaje' => 0,
+                    'color' => '#ffc107',
+                    'total_cursos' => $totalCursos,
+                    'total_cursos_completos' => 0,
+                    'total_cursos_evaluables' => (int) $cursosConCompetencias->count(),
+                    'total_esperado' => 0,
+                    'total_registrado' => 0,
+                    'sin_estudiantes' => true
+                ];
                 continue;
             }
-            
+
             $totalEsperado = 0;
             $totalRegistrado = 0;
-            
-            foreach ($cursosAsignados as $carga) {
-                $competencias = Competencia::where('curso_id', $carga->curso_id)
-                    ->where('activo', true)
-                    ->get();
-                
-                if ($competencias->isEmpty()) continue;
-                
-                $totalEsperado += $matriculas->count() * $competencias->count();
-                
-                foreach ($matriculas as $matricula) {
-                    foreach ($competencias as $competencia) {
-                        $nota = Nota::where('matricula_id', $matricula->id)
-                            ->where('competencia_id', $competencia->id)
-                            ->where('periodo_id', $periodoId)
-                            ->where('tipo_evaluacion', 'BIMESTRAL')
-                            ->exists();
-                        
-                        if ($nota) {
-                            $totalRegistrado++;
-                        }
-                    }
+            $totalCursosEvaluables = 0;
+            $totalCursosCompletos = 0;
+
+            foreach ($cursosConCompetencias as $cursoAula) {
+                $totalCompetencias = (int) $cursoAula->total_competencias;
+                if ($totalCompetencias <= 0) {
+                    continue;
+                }
+
+                $totalCursosEvaluables++;
+                $esperadoCurso = $totalEstudiantes * $totalCompetencias;
+                $registradoCurso = (int) ($registradasMap[$aulaId . '-' . $cursoAula->curso_id]->total_registrado ?? 0);
+
+                $totalEsperado += $esperadoCurso;
+                $totalRegistrado += $registradoCurso;
+
+                if ($esperadoCurso > 0 && $registradoCurso >= $esperadoCurso) {
+                    $totalCursosCompletos++;
                 }
             }
-            
-            $porcentaje = $totalEsperado > 0 ? round(($totalRegistrado / $totalEsperado) * 100, 2) : 0;
-            
+
+            $porcentaje = $totalEsperado > 0
+                ? round(($totalRegistrado / $totalEsperado) * 100, 2)
+                : 0;
+
+            $porcentajeCompletitud = $totalCursosEvaluables > 0
+                ? round(($totalCursosCompletos / $totalCursosEvaluables) * 100, 2)
+                : 0;
+
             $aulasConAvance[] = [
-                'aula' => [
-                    'id' => $aula->id,
-                    'nombre' => $aula->nombre,
-                    'codigo' => $aula->codigo,
-                    'grado' => $aula->grado->nombre ?? '',
-                    'seccion' => $aula->seccion->nombre ?? '',
-                    'turno' => $aula->turno,
-                    'docente' => $aula->docente ? $aula->docente->name : 'No asignado'
-                ],
+                'aula' => $baseAula,
                 'porcentaje' => $porcentaje,
                 'color' => $this->getColorByPercentage($porcentaje),
                 'total_esperado' => $totalEsperado,
                 'total_registrado' => $totalRegistrado
             ];
+
+            $aulasCompletitud[] = [
+                'aula' => $baseAula,
+                'porcentaje' => $porcentajeCompletitud,
+                'color' => $this->getColorByPercentage($porcentajeCompletitud),
+                'total_cursos' => $totalCursos,
+                'total_cursos_completos' => $totalCursosCompletos,
+                'total_cursos_evaluables' => $totalCursosEvaluables,
+                'total_esperado' => $totalEsperado,
+                'total_registrado' => $totalRegistrado
+            ];
         }
+
+        usort($aulasCompletitud, function ($a, $b) {
+            return $b['porcentaje'] <=> $a['porcentaje'];
+        });
         
         return response()->json([
             'success' => true,
-            'data' => $aulasConAvance
+            'data' => $aulasConAvance,
+            'data_completitud' => $aulasCompletitud
         ]);
     }
     

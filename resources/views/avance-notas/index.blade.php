@@ -121,6 +121,49 @@
         background: #f8d7da;
         color: #721c24;
     }
+
+    .avance-tabs-wrap {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .avance-tabs-wrap .nav-pills .nav-link {
+        border-radius: 10px;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .avance-tabs-wrap .nav-pills .nav-link.active {
+        background: var(--primary-color);
+        color: #fff;
+    }
+
+    .tab-content-wrap {
+        margin-top: 16px;
+    }
+
+    .chart-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .chart-card h6 {
+        margin-bottom: 12px;
+    }
+
+    .table-completitud {
+        font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .aulas-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 @endsection
 
@@ -173,17 +216,61 @@
         </div>
     </div>
     
-    <!-- Grid de Aulas -->
+    <!-- Tabs de avance -->
     <div id="aulasContainer" style="display: none;">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5>
-                <i class="fas fa-door-open me-2"></i>
-                Aulas - Avance de Registro
-            </h5>
-            <span class="badge bg-secondary" id="totalAulasCount">0 aulas</span>
-        </div>
-        <div class="aulas-grid" id="aulasGrid">
-            <!-- Las aulas se cargarán aquí -->
+        <div class="avance-tabs-wrap">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <ul class="nav nav-pills" id="avanceTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab-cards-btn" data-bs-toggle="pill" data-bs-target="#tab-cards" type="button" role="tab" aria-controls="tab-cards" aria-selected="true">
+                            <i class="fas fa-layer-group me-1"></i> Aulas - Avance de Registro
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab-completitud-btn" data-bs-toggle="pill" data-bs-target="#tab-completitud" type="button" role="tab" aria-controls="tab-completitud" aria-selected="false">
+                            <i class="fas fa-chart-bar me-1"></i> Completitud por Aula
+                        </button>
+                    </li>
+                </ul>
+
+                <span class="badge bg-secondary" id="totalAulasCount">0 aulas</span>
+            </div>
+
+            <div class="tab-content tab-content-wrap" id="avanceTabsContent">
+                <div class="tab-pane fade show active" id="tab-cards" role="tabpanel" aria-labelledby="tab-cards-btn">
+                    <div class="aulas-grid" id="aulasGrid">
+                        <!-- Las aulas se cargarán aquí -->
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-completitud" role="tabpanel" aria-labelledby="tab-completitud-btn">
+                    <div class="chart-card mb-3">
+                        <h6 class="mb-1">
+                            <i class="fas fa-school me-2"></i>
+                            Progreso de notas completas por aula
+                        </h6>
+                        <small class="text-muted d-block mb-3" id="completitudResumen">
+                            Visualiza el porcentaje de cursos completos por aula para validar el cálculo de orden de mérito.
+                        </small>
+                        <div id="completitudChart"></div>
+                    </div>
+
+                    <div class="table-responsive chart-card">
+                        <table class="table table-sm table-hover align-middle table-completitud mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Aula</th>
+                                    <th>Grado/Sección</th>
+                                    <th class="text-center">Cursos completos</th>
+                                    <th class="text-center">Notas registradas</th>
+                                    <th class="text-center">Avance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="completitudTablaBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -224,9 +311,10 @@
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
 $(document).ready(function() {
-    let gradosPorNivel = {};
+    let completitudChart = null;
     
     // Cargar grados según nivel seleccionado
     $('#nivel_id').on('change', function() {
@@ -284,6 +372,7 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success && response.data.length > 0) {
                     renderizarAulas(response.data);
+                    renderizarCompletitud(response.data_completitud || []);
                     $('#totalAulasCount').text(response.data.length + ' aulas');
                     $('#aulasContainer').show();
                 } else {
@@ -293,6 +382,17 @@ $(document).ready(function() {
                             <p class="text-muted">No hay aulas disponibles para los filtros seleccionados</p>
                         </div>
                     `);
+
+                    $('#completitudTablaBody').html(`
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No hay aulas disponibles para los filtros seleccionados</td>
+                        </tr>
+                    `);
+                    $('#completitudResumen').text('No hay datos de completitud para los filtros seleccionados.');
+                    if (completitudChart) {
+                        completitudChart.destroy();
+                        completitudChart = null;
+                    }
                     $('#aulasContainer').show();
                 }
             },
@@ -317,14 +417,11 @@ $(document).ready(function() {
             let sinEstudiantes = item.sin_estudiantes || false;
             
             let estadoTexto = '';
-            let estadoColor = '';
             
             if (sinCursos) {
                 estadoTexto = 'Sin cursos asignados';
-                estadoColor = '#dc3545';
             } else if (sinEstudiantes) {
                 estadoTexto = 'Sin estudiantes matriculados';
-                estadoColor = '#ffc107';
             }
             
             html += `
@@ -366,6 +463,106 @@ $(document).ready(function() {
         }
         
         $('#aulasGrid').html(html);
+    }
+
+    function renderizarCompletitud(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            $('#completitudTablaBody').html(`
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted">No hay datos de completitud para mostrar</td>
+                </tr>
+            `);
+            $('#completitudResumen').text('No se encontró información de completitud por aula.');
+            if (completitudChart) {
+                completitudChart.destroy();
+                completitudChart = null;
+            }
+            return;
+        }
+
+        const categorias = data.map(item => item.aula.nombre);
+        const valores = data.map(item => Number(item.porcentaje || 0));
+        const colores = data.map(item => item.color || '#6c757d');
+
+        const aulasCompletas = data.filter(item => Number(item.porcentaje || 0) >= 100).length;
+        $('#completitudResumen').text(
+            `Aulas al 100%: ${aulasCompletas} de ${data.length}. Este indicador valida que estén todas las notas por curso para cada aula.`
+        );
+
+        if (completitudChart) {
+            completitudChart.destroy();
+        }
+
+        const options = {
+            chart: {
+                type: 'bar',
+                height: Math.max(360, data.length * 48),
+                toolbar: { show: false }
+            },
+            series: [{
+                name: 'Completitud',
+                data: valores
+            }],
+            plotOptions: {
+                bar: {
+                    horizontal: true,
+                    distributed: true,
+                    borderRadius: 4,
+                    barHeight: '58%'
+                }
+            },
+            colors: colores,
+            xaxis: {
+                categories: categorias,
+                min: 0,
+                max: 100,
+                tickAmount: 5,
+                labels: {
+                    formatter: function(val) {
+                        return val + '%';
+                    }
+                }
+            },
+            dataLabels: {
+                enabled: true,
+                formatter: function(val) {
+                    return Number(val).toFixed(0) + '%';
+                }
+            },
+            legend: { show: false },
+            tooltip: {
+                y: {
+                    formatter: function(val) {
+                        return Number(val).toFixed(2) + '%';
+                    }
+                }
+            }
+        };
+
+        completitudChart = new ApexCharts(document.querySelector('#completitudChart'), options);
+        completitudChart.render();
+
+        let filas = '';
+        for (const item of data) {
+            const aula = item.aula;
+            const porcentaje = Number(item.porcentaje || 0).toFixed(2);
+            const cursosCompletos = item.total_cursos_completos || 0;
+            const cursosEvaluables = item.total_cursos_evaluables || 0;
+            const totalRegistrado = item.total_registrado || 0;
+            const totalEsperado = item.total_esperado || 0;
+
+            filas += `
+                <tr>
+                    <td>${aula.nombre}</td>
+                    <td>${aula.grado} - ${aula.seccion}</td>
+                    <td class="text-center">${cursosCompletos}/${cursosEvaluables}</td>
+                    <td class="text-center">${totalRegistrado}/${totalEsperado}</td>
+                    <td class="text-center"><span class="badge" style="background:${item.color}; color:#fff;">${porcentaje}%</span></td>
+                </tr>
+            `;
+        }
+
+        $('#completitudTablaBody').html(filas);
     }
     
     // Función global para ver detalle del aula
