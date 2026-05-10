@@ -234,6 +234,7 @@ Route::middleware(['auth'])->group(function () {
             // Módulo: importación de pagos
             Route::get('/pagos-importados', [ImportacionPagosController::class, 'index'])->name('pagos-importados.index');
             Route::post('/pagos-importados', [ImportacionPagosController::class, 'store'])->name('pagos-importados.store');
+            Route::get('/pagos-importados/count-by-year', [ImportacionPagosController::class, 'countByYear'])->name('pagos-importados.count-by-year');
             Route::get('/pagos-importados/resumen', [ImportacionPagosController::class, 'resumen'])->name('pagos-importados-resumen.resumen');
         });
 

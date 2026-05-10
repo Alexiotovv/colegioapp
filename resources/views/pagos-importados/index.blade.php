@@ -28,11 +28,11 @@
 
     <div class="card mb-4">
         <div class="card-body">
-            <form action="{{ route('admin.pagos-importados.store') }}" method="POST" enctype="multipart/form-data" class="row g-3">
+            <form id="formImportarPagos" action="{{ route('admin.pagos-importados.store') }}" method="POST" enctype="multipart/form-data" class="row g-3">
                 @csrf
                 <div class="col-md-4">
                     <label for="anio_emision" class="form-label">Año de emisión</label>
-                    <input type="number" name="anio_emision" id="anio_emision" class="form-control" value="{{ old('anio_emision', date('Y')) }}" min="2000" max="2100">
+                    <input type="number" name="anio_emision" id="anio_emision" class="form-control" value="{{ old('anio_emision', date('Y')) }}" min="2000" max="2100" required>
                 </div>
                 <div class="col-md-5">
                     <label for="archivo" class="form-label required-field">Archivo Excel</label>
@@ -44,7 +44,9 @@
                     </button>
                 </div>
             </form>
-            <small class="text-muted d-block mt-2">Se leen las filas desde la 5. La fila 4 se toma como encabezado.</small>
+            <small class="text-muted d-block mt-2">
+                Se leen las filas desde la 5 (la fila 4 es encabezado). Antes de importar, se valida el año detectado en la primera fila del Excel y debe coincidir con el año ingresado. Si coincide, se eliminan los pagos de ese año y se reemplazan con el archivo.
+            </small>
         </div>
     </div>
 
@@ -126,4 +128,70 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+$(document).ready(function () {
+    const form = $('#formImportarPagos');
+    const anioInput = $('#anio_emision');
+    const archivoInput = $('#archivo');
+    let confirmadoReemplazo = false;
+
+    form.on('submit', function (e) {
+        if (confirmadoReemplazo) {
+            return true;
+        }
+
+        e.preventDefault();
+
+        const anioEmision = Number(anioInput.val());
+        if (!anioEmision || anioEmision < 2000 || anioEmision > 2100) {
+            Swal.fire('Validacion', 'Ingrese un anio de emision valido.', 'warning');
+            return;
+        }
+
+        if (!archivoInput.val()) {
+            Swal.fire('Validacion', 'Seleccione un archivo Excel para importar.', 'warning');
+            return;
+        }
+
+        $.ajax({
+            url: '{{ route("admin.pagos-importados.count-by-year") }}',
+            method: 'GET',
+            data: { anio_emision: anioEmision },
+            success: function (response) {
+                if (!response.success) {
+                    form.trigger('submit');
+                    return;
+                }
+
+                if (!response.has_records) {
+                    confirmadoReemplazo = true;
+                    form.trigger('submit');
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Reemplazar pagos del anio ' + anioEmision + '?',
+                    html: 'Se eliminaran <strong>' + response.count + '</strong> registros existentes de ese anio y se cargaran los del Excel.<br><br>Esta accion no se puede deshacer.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Si, reemplazar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#d33'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        confirmadoReemplazo = true;
+                        form.trigger('submit');
+                    }
+                });
+            },
+            error: function () {
+                Swal.fire('Error', 'No se pudo validar si ya existen pagos para ese anio.', 'error');
+            }
+        });
+    });
+});
+</script>
 @endsection

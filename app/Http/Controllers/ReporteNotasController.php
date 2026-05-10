@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnioAcademico;
+use App\Models\Apreciacion;
 use App\Models\Aula;
 use App\Models\CargaHoraria;
 use App\Models\ConfiguracionInstitucion;
 use App\Models\Matricula;
 use App\Models\Nota;
 use App\Models\Periodo;
+use App\Models\RegistroCompetenciaTransversal;
+use App\Models\RegistroEvaluacionActitudinal;
+use App\Models\RegistroOtraEvaluacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -78,12 +82,17 @@ class ReporteNotasController extends Controller
             'anio_id' => ['required', 'exists:anio_academicos,id'],
             'periodo_id' => ['required', 'exists:periodos,id'],
             'aula_id' => ['required', 'exists:aulas,id'],
+            'exportar_completo' => ['nullable', 'in:0,1'],
         ]);
 
         $user = auth()->user();
         $anioId = (int) $request->input('anio_id');
         $periodoId = (int) $request->input('periodo_id');
         $aulaId = (int) $request->input('aula_id');
+        $exportarCompleto = (bool) $request->input('exportar_completo', false);
+        if ($exportarCompleto && !$user->isAdmin()) {
+            $exportarCompleto = false;
+        }
 
         $anio = AnioAcademico::findOrFail($anioId);
         $periodo = Periodo::with('anioAcademico')->findOrFail($periodoId);
@@ -109,6 +118,10 @@ class ReporteNotasController extends Controller
 
         $this->crearHojaGeneralidades($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos);
         $this->crearHojasPorCurso($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
+
+        if ($exportarCompleto) {
+            $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
 
         $nombreArchivo = sprintf(
             'reporte_notas_%s_%s_%s.xlsx',
@@ -480,4 +493,275 @@ class ReporteNotasController extends Controller
             ],
         ];
     }
+
+    private function crearHojasComplementarias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $this->crearHojaCompetenciasTransversales($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaApreciaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaEvaluacionActitudinal($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaOtrasEvaluaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+    }
+
+    private function obtenerCompetenciasTransversalesAlumno(int $matriculaId, int $periodoId): array
+    {
+        $registros = RegistroCompetenciaTransversal::with('competenciaTransversal')
+            ->where('matricula_id', $matriculaId)
+            ->where('periodo_id', $periodoId)
+            ->get();
+        
+        return $registros->map(function ($reg) {
+            $nombre = $reg->competenciaTransversal?->nombre ?? 'Sin nombre';
+            $nota = $reg->nota ?? '—';
+            return "{$nombre}: {$nota}";
+        })->toArray();
+    }
+
+    private function obtenerApreciacionAlumno(int $matriculaId, int $periodoId): string
+    {
+        $apreciacion = Apreciacion::where('matricula_id', $matriculaId)
+            ->where('periodo_id', $periodoId)
+            ->first();
+        
+        return $apreciacion?->apreciacion ?? '—';
+    }
+
+    private function obtenerEvaluacionActitudinalAlumno(int $matriculaId, int $periodoId): array
+    {
+        $registros = RegistroEvaluacionActitudinal::with('evaluacionActitudinal')
+            ->where('matricula_id', $matriculaId)
+            ->where('periodo_id', $periodoId)
+            ->get();
+        
+        return $registros->map(function ($reg) {
+            $nombre = $reg->evaluacionActitudinal?->nombre ?? 'Sin nombre';
+            $valoracion = $reg->valoracion_nombre ?? $reg->valoracion ?? '—';
+            return "{$nombre}: {$valoracion}";
+        })->toArray();
+    }
+
+    private function obtenerOtrasEvaluacionesAlumno(int $matriculaId, int $periodoId): array
+    {
+        $registros = RegistroOtraEvaluacion::with('tipoOtraEvaluacion')
+            ->where('matricula_id', $matriculaId)
+            ->where('periodo_id', $periodoId)
+            ->get();
+        
+        return $registros->map(function ($reg) {
+            $nombre = $reg->tipoOtraEvaluacion?->nombre ?? 'Sin nombre';
+            $valor = $reg->valor ?? '—';
+            return "{$nombre}: {$valor}";
+        })->toArray();
+    }
+
+    private function crearHojaCompetenciasTransversales(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Competencias Transversales');
+        $sheet->setShowGridLines(false);
+        $sheet->freezePane('D4');
+
+        $sheet->mergeCells('A1:D1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:D2');
+        $sheet->setCellValue('A2', 'COMPETENCIAS TRANSVERSALES');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:D3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'Competencias Transversales');
+        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $competencias = $this->obtenerCompetenciasTransversalesAlumno($matricula->id, $periodo->id);
+            $texto = implode("\n", $competencias);
+            
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $texto);
+            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setWidth(40);
+        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+    }
+
+    private function crearHojaApreciaciones(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Apreciaciones del Tutor');
+        $sheet->setShowGridLines(false);
+        $sheet->freezePane('D4');
+
+        $sheet->mergeCells('A1:D1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:D2');
+        $sheet->setCellValue('A2', 'APRECIACIONES DEL TUTOR');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:D3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'Apreciaciones');
+        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $apreciacion = $this->obtenerApreciacionAlumno($matricula->id, $periodo->id);
+            
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $apreciacion);
+            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setWidth(40);
+        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+    }
+
+    private function crearHojaEvaluacionActitudinal(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Evaluación Actitudinal');
+        $sheet->setShowGridLines(false);
+        $sheet->freezePane('D4');
+
+        $sheet->mergeCells('A1:D1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:D2');
+        $sheet->setCellValue('A2', 'EVALUACIÓN ACTITUDINAL');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:D3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'Conducta');
+        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $evaluaciones = $this->obtenerEvaluacionActitudinalAlumno($matricula->id, $periodo->id);
+            $texto = implode("\n", $evaluaciones);
+            
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $texto);
+            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setWidth(40);
+        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+    }
+
+    private function crearHojaOtrasEvaluaciones(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Otras Evaluaciones');
+        $sheet->setShowGridLines(false);
+        $sheet->freezePane('D4');
+
+        $sheet->mergeCells('A1:D1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:D2');
+        $sheet->setCellValue('A2', 'OTRAS EVALUACIONES');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:D3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'Evaluaciones');
+        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $evaluaciones = $this->obtenerOtrasEvaluacionesAlumno($matricula->id, $periodo->id);
+            $texto = implode("\n", $evaluaciones);
+            
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $texto);
+            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setWidth(40);
+        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+    }
 }
+

@@ -4,13 +4,30 @@ namespace App\Http\Controllers;
 
 use App\Models\PagoImportado;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ImportacionPagosController extends Controller
 {
+    public function countByYear(Request $request)
+    {
+        $validated = $request->validate([
+            'anio_emision' => ['required', 'integer', 'min:2000', 'max:2100'],
+        ]);
+
+        $anioEmision = (int) $validated['anio_emision'];
+        $cantidad = PagoImportado::where('anio_emision', $anioEmision)->count();
+
+        return response()->json([
+            'success' => true,
+            'anio_emision' => $anioEmision,
+            'count' => $cantidad,
+            'has_records' => $cantidad > 0,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $search = trim((string) $request->get('search', ''));
@@ -112,7 +129,7 @@ class ImportacionPagosController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'archivo' => ['required', 'file', 'mimes:xlsx,xls,csv'],
-            'anio_emision' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'anio_emision' => ['required', 'integer', 'min:2000', 'max:2100'],
         ]);
 
         if ($validator->fails()) {
@@ -126,9 +143,27 @@ class ImportacionPagosController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $highestRow = $sheet->getHighestRow();
-        $importados = 0;
+        $anioDetectado = $this->extractYearFromFirstRow($sheet);
 
-        DB::transaction(function () use ($sheet, $highestRow, $anioEmision, &$importados) {
+        if (!$anioDetectado) {
+            return back()
+                ->withErrors(['archivo' => 'No se detecto un anio valido en la primera fila del Excel. Verifique el encabezado combinado con el anio de emision.'])
+                ->withInput();
+        }
+
+        if ((int) $anioDetectado !== (int) $anioEmision) {
+            return back()
+                ->withErrors(['anio_emision' => "El anio del archivo ({$anioDetectado}) no coincide con el anio ingresado ({$anioEmision}). No se realizo la importacion."])
+                ->withInput();
+        }
+
+        $importados = 0;
+        $eliminados = 0;
+
+        DB::transaction(function () use ($sheet, $highestRow, $anioEmision, &$importados, &$eliminados) {
+            // Reemplazo total por anio: elimina y vuelve a cargar el Excel actualizado.
+            $eliminados = PagoImportado::where('anio_emision', $anioEmision)->delete();
+
             for ($row = 5; $row <= $highestRow; $row++) {
                 $numeroFila = $this->normalizeString($sheet->getCell("A{$row}")->getCalculatedValue());
                 $estudiante = $this->normalizeString($sheet->getCell("B{$row}")->getCalculatedValue());
@@ -173,7 +208,43 @@ class ImportacionPagosController extends Controller
 
         return redirect()
             ->route('admin.pagos-importados.index')
-            ->with('success', "Importación completada: {$importados} registros importados.");
+            ->with('success', "Importacion completada: {$importados} registros importados y {$eliminados} eliminados del anio {$anioEmision}.");
+    }
+
+    private function extractYearFromFirstRow(Worksheet $sheet): ?int
+    {
+        $textos = [];
+
+        foreach ($sheet->getMergeCells() as $mergeRange) {
+            [$inicio] = explode(':', $mergeRange);
+            if (preg_match('/^[A-Z]+1$/', $inicio) === 1) {
+                $texto = $this->normalizeString($sheet->getCell($inicio)->getCalculatedValue());
+                if ($texto !== '') {
+                    $textos[] = $texto;
+                }
+            }
+        }
+
+        if (empty($textos)) {
+            $highestColumn = $sheet->getHighestColumn(1);
+            for ($col = 'A'; $col <= $highestColumn; $col++) {
+                $texto = $this->normalizeString($sheet->getCell($col . '1')->getCalculatedValue());
+                if ($texto !== '') {
+                    $textos[] = $texto;
+                }
+            }
+        }
+
+        if (empty($textos)) {
+            return null;
+        }
+
+        $textoCompleto = implode(' ', $textos);
+        if (preg_match('/\b(20\d{2}|2100)\b/', $textoCompleto, $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return null;
     }
 
     private function numericOnly($value): ?string

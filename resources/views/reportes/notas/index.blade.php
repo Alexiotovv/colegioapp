@@ -194,6 +194,16 @@
                         <span class="small-note">Solo puedes descargar reportes de las aulas en las que tienes cursos asignados.</span>
                     @endif
                 </div>
+
+                @if(auth()->user()->isAdmin())
+                    <div class="form-check ps-0">
+                        <input class="form-check-input" type="checkbox" id="exportarCompleto" name="exportar_completo" value="1">
+                        <label class="form-check-label" for="exportarCompleto">
+                            <strong>Exportar completo</strong>
+                            <small class="d-block text-muted">Incluye: competencias transversales, apreciaciones, evaluación actitudinal y otras evaluaciones (una fila por alumno)</small>
+                        </label>
+                    </div>
+                @endif
             </div>
         </form>
 
