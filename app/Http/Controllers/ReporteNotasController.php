@@ -25,6 +25,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ReporteNotasController extends Controller
 {
+    private const MODULO_EXPORTAR_COMPLETO = 'reportes-notas-exportar-completo';
+
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -32,6 +34,7 @@ class ReporteNotasController extends Controller
         $anios = AnioAcademico::orderByDesc('anio')->get();
         $periodos = $this->obtenerPeriodosPorAnio($anioSeleccionado?->id);
         $aulas = $this->obtenerAulasPorUsuario($user, $anioSeleccionado?->id);
+        $puedeExportarCompleto = $this->puedeExportarCompleto($user);
 
         $periodoSeleccionado = $this->obtenerPeriodoSeleccionado($request, $periodos);
         $aulaSeleccionada = $this->obtenerAulaSeleccionada($request, $aulas);
@@ -42,7 +45,8 @@ class ReporteNotasController extends Controller
             'periodos',
             'periodoSeleccionado',
             'aulas',
-            'aulaSeleccionada'
+            'aulaSeleccionada',
+            'puedeExportarCompleto'
         ));
     }
 
@@ -90,7 +94,7 @@ class ReporteNotasController extends Controller
         $periodoId = (int) $request->input('periodo_id');
         $aulaId = (int) $request->input('aula_id');
         $exportarCompleto = (bool) $request->input('exportar_completo', false);
-        if ($exportarCompleto && !$user->isAdmin()) {
+        if ($exportarCompleto && !$this->puedeExportarCompleto($user)) {
             $exportarCompleto = false;
         }
 
@@ -157,6 +161,15 @@ class ReporteNotasController extends Controller
         }
 
         return $periodos->first();
+    }
+
+    private function puedeExportarCompleto($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $user->isAdmin() || $user->puedeAccederModulo(self::MODULO_EXPORTAR_COMPLETO);
     }
 
     private function obtenerAulaSeleccionada(Request $request, Collection $aulas)

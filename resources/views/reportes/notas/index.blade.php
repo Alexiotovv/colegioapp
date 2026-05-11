@@ -195,7 +195,7 @@
                     @endif
                 </div>
 
-                @if(auth()->user()->isAdmin())
+                @if($puedeExportarCompleto ?? false)
                     <div class="form-check ps-0">
                         <input class="form-check-input" type="checkbox" id="exportarCompleto" name="exportar_completo" value="1">
                         <label class="form-check-label" for="exportarCompleto">
