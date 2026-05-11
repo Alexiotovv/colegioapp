@@ -262,7 +262,7 @@
 
 <!-- ==================== COMPETENCIAS TRANSVERSALES ==================== -->
 @if(__cuadro_enabled('competencias_transversales', $cuadrosForNivel) && $competenciasTransversales && $competenciasTransversales->count() > 0)
-<table class="tabla-notas" style="margin-top: 20px;">
+<table class="tabla-notas tabla-transversales" style="margin-top: 20px;">
     <thead>
         <tr>
             <th rowspan="2" style="width: 35%;">Competencias Transversales</th>

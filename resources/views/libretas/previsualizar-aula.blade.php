@@ -282,6 +282,20 @@
         .fila-promedio-general {
             background-color: #e8f0fe;
         }
+
+        .tabla-transversales {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+        }
+
+        .tabla-transversales thead {
+            display: table-header-group;
+        }
+
+        .tabla-transversales tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         
         .libreta-content {
             page-break-after: always;
