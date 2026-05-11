@@ -481,6 +481,35 @@ $(document).ready(function() {
     let registrosData = {};
     let registrosHabilitados = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
+
+    function getCsrfToken() {
+        return $('meta[name="csrf-token"]').attr('content') || '';
+    }
+
+    // Usa siempre el token más reciente presente en el DOM para todas las peticiones AJAX.
+    $.ajaxSetup({
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        beforeSend: function(xhr) {
+            const token = getCsrfToken();
+            if (token) {
+                xhr.setRequestHeader('X-CSRF-TOKEN', token);
+            }
+        }
+    });
+
+    $(document).ajaxError(function(event, xhr) {
+        if (xhr && xhr.status === 419) {
+            Swal.fire(
+                'Sesión expirada',
+                'La sesión cambió o expiró. Recarga la página para continuar guardando.',
+                'warning'
+            ).then(() => {
+                window.location.reload();
+            });
+        }
+    });
     
     // Valoraciones - cargadas dinámicamente
     let valoraciones = {};
@@ -804,11 +833,12 @@ $(document).ready(function() {
         $.ajax({
             url: '{{ route("admin.registro-evaluaciones.save") }}',
             method: 'POST',
-            data: {
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            data: JSON.stringify({
                 registros: registros,
-                periodo_id: periodoId,
-                _token: '{{ csrf_token() }}'
-            },
+                periodo_id: periodoId
+            }),
             success: function(response) {
                 if (response.success) {
                     Swal.fire('Éxito', response.message, 'success').then(() => {
@@ -956,10 +986,11 @@ $(document).ready(function() {
         $.ajax({
             url: '{{ route("admin.registro-evaluaciones.toggle-habilitacion") }}',
             method: 'POST',
-            data: {
-                periodo_id: periodoId,
-                _token: '{{ csrf_token() }}'
-            },
+            contentType: 'application/json; charset=utf-8',
+            processData: false,
+            data: JSON.stringify({
+                periodo_id: periodoId
+            }),
             success: function(response) {
                 if (response.success) {
                     registrosHabilitados = response.habilitado;
