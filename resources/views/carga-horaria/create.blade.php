@@ -157,6 +157,61 @@
         justify-content: space-between;
         align-items: center;
     }
+
+    /* Chips de aulas del docente */
+    .aula-docente-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f0f4ff;
+        border: 1px solid #c5d3f0;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+    .aula-chip-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+    }
+    .aula-chip-nombre {
+        font-weight: 600;
+        color: #2c3e6b;
+    }
+    .aula-chip-nivel {
+        font-size: 11px;
+        color: #6c757d;
+    }
+    .btn-aula-delete {
+        background: none;
+        border: 1px solid #dc3545;
+        border-radius: 6px;
+        color: #dc3545;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 11px;
+        flex-shrink: 0;
+        transition: background 0.15s;
+    }
+    .btn-aula-delete:hover {
+        background: #dc3545;
+        color: #fff;
+    }
+    .btn-aula-delete-disabled {
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #adb5bd;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
 </style>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
@@ -193,6 +248,19 @@
                             </option>
                         @endforeach
                     </select>
+
+                    {{-- Aulas asignadas al docente --}}
+                    <div id="aulasDocenteContainer" style="display:none;" class="mt-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <small class="fw-semibold text-muted">
+                                <i class="fas fa-door-open me-1 text-primary"></i> Aulas asignadas al docente:
+                            </small>
+                            <span class="badge bg-secondary ms-2" id="aulasDocenteCount">0</span>
+                        </div>
+                        <div id="aulasDocenteList" class="d-flex flex-wrap gap-2">
+                            {{-- populated via JS --}}
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -421,6 +489,8 @@ $(document).ready(function() {
             $('#datosAdicionales').hide();
             $('#botonesAccion').hide();
             $('#aulaSelectorContainer').hide();
+            $('#aulasDocenteContainer').hide();
+            $('#aulasDocenteList').html('');
             aulasSinCursoAsignadas = [];
         }
     });
@@ -524,6 +594,7 @@ $(document).ready(function() {
 
                 console.log('Cursos asignados procesados:', cursosAsignados.length);
                 renderizarCursos();
+                renderizarAulasDocente();
                 $('#cursosSection').show();
                 mostrarLoading(false);
             },
@@ -945,6 +1016,7 @@ function recargarCursosAsignados(docenteId) {
             
             console.log('Cursos asignados recargados:', cursosAsignados.length);
             renderizarCursos();
+            renderizarAulasDocente();
             if (aulaSeleccionadaId) {
                 actualizarCursosDisponibles();
             }
@@ -954,6 +1026,107 @@ function recargarCursosAsignados(docenteId) {
         },
         error: function(xhr) {
             console.error('Error al recargar cursos asignados:', xhr);
+        }
+    });
+}
+
+function renderizarAulasDocente() {
+    // Construir mapa de aulas únicas del docente
+    let aulasMap = {};
+
+    // Aulas con cursos asignados → no se pueden eliminar
+    cursosAsignados.forEach(function(c) {
+        if (c.aula_id) {
+            let key = String(c.aula_id);
+            if (!aulasMap[key]) {
+                aulasMap[key] = {
+                    aula_id: c.aula_id,
+                    aula: c.aula || 'Aula',
+                    nivel: c.nivel || '',
+                    carga_id: null,
+                    tiene_cursos: true
+                };
+            } else {
+                aulasMap[key].tiene_cursos = true;
+            }
+        }
+    });
+
+    // Aulas sin cursos → se pueden eliminar
+    aulasSinCursoAsignadas.forEach(function(a) {
+        let key = String(a.aula_id);
+        if (!aulasMap[key]) {
+            aulasMap[key] = {
+                aula_id: a.aula_id,
+                aula: a.aula || 'Aula',
+                nivel: a.nivel || '',
+                seccion: a.seccion || '',
+                carga_id: a.carga_id,
+                tiene_cursos: false
+            };
+        }
+        // Si ya existe en el mapa (tiene cursos), no sobreescribir
+    });
+
+    let aulas = Object.values(aulasMap);
+
+    if (aulas.length === 0) {
+        $('#aulasDocenteContainer').hide();
+        return;
+    }
+
+    $('#aulasDocenteCount').text(aulas.length);
+
+    let html = '';
+    aulas.forEach(function(aula) {
+        let canDelete = !aula.tiene_cursos && aula.carga_id;
+        let aulaNombreEsc = (aula.aula || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        let deleteBtn = canDelete
+            ? `<button type="button" class="btn-aula-delete" onclick="eliminarAulaDocente(${aula.carga_id}, '${aulaNombreEsc}')" title="Eliminar asignación de aula"><i class="fas fa-trash-alt"></i></button>`
+            : `<span class="btn-aula-delete-disabled" title="Tiene cursos asignados, no se puede eliminar"><i class="fas fa-lock"></i></span>`;
+
+        html += `<div class="aula-docente-chip" id="aulaChip-${aula.aula_id}">
+            <div class="aula-chip-info">
+                <span class="aula-chip-nombre"><i class="fas fa-door-open me-1"></i>${aula.aula}</span>
+                ${aula.nivel ? `<span class="aula-chip-nivel">${aula.nivel}${aula.seccion ? ' &mdash; ' + aula.seccion : ''}</span>` : (aula.seccion ? `<span class="aula-chip-nivel">${aula.seccion}</span>` : '')}
+            </div>
+            ${deleteBtn}
+        </div>`;
+    });
+
+    $('#aulasDocenteList').html(html);
+    $('#aulasDocenteContainer').show();
+}
+
+function eliminarAulaDocente(cargaId, aulaNombre) {
+    Swal.fire({
+        title: '¿Eliminar aula?',
+        text: `Se eliminará la asignación del aula "${aulaNombre}" de este docente.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '/admin/carga-horaria/' + cargaId,
+                method: 'DELETE',
+                data: { _token: '{{ csrf_token() }}' },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        toast.success('Aula eliminada correctamente');
+                        let docenteId = $('#docente_id').val();
+                        recargarCursosAsignados(docenteId);
+                    } else {
+                        toast.error(response.message || 'No se pudo eliminar el aula');
+                    }
+                },
+                error: function(xhr) {
+                    toast.error(xhr.responseJSON?.message || 'Error al eliminar el aula');
+                }
+            });
         }
     });
 }

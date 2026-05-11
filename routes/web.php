@@ -467,13 +467,17 @@ Route::middleware(['auth'])->group(function () {
         // Módulo: libretas
         Route::middleware(['modulo:libretas'])->group(function () {
             Route::get('/libretas', [LibretaController::class, 'index'])->name('libretas.index');
-            Route::get('/libretas/orden-merito/reporte', [OrdenMeritoExportController::class, 'index'])->name('libretas.orden-merito.index');
-            Route::post('/libretas/orden-merito/reporte/exportar', [OrdenMeritoExportController::class, 'exportar'])->name('libretas.orden-merito-reporte.exportar');
             Route::get('/libretas/alumnos-by-aula', [LibretaController::class, 'getAlumnosByAula'])->name('libretas.alumnos-by-aula');
             Route::post('/libretas/exportar-aula', [LibretaController::class, 'exportarAula'])->name('libretas.exportar-aula');
             Route::post('/libretas/exportar-alumno', [LibretaController::class, 'exportarAlumno'])->name('libretas.exportar-alumno');
             Route::get('/libretas/previsualizar', [LibretaController::class, 'previsualizar'])->name('libretas.previsualizar');
             Route::get('/libretas/previsualizar-aula', [LibretaController::class, 'previsualizarAula'])->name('libretas.previsualizar-aula');
+        });
+
+        // Módulo: orden-merito-exportar
+        Route::middleware(['modulo:orden-merito-exportar'])->group(function () {
+            Route::get('/libretas/orden-merito/reporte', [OrdenMeritoExportController::class, 'index'])->name('libretas.orden-merito.index');
+            Route::post('/libretas/orden-merito/reporte/exportar', [OrdenMeritoExportController::class, 'exportar'])->name('libretas.orden-merito-reporte.exportar');
         });
         
         // ==================== MÓDULOS PARA PERMISOS (solo admin) ====================
