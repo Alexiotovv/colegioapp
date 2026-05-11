@@ -256,7 +256,27 @@
             border-collapse: collapse;
             margin-bottom: 15px;
             font-size: 9px;
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+
+        .tabla-cursos {
             page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .bloque-encabezado {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        .bloque-cursos {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: avoid;
+            break-before: avoid;
         }
 
         .tabla-notas th, 
@@ -339,6 +359,7 @@
             <div class="libreta-content">
                 
                 @if ($matricula)
+                <div class="bloque-encabezado">
                 <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - {{ $anio }}</h1>
 
                 <div class="header-box">
@@ -393,6 +414,7 @@
                             <img class="logo_encabezados" src="{{ Storage::url($configLibreta->logo_institucion) }}"">
                     </div>
 
+                </div>
                 </div>
 
                 @include('libretas.partials.libreta-alumno', [

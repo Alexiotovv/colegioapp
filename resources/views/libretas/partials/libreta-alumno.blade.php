@@ -149,7 +149,8 @@
 
 <!-- ==================== TABLA DE NOTAS POR COMPETENCIA ==================== -->
 @if(__cuadro_enabled('cursos_competencias', $cuadrosForNivel))
-<table class="tabla-notas">
+<div class="bloque-cursos">
+<table class="tabla-notas tabla-cursos">
     <thead>
         <tr>
             <th rowspan="2" style="width: 10%;">Área curricular</th>
@@ -257,6 +258,7 @@
 
     </tbody>
 </table>
+</div>
 @endif
 
 

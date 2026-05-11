@@ -248,7 +248,27 @@
             border-collapse: collapse;
             margin-bottom: 15px;
             font-size: 9px;
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+
+        .tabla-cursos {
             page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .bloque-encabezado {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        .bloque-cursos {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: avoid;
+            break-before: avoid;
         }
 
         .tabla-notas th, 
@@ -341,6 +361,8 @@
 
 
             @foreach($matriculas as $index => $matricula)
+            <div class="libreta-content">
+            <div class="bloque-encabezado">
             <h1>INFORME DE PROGRESO DE LAS COMPETENCIAS DEL ESTUDIANTE - {{ $anio }}</h1>
             <div class="header-box">
 
@@ -395,7 +417,7 @@
                 </div>
 
             </div>
-            <div class="libreta-content">
+            </div>
                 @include('libretas.partials.libreta-alumno', [
                     'matricula' => $matricula,
                     'periodos' => $periodos,
