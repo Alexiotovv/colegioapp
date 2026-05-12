@@ -282,7 +282,7 @@
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
                     <i class="fas fa-chalkboard me-2"></i>
-                    Detalle de Avance - <span id="modalAulaNombre"></span>
+                    Detalle de Avance - <span id="modalAulaNombre"></span><span id="modalAulaSeccion"></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -425,7 +425,7 @@ $(document).ready(function() {
             }
             
             html += `
-                <div class="aula-card" data-aula-id="${aula.id}" data-periodo-id="${$('#periodo_id').val()}" onclick="verDetalleAula(${aula.id}, '${aula.nombre.replace(/'/g, "\\'")}')">
+                <div class="aula-card" data-aula-id="${aula.id}" data-periodo-id="${$('#periodo_id').val()}" onclick="verDetalleAula(${aula.id}, '${aula.nombre.replace(/'/g, "\\'")}', '${(aula.seccion || '').toString().replace(/'/g, "\\'")}')">
                     <div class="aula-card-header" style="background: ${color};">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
@@ -566,10 +566,11 @@ $(document).ready(function() {
     }
     
     // Función global para ver detalle del aula
-    window.verDetalleAula = function(aulaId, aulaNombre) {
+    window.verDetalleAula = function(aulaId, aulaNombre, aulaSeccion = '') {
         let periodoId = $('#periodo_id').val();
         
         $('#modalAulaNombre').text(aulaNombre);
+        $('#modalAulaSeccion').text(aulaSeccion ? ` - Sección ${aulaSeccion}` : '');
         $('#modalDetalleBody').html(`
             <div class="text-center py-5">
                 <div class="loading-spinner"></div>
