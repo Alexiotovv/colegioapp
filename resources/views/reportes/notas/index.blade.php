@@ -133,7 +133,11 @@
             <div>
                 <h4>Reporte de Notas</h4>
                 <p class="reporte-subtitle mb-0">Descarga un archivo Excel con una hoja por curso, competencias, NL y conclusiones descriptivas.</p>
-                @if(!auth()->user()->isAdmin())
+                @if(auth()->user()->isDirector() || strtolower(trim((string) optional(auth()->user()->role)->nombre)) === 'subdirector')
+                    <small class="text-muted mt-2 d-block">
+                        <strong>Solo ves:</strong> Las aulas que tienes asignadas para supervisión.
+                    </small>
+                @elseif(!auth()->user()->isAdmin())
                     <small class="text-muted mt-2 d-block">
                         <strong>Solo ves:</strong> Las aulas a las que tienes asignados cursos activos.
                     </small>
@@ -190,6 +194,8 @@
                     </button>
                     @if(auth()->user()->isAdmin())
                         <span class="small-note">Como administrador, puedes descargar reportes de cualquier aula del sistema.</span>
+                    @elseif(auth()->user()->isDirector() || strtolower(trim((string) optional(auth()->user()->role)->nombre)) === 'subdirector')
+                        <span class="small-note">Puedes descargar reportes completos de las aulas que tienes asignadas.</span>
                     @else
                         <span class="small-note">Solo puedes descargar reportes de las aulas en las que tienes cursos asignados.</span>
                     @endif

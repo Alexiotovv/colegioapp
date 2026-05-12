@@ -203,13 +203,16 @@ class ReporteNotasController extends Controller
 
         if (!$user || !$user->isAdmin()) {
             $userId = $user?->id;
-            $query->whereHas('cargaHoraria', function ($q) use ($userId, $anioId) {
+            $query->where(function ($q) use ($userId, $anioId) {
                 $q->where('docente_id', $userId)
-                    ->where('estado', CargaHoraria::ESTADO_ACTIVO)
-                    ->when($anioId, function ($subQuery) use ($anioId) {
-                        $subQuery->whereHas('aula', function ($aulaQuery) use ($anioId) {
-                            $aulaQuery->where('anio_academico_id', $anioId);
-                        });
+                    ->orWhereHas('cargaHoraria', function ($subQ) use ($userId, $anioId) {
+                        $subQ->where('docente_id', $userId)
+                            ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                            ->when($anioId, function ($subQuery) use ($anioId) {
+                                $subQuery->whereHas('aula', function ($aulaQuery) use ($anioId) {
+                                    $aulaQuery->where('anio_academico_id', $anioId);
+                                });
+                            });
                     });
             });
         }
@@ -219,7 +222,7 @@ class ReporteNotasController extends Controller
 
     private function obtenerCargasPorAula($user, int $aulaId, int $anioId): Collection
     {
-        $query = CargaHoraria::with([
+        $baseQuery = CargaHoraria::with([
                 'docente',
                 'curso.competencias' => function ($q) {
                     $q->where('activo', true)->orderBy('orden')->orderBy('nombre');
@@ -235,11 +238,26 @@ class ReporteNotasController extends Controller
                   ->where('activo', true);
             });
 
-        if (!$user || !$user->isAdmin()) {
-            $query->where('docente_id', $user?->id);
+        // Admin: siempre obtiene todos los cursos del aula.
+        if ($user && $user->isAdmin()) {
+            return $baseQuery->orderBy('curso_id')->get()->groupBy('curso_id')->map(function ($grupo) {
+                return $grupo->first();
+            })->values();
         }
 
-        return $query->orderBy('curso_id')->get()->groupBy('curso_id')->map(function ($grupo) {
+        $todasLasCargas = (clone $baseQuery)
+            ->orderBy('curso_id')
+            ->get();
+
+        // Para no-admin: si tiene cursos asignados en el aula, exporta solo esos.
+        $cargasUsuario = (clone $baseQuery)
+            ->where('docente_id', $user?->id)
+            ->orderBy('curso_id')
+            ->get();
+
+        $cargasFinales = $cargasUsuario->isNotEmpty() ? $cargasUsuario : $todasLasCargas;
+
+        return $cargasFinales->groupBy('curso_id')->map(function ($grupo) {
             return $grupo->first();
         })->values();
     }
@@ -284,11 +302,14 @@ class ReporteNotasController extends Controller
             return;
         }
 
-        $tieneAcceso = CargaHoraria::where('docente_id', $user?->id)
-            ->where('aula_id', $aula->id)
-            ->where('estado', CargaHoraria::ESTADO_ACTIVO)
-            ->whereHas('aula', function ($q) use ($anioId) {
-                $q->where('anio_academico_id', $anioId);
+        $tieneAcceso = Aula::where('id', $aula->id)
+            ->where('anio_academico_id', $anioId)
+            ->where(function ($q) use ($user) {
+                $q->where('docente_id', $user?->id)
+                    ->orWhereHas('cargaHoraria', function ($subQ) use ($user) {
+                        $subQ->where('docente_id', $user?->id)
+                            ->where('estado', CargaHoraria::ESTADO_ACTIVO);
+                    });
             })
             ->exists();
 
