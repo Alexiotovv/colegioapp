@@ -20,6 +20,10 @@ class AvanceNotasController extends Controller
      */
     public function index()
     {
+        $user = auth()->user();
+        $esAdmin = $user && $user->isAdmin();
+        $docenteId = auth()->id();
+
         // Obtener el año académico activo
         $anioActivo = AnioAcademico::where('activo', true)->first();
         
@@ -33,13 +37,34 @@ class AvanceNotasController extends Controller
             ->orderBy('orden')
             ->get();
         
-        // Obtener todos los niveles con sus grados y aulas
-        $niveles = Nivel::where('activo', true)
+        // Obtener niveles según rol:
+        // - admin: todos los niveles activos
+        // - no-admin: solo niveles de aulas asignadas en el año activo
+        $nivelesQuery = Nivel::where('activo', true)
             ->with(['grados' => function($query) {
                 $query->where('activo', true);
             }])
-            ->orderBy('orden')
-            ->get();
+            ->orderBy('orden');
+
+        if (!$esAdmin) {
+            $nivelIdsAsignados = Aula::where('activo', true)
+                ->where('anio_academico_id', $anioActivo->id)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                            $q2->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
+                ->whereNotNull('nivel_id')
+                ->distinct()
+                ->pluck('nivel_id');
+
+            $nivelesQuery->whereIn('id', $nivelIdsAsignados);
+        }
+
+        $niveles = $nivelesQuery->get();
         
         return view('avance-notas.index', compact('niveles', 'periodos', 'anioActivo'));
     }
@@ -56,6 +81,29 @@ class AvanceNotasController extends Controller
         
         $periodoId = $request->periodo_id;
         $aulaId = $request->aula_id;
+        $user = auth()->user();
+        $esAdmin = $user && $user->isAdmin();
+        $docenteId = auth()->id();
+
+        if (!$esAdmin) {
+            $tieneAcceso = Aula::where('id', $aulaId)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                            $q2->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
+                ->exists();
+
+            if (!$tieneAcceso) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permiso para consultar esta aula.'
+                ], 403);
+            }
+        }
         
         // Obtener el aula con sus relaciones
         $aula = Aula::with(['grado.nivel', 'seccion', 'anioAcademico', 'docente'])
@@ -192,6 +240,9 @@ class AvanceNotasController extends Controller
         
         $periodoId = $request->periodo_id;
         $anioActivo = AnioAcademico::where('activo', true)->first();
+        $user = auth()->user();
+        $esAdmin = $user && $user->isAdmin();
+        $docenteId = auth()->id();
         
         if (!$anioActivo) {
             return response()->json([
@@ -203,11 +254,20 @@ class AvanceNotasController extends Controller
         $query = Aula::where('anio_academico_id', $anioActivo->id)
             ->where('activo', true)
             ->with(['grado.nivel', 'seccion', 'docente']);
+
+        if (!$esAdmin) {
+            $query->where(function ($q) use ($docenteId) {
+                $q->where('docente_id', $docenteId)
+                    ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                        $q2->where('docente_id', $docenteId)
+                            ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                            ->whereNull('deleted_at');
+                    });
+            });
+        }
         
         if ($request->nivel_id) {
-            $query->whereHas('grado', function($q) use ($request) {
-                $q->where('nivel_id', $request->nivel_id);
-            });
+            $query->where('nivel_id', $request->nivel_id);
         }
         
         if ($request->grado_id) {

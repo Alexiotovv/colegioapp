@@ -88,7 +88,9 @@
             <div class="col-md-2">
                 <label for="nivel_id" class="form-label required-field">Nivel</label>
                 <select id="nivel_id" name="nivel_id" class="form-select" required disabled>
-                    <option value="todos" {{ old('nivel_id') === 'todos' ? 'selected' : '' }}>Todos</option>
+                    @if($mostrarOpcionTodos)
+                        <option value="todos" {{ old('nivel_id') === 'todos' ? 'selected' : '' }}>Todos</option>
+                    @endif
                     <option value="">Seleccionar nivel</option>
                     @foreach($niveles as $nivel)
                         <option value="{{ $nivel->id }}" {{ old('nivel_id') == $nivel->id ? 'selected' : '' }}>

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnioAcademico;
+use App\Models\Aula;
+use App\Models\CargaHoraria;
 use App\Models\Matricula;
 use App\Models\Nivel;
 use App\Models\RegistroOrdenMerito;
@@ -17,16 +19,50 @@ class OrdenMeritoExportController extends Controller
 {
     public function index()
     {
+        $user = auth()->user();
+        $esAdmin = $user && $user->isAdmin();
+        $docenteId = auth()->id();
+
         $anios = AnioAcademico::orderByDesc('anio')->get();
-        $niveles = Nivel::activo()->orderBy('orden')->orderBy('nombre')->get();
         $anioActivo = AnioAcademico::where('activo', true)->first();
+
+        $nivelesQuery = Nivel::activo()->orderBy('orden')->orderBy('nombre');
+        $totalNivelesActivos = Nivel::activo()->count();
+        $mostrarOpcionTodos = $esAdmin;
+
+        if (!$esAdmin) {
+            $nivelIdsAsignados = Aula::where('activo', true)
+                ->when($anioActivo, function ($query) use ($anioActivo) {
+                    $query->where('anio_academico_id', $anioActivo->id);
+                })
+                ->where(function ($query) use ($docenteId) {
+                    $query->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($cargaQuery) use ($docenteId) {
+                            $cargaQuery->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
+                ->whereNotNull('nivel_id')
+                ->distinct()
+                ->pluck('nivel_id');
+
+            $mostrarOpcionTodos = $nivelIdsAsignados->count() >= $totalNivelesActivos;
+            $nivelesQuery->whereIn('id', $nivelIdsAsignados);
+        }
+
+        $niveles = $nivelesQuery->get();
         $ordenesDisponibles = range(1, 40);
 
-        return view('libretas.orden-merito.index', compact('anios', 'niveles', 'anioActivo', 'ordenesDisponibles'));
+        return view('libretas.orden-merito.index', compact('anios', 'niveles', 'anioActivo', 'ordenesDisponibles', 'mostrarOpcionTodos'));
     }
 
     public function exportar(Request $request)
     {
+        $user = auth()->user();
+        $esAdmin = $user && $user->isAdmin();
+        $docenteId = auth()->id();
+
         $request->validate([
             'anio_id' => ['required', 'exists:anio_academicos,id'],
             'nivel_id' => ['required', 'string'],
@@ -49,6 +85,33 @@ class OrdenMeritoExportController extends Controller
             return back()->with('error', 'Debes seleccionar al menos un orden de mérito válido.');
         }
 
+        if (!$esAdmin) {
+            $nivelesPermitidos = Aula::where('activo', true)
+                ->where('anio_academico_id', $anioId)
+                ->where(function ($query) use ($docenteId) {
+                    $query->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($cargaQuery) use ($docenteId) {
+                            $cargaQuery->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
+                ->whereNotNull('nivel_id')
+                ->distinct()
+                ->pluck('nivel_id');
+
+            $totalNivelesActivos = Nivel::activo()->count();
+            $puedeUsarTodos = $nivelesPermitidos->count() >= $totalNivelesActivos;
+
+            if ($esTodos && !$puedeUsarTodos) {
+                return back()->with('error', 'No tienes acceso a todos los niveles para el año académico indicado.');
+            }
+
+            if (!$esTodos && !$nivelesPermitidos->contains($nivelId)) {
+                return back()->with('error', 'No tienes acceso al nivel seleccionado para el año académico indicado.');
+            }
+        }
+
         $anio = AnioAcademico::findOrFail($anioId);
         $nivel = $esTodos ? null : Nivel::findOrFail($nivelId);
 
@@ -66,12 +129,20 @@ class OrdenMeritoExportController extends Controller
             ->whereHas('matricula', function ($query) {
                 $query->where('estado', Matricula::ESTADO_ACTIVA);
             })
-            ->whereHas('matricula.aula', function ($query) use ($anioId, $nivelId) {
+            ->whereHas('matricula.aula', function ($query) use ($anioId, $nivelId, $esAdmin, $docenteId) {
                 $query->where('anio_academico_id', $anioId)
-                    ->when($nivelId !== null, function ($aulaQuery) use ($nivelId) {
-                        $aulaQuery->whereHas('grado', function ($gradoQuery) use ($nivelId) {
-                            $gradoQuery->where('nivel_id', $nivelId);
+                    ->when(!$esAdmin, function ($aulaQuery) use ($docenteId) {
+                        $aulaQuery->where(function ($subQuery) use ($docenteId) {
+                            $subQuery->where('docente_id', $docenteId)
+                                ->orWhereHas('cargaHoraria', function ($cargaQuery) use ($docenteId) {
+                                    $cargaQuery->where('docente_id', $docenteId)
+                                        ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                        ->whereNull('deleted_at');
+                                });
                         });
+                    })
+                    ->when($nivelId !== null, function ($aulaQuery) use ($nivelId) {
+                        $aulaQuery->where('nivel_id', $nivelId);
                     });
             })
             ->get()
