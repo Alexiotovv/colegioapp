@@ -480,9 +480,18 @@ $(document).ready(function() {
             return;
         }
 
-        const categorias = data.map(item => item.aula.nombre);
-        const valores = data.map(item => Number(item.porcentaje || 0));
-        const colores = data.map(item => item.color || '#6c757d');
+        const dataOrdenada = [...data].sort((a, b) => {
+            const gradoA = a.aula.grado || '';
+            const gradoB = b.aula.grado || '';
+            if (gradoA !== gradoB) return gradoA.localeCompare(gradoB, 'es', { numeric: true });
+            const seccionA = a.aula.seccion || '';
+            const seccionB = b.aula.seccion || '';
+            return seccionA.localeCompare(seccionB, 'es');
+        });
+
+        const categorias = dataOrdenada.map(item => item.aula.nombre + ' - ' + item.aula.seccion);
+        const valores = dataOrdenada.map(item => Number(item.porcentaje || 0));
+        const colores = dataOrdenada.map(item => item.color || '#6c757d');
 
         const aulasCompletas = data.filter(item => Number(item.porcentaje || 0) >= 100).length;
         $('#completitudResumen').text(
