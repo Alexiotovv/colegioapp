@@ -261,8 +261,30 @@ class NotaController extends Controller
                 $tieneConclusion = isset($conclusionesMap[$key]) && $conclusionesMap[$key] !== '';
                 $existingNota = $existingNotas[$key] ?? null;
                 $existingConclusion = $existingNota && $existingNota->conclusionDescriptiva ? true : false;
+                $notaAnterior = $existingNota ? strtoupper(trim((string) $existingNota->nota)) : null;
+                $requiereConclusionActualPrimaria =
+                    $requiereConclusionBCPrimaria &&
+                    $esPrimaria &&
+                    in_array($notaValor, ['B', 'C']);
+                $requiereConclusionActualSecundaria =
+                    $requiereConclusionBSecundaria &&
+                    $esSecundaria &&
+                    $notaValor === 'C';
+                $requiereConclusionActual = $requiereConclusionActualPrimaria || $requiereConclusionActualSecundaria;
 
-                if ($requiereConclusionBCPrimaria && $esPrimaria && in_array($notaValor, ['B', 'C'])) {
+                $requeriaConclusionAntesPrimaria =
+                    $requiereConclusionBCPrimaria &&
+                    $esPrimaria &&
+                    in_array($notaAnterior, ['B', 'C']);
+                $requeriaConclusionAntesSecundaria =
+                    $requiereConclusionBSecundaria &&
+                    $esSecundaria &&
+                    $notaAnterior === 'C';
+                $eliminarConclusionPorCambio =
+                    ($requeriaConclusionAntesPrimaria || $requeriaConclusionAntesSecundaria) &&
+                    !$requiereConclusionActual;
+
+                if ($requiereConclusionActualPrimaria) {
                     if (!$tieneConclusion && !$existingConclusion) {
                         DB::rollBack();
                         return response()->json([
@@ -272,7 +294,7 @@ class NotaController extends Controller
                     }
                 }
 
-                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'C') {
+                if ($requiereConclusionActualSecundaria) {
                     if (!$tieneConclusion && !$existingConclusion) {
                         DB::rollBack();
                         return response()->json([
@@ -296,7 +318,16 @@ class NotaController extends Controller
                         'observacion' => $item['observacion'] ?? null,
                     ]
                 );
+
+                if ((!$requiereConclusionActual || $eliminarConclusionPorCambio) && $notaModel) {
+                    ConclusionDescriptiva::where('nota_id', $notaModel->id)->delete();
+                }
+
                 if (isset($conclusionesMap[$key]) && $conclusionesMap[$key] !== '') {
+                    if (!$requiereConclusionActual) {
+                        continue;
+                    }
+
                     if ($notaModel) {
                         ConclusionDescriptiva::updateOrCreate(
                             ['nota_id' => $notaModel->id],
@@ -386,15 +417,41 @@ class NotaController extends Controller
         $request->validate([
             'nota_id' => 'required|exists:notas,id',
             'conclusion' => 'required|string|max:500',
+            'nota_valor_actual' => 'nullable|string|max:10',
         ]);
         
-        $nota = Nota::find($request->nota_id);
+        $nota = Nota::with(['matricula.aula.grado.nivel'])->find($request->nota_id);
         
         if (!$nota) {
             return response()->json([
                 'success' => false,
                 'message' => 'Nota no encontrada'
             ], 404);
+        }
+
+        $esPrimaria = false;
+        $esSecundaria = false;
+        $nivelNombre = $nota->matricula?->aula?->grado?->nivel?->nombre;
+        if ($nivelNombre) {
+            $esPrimaria = stripos($nivelNombre, 'primaria') !== false;
+            $esSecundaria = stripos($nivelNombre, 'secundaria') !== false;
+        }
+
+        $requiereConclusionBCPrimaria = (bool) Configuracion::getValor('notas_requiere_conclusion_bc_primaria', false);
+        $requiereConclusionBSecundaria = (bool) Configuracion::getValor('notas_requiere_conclusion_b_secundaria', false);
+        $notaValor = strtoupper(trim((string) ($request->nota_valor_actual ?? $nota->nota)));
+
+        $requiereConclusionActual =
+            ($requiereConclusionBCPrimaria && $esPrimaria && in_array($notaValor, ['B', 'C'])) ||
+            ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'C');
+
+        if (!$requiereConclusionActual) {
+            ConclusionDescriptiva::where('nota_id', $nota->id)->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'La nota actual no requiere conclusión descriptiva. Se eliminó cualquier conclusión existente.'
+            ]);
         }
         
         // Actualizar o crear la conclusión

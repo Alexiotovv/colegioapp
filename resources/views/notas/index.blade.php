@@ -478,6 +478,7 @@
                 <input type="hidden" id="conclusion_nota_id">
                 <input type="hidden" id="conclusion_matricula_id">
                 <input type="hidden" id="conclusion_competencia_id">
+                <input type="hidden" id="conclusion_nota_valor_actual">
                 <div class="alert alert-info mb-3" id="conclusion_info">
                     <!-- Información del alumno, competencia y nota -->
                 </div>
@@ -1039,6 +1040,11 @@ $(document).ready(function() {
                 // Swal.fire('Atención', mensaje, 'info');
                 $btnMensaje.find('i').css('color', '#dc3545');
             } else {
+                if ((ruleActivePrimaria && isPrimaria && !['B', 'C'].includes(valor)) ||
+                    (ruleActiveSecundaria && isSecundaria && valor !== 'C')) {
+                    let pendingKey = `${$select.data('matricula')}_${$select.data('competencia')}`;
+                    delete conclusionesPendientes[pendingKey];
+                }
                 // Si ya no aplica la regla (por ejemplo, al cambiar a A), volver a color neutro
                 $btnMensaje.find('i').css('color', '#6c757d');
             }
@@ -1209,13 +1215,18 @@ $(document).ready(function() {
         $('#conclusion_nota_id').val(notaId);
         $('#conclusion_matricula_id').val(matriculaId || '');
         $('#conclusion_competencia_id').val(competenciaId || '');
+        $('#conclusion_nota_valor_actual').val(notaValor || '');
         $('#conclusion_texto').val('');
         
         // Inicializar contador de caracteres
         $('#conclusion_char_count').text('0');
         $('#conclusion_char_max').text(conclusionesCaracteresMax);
 
-        if (notaId) {
+        let pendingKey = `${matriculaId}_${competenciaId}`;
+        if (conclusionesPendientes[pendingKey]) {
+            $('#conclusion_texto').val(conclusionesPendientes[pendingKey]);
+            $('#conclusion_char_count').text(conclusionesPendientes[pendingKey].length);
+        } else if (notaId) {
             $.ajax({
                 url: '/admin/notas/conclusion/' + notaId,
                 method: 'GET',
@@ -1230,12 +1241,6 @@ $(document).ready(function() {
                     console.log('No hay conclusión previa');
                 }
             });
-        } else {
-            let pendingKey = `${matriculaId}_${competenciaId}`;
-            if (conclusionesPendientes[pendingKey]) {
-                $('#conclusion_texto').val(conclusionesPendientes[pendingKey]);
-                $('#conclusion_char_count').text(conclusionesPendientes[pendingKey].length);
-            }
         }
         
         $('#modalConclusion').modal('show');
@@ -1247,6 +1252,7 @@ $(document).ready(function() {
         let conclusion = $('#conclusion_texto').val();
         let matriculaId = $('#conclusion_matricula_id').val();
         let competenciaId = $('#conclusion_competencia_id').val();
+        let notaValorActual = ($('#conclusion_nota_valor_actual').val() || '').trim().toUpperCase();
         
         if (!conclusion.trim()) {
             Swal.fire('Advertencia', 'Por favor ingrese una conclusión', 'warning');
@@ -1268,9 +1274,12 @@ $(document).ready(function() {
             data: {
                 nota_id: notaId,
                 conclusion: conclusion,
+                nota_valor_actual: notaValorActual,
             },
             success: function(response) {
                 if (response.success) {
+                    let pendingKey = `${matriculaId}_${competenciaId}`;
+                    conclusionesPendientes[pendingKey] = conclusion.trim();
                     toast.success(response.message);
                     $('#modalConclusion').modal('hide');
                     $(`.btn-message[data-nota-id="${notaId}"] i`).css('color', '#28a745');
