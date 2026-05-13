@@ -61,6 +61,13 @@ Route::middleware(['guest'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/csrf-token', function () {
+        request()->session()->regenerateToken();
+
+        return response()->json([
+            'token' => csrf_token(),
+        ]);
+    })->name('csrf.token');
     
     // ==================== MÓDULOS DE ADMINISTRACIÓN (solo visible si tiene el módulo) ====================
     Route::prefix('admin')->name('admin.')->group(function () {

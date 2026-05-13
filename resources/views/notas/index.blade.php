@@ -529,6 +529,49 @@ $(document).ready(function() {
     
     // ==================== CONFIGURACIÓN DE CARACTERES ====================
     let conclusionesCaracteresMax = 500; // Valor por defecto
+    const CSRF_BACKUP_KEY = 'colegioapp:notas:ultimo-intento-guardado';
+
+    function getCsrfToken() {
+        return $('meta[name="csrf-token"]').attr('content') || '';
+    }
+
+    function setCsrfToken(token) {
+        if (token && token.trim() !== '') {
+            $('meta[name="csrf-token"]').attr('content', token);
+        }
+    }
+
+    function refreshCsrfToken() {
+        return $.ajax({
+            url: '{{ route("csrf.token") }}',
+            method: 'GET',
+            cache: false,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(function(response) {
+            if (response && response.token) {
+                setCsrfToken(response.token);
+                return response.token;
+            }
+
+            return $.Deferred().reject('No se pudo renovar CSRF').promise();
+        });
+    }
+
+    function guardarRespaldoLocalAntesDeEnviar(payload) {
+        localStorage.setItem(CSRF_BACKUP_KEY, JSON.stringify({
+            fecha: new Date().toISOString(),
+            aula_id: payload.aula_id,
+            periodo_id: payload.periodo_id,
+            notas: payload.notas,
+            conclusiones: payload.conclusiones
+        }));
+    }
+
+    function limpiarRespaldoLocalDeGuardado() {
+        localStorage.removeItem(CSRF_BACKUP_KEY);
+    }
 
     // ==================== CARGAR OPCIONES DE NOTAS ====================
     function cargarOpcionesNotas() {
@@ -1062,37 +1105,74 @@ $(document).ready(function() {
         
         let btn = $('#btnGuardarTodas');
         let originalHtml = btn.html();
+        let esperandoReintento = false;
+        let payload = {
+            notas: notas,
+            conclusiones: conclusiones,
+            aula_id: $('#aula_id').val(),
+            periodo_id: periodoId,
+            _token: getCsrfToken()
+        };
+
+        guardarRespaldoLocalAntesDeEnviar(payload);
         
         btn.prop('disabled', true);
         btn.html('<span class="loading-spinner me-2"></span> Guardando...');
-        
-        $.ajax({
-            url: '{{ route("admin.notas.save") }}',
-            method: 'POST',
-            data: {
-                notas: notas,
-                conclusiones: conclusiones,
-                aula_id: $('#aula_id').val(),
-                periodo_id: periodoId,
-                _token: '{{ csrf_token() }}'
-            },
-            success: function(response) {
-                if (response.success) {
-                    Swal.fire('Éxito', response.message, 'success');
-                    // Recargar datos automáticamente (antes se usaba un botón que fue eliminado)
-                    conclusionesPendientes = {}; // limpiar conclusiones pendientes locales
-                    cargarNotasAutomaticamente();
+
+        function enviarGuardado(reintentado) {
+            payload._token = getCsrfToken();
+
+            $.ajax({
+                url: '{{ route("admin.notas.save") }}',
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: payload,
+                success: function(response) {
+                    if (response.success) {
+                        limpiarRespaldoLocalDeGuardado();
+                        Swal.fire('Éxito', response.message, 'success');
+                        // Recargar datos automáticamente (antes se usaba un botón que fue eliminado)
+                        conclusionesPendientes = {}; // limpiar conclusiones pendientes locales
+                        cargarNotasAutomaticamente();
+                    }
+                },
+                error: function(xhr) {
+                    if (xhr.status === 419 && !reintentado) {
+                        esperandoReintento = true;
+                        refreshCsrfToken()
+                            .done(function() {
+                                enviarGuardado(true);
+                            })
+                            .fail(function() {
+                                esperandoReintento = false;
+                                Swal.fire(
+                                    'Sesión expirada',
+                                    'No se pudo renovar el token CSRF. El llenado quedó respaldado localmente; recargue la página, restaure y vuelva a guardar.',
+                                    'warning'
+                                );
+                                btn.prop('disabled', false);
+                                btn.html(originalHtml);
+                                $('#fabMenu').removeClass('show');
+                            });
+                        return;
+                    }
+
+                    Swal.fire('Error', xhr.responseJSON?.message || 'Error al guardar notas', 'error');
+                },
+                complete: function() {
+                    if (!esperandoReintento || reintentado) {
+                        btn.prop('disabled', false);
+                        btn.html(originalHtml);
+                        $('#fabMenu').removeClass('show');
+                    }
                 }
-            },
-            error: function(xhr) {
-                Swal.fire('Error', xhr.responseJSON?.message || 'Error al guardar notas', 'error');
-            },
-            complete: function() {
-                btn.prop('disabled', false);
-                btn.html(originalHtml);
-                $('#fabMenu').removeClass('show');
-            }
-        });
+            });
+        }
+
+        enviarGuardado(false);
     }
     
     // ==================== DESCARGAR EXCEL ====================
@@ -1190,7 +1270,11 @@ $(document).ready(function() {
             data: {
                 nota_id: notaId,
                 conclusion: conclusion,
-                _token: '{{ csrf_token() }}'
+                _token: getCsrfToken()
+            },
+            headers: {
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
                 if (response.success) {
@@ -1227,7 +1311,11 @@ $(document).ready(function() {
             method: 'POST',
             data: {
                 periodo_id: periodoId,
-                _token: '{{ csrf_token() }}'
+                _token: getCsrfToken()
+            },
+            headers: {
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
                 if (response.success) {
