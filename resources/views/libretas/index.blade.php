@@ -102,11 +102,23 @@
                 <label for="aula_id" class="form-label required-field">Aula</label>
                 <select class="form-select" id="aula_id" required>
                     <option value="">Seleccionar aula</option>
-                    @foreach($aulas as $aula)
-                        <option value="{{ $aula->id }}">
-                            {{ $aula->grado->nivel->nombre ?? '' }} - {{ $aula->grado->nombre ?? '' }} 
-                            "{{ $aula->seccion->nombre ?? '' }}" ({{ $aula->turno_nombre }}) - {{ $aula->anioAcademico->anio ?? '' }}
-                        </option>
+                    @php
+                        $aulasSorted = $aulas->sortBy([
+                            fn($a, $b) => strcmp($a->grado->nivel->nombre ?? '', $b->grado->nivel->nombre ?? ''),
+                            fn($a, $b) => strnatcasecmp($a->grado->nombre ?? '', $b->grado->nombre ?? ''),
+                            fn($a, $b) => strcmp($a->seccion->nombre ?? '', $b->seccion->nombre ?? ''),
+                        ]);
+                        $aulasPorNivel = $aulasSorted->groupBy(fn($a) => $a->grado->nivel->nombre ?? 'Sin nivel');
+                    @endphp
+                    @foreach($aulasPorNivel as $nivelNombre => $aulasNivel)
+                        <optgroup label="{{ $nivelNombre }}">
+                            @foreach($aulasNivel as $aula)
+                                <option value="{{ $aula->id }}">
+                                    {{ $aula->grado->nivel->nombre ?? '' }} - {{ $aula->grado->nombre ?? '' }} 
+                                    "{{ $aula->seccion->nombre ?? '' }}" ({{ $aula->turno_nombre }}) - {{ $aula->anioAcademico->anio ?? '' }}
+                                </option>
+                            @endforeach
+                        </optgroup>
                     @endforeach
                 </select>
             </div>
