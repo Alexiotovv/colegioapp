@@ -101,6 +101,25 @@
         cursor: not-allowed;
     }
 
+    .btn-descargar-unificado {
+        background: #7c3aed;
+        border: none;
+        color: #fff;
+        padding: 11px 18px;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: background 0.2s ease;
+    }
+
+    .btn-descargar-unificado:hover {
+        background: #6d28d9;
+    }
+
+    .btn-descargar-unificado:disabled {
+        background: #c4b5fd;
+        cursor: not-allowed;
+    }
+
     .hint-box {
         background: #eff6ff;
         border-left: 4px solid #3b82f6;
@@ -192,6 +211,9 @@
                     <button type="submit" id="btnDescargar" class="btn-descargar">
                         <i class="fas fa-file-excel me-2"></i> Descargar Excel
                     </button>
+                    <button type="button" id="btnDescargarUnificado" class="btn-descargar-unificado">
+                        <i class="fas fa-layer-group me-2"></i> Descargar Unificado Excel
+                    </button>
                     @if(auth()->user()->isAdmin())
                         <span class="small-note">Como administrador, puedes descargar reportes de cualquier aula del sistema.</span>
                     @elseif(auth()->user()->isDirector() || strtolower(trim((string) optional(auth()->user()->role)->nombre)) === 'subdirector')
@@ -225,10 +247,12 @@
 <script>
     (function () {
         const endpointFiltros = '{{ route('admin.reportes-notas.filtros') }}';
+        const endpointUnificado = '{{ route('admin.reportes-notas.exportar-unificado') }}';
         const anioSelect = document.getElementById('anio_id');
         const periodoSelect = document.getElementById('periodo_id');
         const aulaSelect = document.getElementById('aula_id');
         const btnDescargar = document.getElementById('btnDescargar');
+        const btnDescargarUnificado = document.getElementById('btnDescargarUnificado');
 
         // Inicializar Select2 para el aula
         const select2Instance = $('#aula_id').select2({
@@ -288,6 +312,7 @@
                 }
 
                 btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
+                btnDescargarUnificado.disabled = btnDescargar.disabled;
             })
             .catch(() => {
                 alert('No se pudieron cargar los filtros del reporte.');
@@ -302,13 +327,26 @@
 
         periodoSelect.addEventListener('change', function () {
             btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
+            btnDescargarUnificado.disabled = btnDescargar.disabled;
         });
 
         $(aulaSelect).on('change.select2', function () {
             btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
+            btnDescargarUnificado.disabled = btnDescargar.disabled;
         });
 
         btnDescargar.disabled = !(anioSelect.value && periodoSelect.value && aulaSelect.value);
+        btnDescargarUnificado.disabled = btnDescargar.disabled;
+
+        btnDescargarUnificado.addEventListener('click', function () {
+            if (!anioSelect.value || !periodoSelect.value || !aulaSelect.value) return;
+            const params = new URLSearchParams({
+                anio_id: anioSelect.value,
+                periodo_id: periodoSelect.value,
+                aula_id: aulaSelect.value,
+            });
+            window.location.href = endpointUnificado + '?' + params.toString();
+        });
     })();
 </script>
 @endsection

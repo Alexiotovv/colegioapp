@@ -167,12 +167,7 @@ class RegistroEvaluacionController extends Controller
             foreach ($request->registros as $item) {
                 $valoracion = trim((string) ($item['valoracion'] ?? ''));
 
-                // Si llega vacío desde "Seleccionar", se limpia el registro existente.
                 if ($valoracion === '') {
-                    RegistroEvaluacion::where('matricula_id', $item['matricula_id'])
-                        ->where('evaluacion_id', $item['evaluacion_id'])
-                        ->where('periodo_id', $request->periodo_id)
-                        ->delete();
                     continue;
                 }
 

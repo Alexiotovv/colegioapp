@@ -227,6 +227,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/reportes/notas', [ReporteNotasController::class, 'index'])->name('reportes-notas.index');
             Route::get('/reportes/notas/filtros', [ReporteNotasController::class, 'filtros'])->name('reportes-notas.filtros');
             Route::get('/reportes/notas/exportar', [ReporteNotasController::class, 'exportar'])->name('reportes-notas.exportar');
+            Route::get('/reportes/notas/exportar-unificado', [ReporteNotasController::class, 'exportarUnificado'])->name('reportes-notas.exportar-unificado');
             Route::get('/notas', [NotaController::class, 'index'])->name('notas.index');
             Route::get('/notas/cursos-by-aula', [NotaController::class, 'getCursosByAula'])->name('notas.cursos-by-aula');
             Route::get('/notas/get-data', [NotaController::class, 'getDataForNotas'])->name('notas.get-data');

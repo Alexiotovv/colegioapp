@@ -800,9 +800,10 @@ $(document).ready(function() {
         let registros = [];
         let periodoId = $('#periodo_id').val();
         
-        // Recorrer todos los selects: si está vacío, el backend limpiará ese registro.
+        // Solo enviar selects con valoración seleccionada
         $('.valoracion-select').each(function() {
             let valoracion = $(this).val();
+            if (!valoracion) return;
             let matriculaId = $(this).data('matricula');
             let evaluacionId = $(this).data('evaluacion');
             let comentario = $(this).closest('tr').find('.comentario-input').val();
@@ -810,7 +811,7 @@ $(document).ready(function() {
             registros.push({
                 matricula_id: matriculaId,
                 evaluacion_id: evaluacionId,
-                valoracion: valoracion || '',
+                valoracion: valoracion,
                 comentario: comentario || ''
             });
         });

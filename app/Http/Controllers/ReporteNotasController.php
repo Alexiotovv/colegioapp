@@ -442,7 +442,6 @@ class ReporteNotasController extends Controller
             foreach ($alumnos as $index => $matricula) {
                 $alumno = $matricula->alumno;
                 $sheet->setCellValue("A{$row}", $index + 1);
-                $sheet->setCellValue("B{$row}", $alumno?->id ?? '');
                 $sheet->setCellValue("C{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
                 $sheet->setCellValue("D{$row}", $this->nombreCompletoAlumno($alumno));
 
@@ -480,6 +479,7 @@ class ReporteNotasController extends Controller
                 $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
             }
             $sheet->getColumnDimension('B')->setVisible(false);
+            $sheet->getColumnDimension('C')->setVisible(false);
         }
     }
 
@@ -526,6 +526,243 @@ class ReporteNotasController extends Controller
                 ],
             ],
         ];
+    }
+
+    public function exportarUnificado(Request $request)
+    {
+        $request->validate([
+            'anio_id'    => ['required', 'exists:anio_academicos,id'],
+            'periodo_id' => ['required', 'exists:periodos,id'],
+            'aula_id'    => ['required', 'exists:aulas,id'],
+        ]);
+
+        $user     = auth()->user();
+        $anioId   = (int) $request->input('anio_id');
+        $periodoId = (int) $request->input('periodo_id');
+        $aulaId   = (int) $request->input('aula_id');
+
+        $anio    = AnioAcademico::findOrFail($anioId);
+        $periodo = Periodo::with('anioAcademico')->findOrFail($periodoId);
+        $aula    = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])->findOrFail($aulaId);
+
+        $this->asegurarAccesoAula($user, $aula, $anioId);
+
+        $cargas = $this->obtenerCargasPorAula($user, $aula->id, $anioId);
+        if ($cargas->isEmpty()) {
+            return back()->with('error', 'No hay cursos asignados para el aula seleccionada.');
+        }
+
+        $alumnos = $this->obtenerAlumnosPorAula($aula->id);
+        if ($alumnos->isEmpty()) {
+            return back()->with('error', 'El aula seleccionada no tiene alumnos matriculados activos.');
+        }
+
+        $institucion   = ConfiguracionInstitucion::getConfig();
+        $notasGlobales = $this->obtenerNotasGlobales($periodoId, $alumnos, $cargas);
+
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
+
+        $this->crearHojaUnificadaCursos($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
+        $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+
+        $nombreArchivo = sprintf(
+            'reporte_unificado_%s_%s_%s.xlsx',
+            $anio->anio,
+            $periodo->nombre,
+            str_replace(' ', '_', $aula->nombre_completo)
+        );
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            if (ob_get_length()) {
+                @ob_end_clean();
+            }
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $nombreArchivo, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    private function crearHojaUnificadaCursos(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $cargas, Collection $alumnos, Collection $notasGlobales): void
+    {
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Todas las Áreas');
+        $sheet->setShowGridLines(false);
+
+        // Precalculate competencias per curso
+        $cursosData = $cargas->map(function ($carga) {
+            return [
+                'carga'        => $carga,
+                'curso'        => $carga->curso,
+                'competencias' => $carga->curso?->competencias?->where('activo', true)->sortBy('orden')->values() ?? collect(),
+            ];
+        });
+
+        // Total dynamic columns: N°, ID(hidden), Cód, Nombre + (comp*2 per curso) + CT + Apreciacion + EvalPadre + EvalActitudinal + OtrasEval
+        $colCursosStart = 5; // 1=N°, 2=ID, 3=Cód, 4=Nombre
+        $totalCursosCols = $cursosData->sum(fn($d) => max(1, $d['competencias']->count()) * 2);
+        $colComplementariosStart = $colCursosStart + $totalCursosCols;
+        $totalCols = $colComplementariosStart + 4; // CT, Apreciación, EvalPadre, EvalActitudinal, OtrasEval
+        $lastCol = Coordinate::stringFromColumnIndex($totalCols);
+
+        // ── Row 1: Institution name ──────────────────────────────────────────
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // ── Row 2: Report title ──────────────────────────────────────────────
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->setCellValue('A2', 'REPORTE UNIFICADO DE NOTAS');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // ── Row 3: Subtitle ──────────────────────────────────────────────────
+        $sheet->mergeCells("A3:{$lastCol}3");
+        $sheet->setCellValue('A3', sprintf(
+            'Año académico: %s | Periodo: %s | Aula: %s',
+            $anio->anio, $periodo->nombre, $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+        $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        // ── Rows 4-5: Headers ────────────────────────────────────────────────
+        // Fixed columns — span rows 4 and 5
+        $sheet->mergeCells('A4:A5'); $sheet->setCellValue('A4', 'N°');
+        $sheet->mergeCells('B4:B5'); $sheet->setCellValue('B4', 'ID');
+        $sheet->mergeCells('C4:C5'); $sheet->setCellValue('C4', 'Cód. Estudiante');
+        $sheet->mergeCells('D4:D5'); $sheet->setCellValue('D4', 'Apellidos y Nombres');
+
+        // Course headers (merged across competencias*2 cols)
+        $col = $colCursosStart;
+        foreach ($cursosData as $item) {
+            $numComps = max(1, $item['competencias']->count());
+            $spanCols = $numComps * 2;
+            $colStart = Coordinate::stringFromColumnIndex($col);
+            $colEnd   = Coordinate::stringFromColumnIndex($col + $spanCols - 1);
+
+            // Row 4: merged course name
+            if ($spanCols > 1) {
+                $sheet->mergeCells("{$colStart}4:{$colEnd}4");
+            }
+            $sheet->setCellValue("{$colStart}4", $item['curso']?->nombre ?? '—');
+
+            // Row 5: competencia sub-headers (NL + Conclusión pairs)
+            $subCol = $col;
+            foreach ($item['competencias'] as $idx => $comp) {
+                $code = str_pad((string) ($comp->orden ?: ($idx + 1)), 2, '0', STR_PAD_LEFT);
+                $nlCol   = Coordinate::stringFromColumnIndex($subCol);
+                $concCol = Coordinate::stringFromColumnIndex($subCol + 1);
+                $sheet->setCellValue("{$nlCol}5", $code . ' NL');
+                $sheet->setCellValue("{$concCol}5", $code . ' Conclusión');
+                $subCol += 2;
+            }
+            if ($item['competencias']->isEmpty()) {
+                $sheet->setCellValue("{$colStart}5", 'NL');
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($col + 1) . '5', 'Conclusión');
+            }
+
+            $col += $spanCols;
+        }
+
+        // Complementary headers (span rows 4-5)
+        $colCT   = Coordinate::stringFromColumnIndex($colComplementariosStart);
+        $colApr  = Coordinate::stringFromColumnIndex($colComplementariosStart + 1);
+        $colEP   = Coordinate::stringFromColumnIndex($colComplementariosStart + 2);
+        $colEA   = Coordinate::stringFromColumnIndex($colComplementariosStart + 3);
+        $colOE   = Coordinate::stringFromColumnIndex($colComplementariosStart + 4);
+
+        $sheet->mergeCells("{$colCT}4:{$colCT}5");  $sheet->setCellValue("{$colCT}4", 'Comp. Transversales');
+        $sheet->mergeCells("{$colApr}4:{$colApr}5"); $sheet->setCellValue("{$colApr}4", 'Apreciación Tutor');
+        $sheet->mergeCells("{$colEP}4:{$colEP}5");  $sheet->setCellValue("{$colEP}4", 'Evaluación Padre');
+        $sheet->mergeCells("{$colEA}4:{$colEA}5");  $sheet->setCellValue("{$colEA}4", 'Eval. Actitudinal');
+        $sheet->mergeCells("{$colOE}4:{$colOE}5");  $sheet->setCellValue("{$colOE}4", 'Otras Evaluaciones');
+
+        // Apply header styles
+        $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setWrapText(true);
+
+        // ── Data rows ────────────────────────────────────────────────────────
+        $row = 6;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("C{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("D{$row}", $this->nombreCompletoAlumno($alumno));
+
+            $col = $colCursosStart;
+            foreach ($cursosData as $item) {
+                $numComps = max(1, $item['competencias']->count());
+                $subCol = $col;
+                if ($item['competencias']->isNotEmpty()) {
+                    foreach ($item['competencias'] as $comp) {
+                        $nota = $notasGlobales[$matricula->id . '_' . $comp->id] ?? null;
+                        $sheet->setCellValueExplicit(
+                            Coordinate::stringFromColumnIndex($subCol) . $row,
+                            $nota?->nota ?? '',
+                            \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                        );
+                        $sheet->setCellValueExplicit(
+                            Coordinate::stringFromColumnIndex($subCol + 1) . $row,
+                            $nota?->conclusionDescriptiva?->conclusion ?? '',
+                            \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                        );
+                        $subCol += 2;
+                    }
+                } else {
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($subCol) . $row, '');
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($subCol + 1) . $row, '');
+                }
+                $col += $numComps * 2;
+            }
+
+            // Complementary columns
+            $ct  = $this->obtenerCompetenciasTransversalesAlumno($matricula->id, $periodo->id);
+            $apr = $this->obtenerApreciacionAlumno($matricula->id, $periodo->id);
+            $ep  = $this->obtenerEvaluacionPadreAlumno($matricula->id, $periodo->id);
+            $ea  = $this->obtenerEvaluacionActitudinalAlumno($matricula->id, $periodo->id);
+            $oe  = $this->obtenerOtrasEvaluacionesAlumno($matricula->id, $periodo->id);
+
+            $sheet->setCellValue("{$colCT}{$row}", implode("\n", $ct));
+            $sheet->getStyle("{$colCT}{$row}")->getAlignment()->setWrapText(true);
+            $sheet->setCellValue("{$colApr}{$row}", $apr);
+            $sheet->getStyle("{$colApr}{$row}")->getAlignment()->setWrapText(true);
+            $sheet->setCellValue("{$colEP}{$row}", implode("\n", $ep));
+            $sheet->getStyle("{$colEP}{$row}")->getAlignment()->setWrapText(true);
+            $sheet->setCellValue("{$colEA}{$row}", implode("\n", $ea));
+            $sheet->getStyle("{$colEA}{$row}")->getAlignment()->setWrapText(true);
+            $sheet->setCellValue("{$colOE}{$row}", implode("\n", $oe));
+            $sheet->getStyle("{$colOE}{$row}")->getAlignment()->setWrapText(true);
+
+            $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $row++;
+        }
+
+        // ── Column widths ─────────────────────────────────────────────────────
+        $sheet->getColumnDimension('A')->setWidth(5);
+        $sheet->getColumnDimension('B')->setVisible(false);
+        $sheet->getColumnDimension('C')->setWidth(14);
+        $sheet->getColumnDimension('C')->setVisible(false);
+        $sheet->getColumnDimension('D')->setWidth(30);
+        // curso columns: narrow NL, wider conclusion
+        $col = $colCursosStart;
+        foreach ($cursosData as $item) {
+            $numComps = max(1, $item['competencias']->count());
+            for ($i = 0; $i < $numComps; $i++) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2))->setWidth(6);       // NL
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2 + 1))->setWidth(22); // Conclusión
+            }
+            $col += $numComps * 2;
+        }
+        // Complementary columns
+        $sheet->getColumnDimension($colCT)->setWidth(30);
+        $sheet->getColumnDimension($colApr)->setWidth(30);
+        $sheet->getColumnDimension($colEP)->setWidth(30);
+        $sheet->getColumnDimension($colEA)->setWidth(30);
+        $sheet->getColumnDimension($colOE)->setWidth(30);
     }
 
     private function crearHojasComplementarias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
@@ -635,6 +872,7 @@ class ReporteNotasController extends Controller
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
@@ -701,6 +939,7 @@ class ReporteNotasController extends Controller
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
@@ -752,6 +991,7 @@ class ReporteNotasController extends Controller
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
@@ -804,6 +1044,7 @@ class ReporteNotasController extends Controller
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
@@ -856,6 +1097,7 @@ class ReporteNotasController extends Controller
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
