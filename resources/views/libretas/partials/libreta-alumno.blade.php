@@ -435,7 +435,7 @@
                                         @foreach($periodos as $periodo)
                                             @php
                                                 $inasistencia = $inasistencias[$periodo->id][$tipo->id] ?? null;
-                                                $valor = $inasistencia ? $inasistencia->cantidad : '0';
+                                                $valor = $inasistencia ? $inasistencia->cantidad : '';
                                             @endphp
                                             <td style="text-align: center;">{{ $valor }}</td>
                                         @endforeach
