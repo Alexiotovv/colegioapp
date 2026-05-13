@@ -321,7 +321,6 @@ class ReporteNotasController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Generalidades');
         $sheet->setShowGridLines(false);
-        $sheet->freezePane('A8');
 
         $sheet->mergeCells('A1:F1');
         $sheet->setCellValue('A1', 'REPORTE DE NOTAS - GENERALIDADES');
@@ -387,7 +386,6 @@ class ReporteNotasController extends Controller
             $titulo = $curso?->codigo ? $curso->codigo . ' - ' . $curso->nombre : ($curso?->nombre ?? 'Curso');
             $sheet->setTitle($this->sanitizarTituloHoja($curso?->codigo ?? $curso?->nombre ?? 'Curso'));
             $sheet->setShowGridLines(false);
-            $sheet->freezePane('D6');
 
             $maxCol = 4 + max(1, $competencias->count() * 2);
             $lastCol = Coordinate::stringFromColumnIndex($maxCol);
@@ -480,6 +478,7 @@ class ReporteNotasController extends Controller
             foreach (range(1, $maxCol) as $i) {
                 $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
             }
+            $sheet->getColumnDimension('B')->setVisible(false);
         }
     }
 
@@ -592,7 +591,6 @@ class ReporteNotasController extends Controller
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Competencias Transversales');
         $sheet->setShowGridLines(false);
-        $sheet->freezePane('D4');
 
         $sheet->mergeCells('A1:D1');
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
@@ -645,7 +643,6 @@ class ReporteNotasController extends Controller
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Apreciaciones del Tutor');
         $sheet->setShowGridLines(false);
-        $sheet->freezePane('D4');
 
         $sheet->mergeCells('A1:D1');
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
@@ -697,7 +694,6 @@ class ReporteNotasController extends Controller
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Evaluación Actitudinal');
         $sheet->setShowGridLines(false);
-        $sheet->freezePane('D4');
 
         $sheet->mergeCells('A1:D1');
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
@@ -750,7 +746,6 @@ class ReporteNotasController extends Controller
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Otras Evaluaciones');
         $sheet->setShowGridLines(false);
-        $sheet->freezePane('D4');
 
         $sheet->mergeCells('A1:D1');
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
