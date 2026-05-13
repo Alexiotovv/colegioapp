@@ -103,6 +103,9 @@
             <div class="col-md-6">
                 <label for="orden_merito" class="form-label required-field">Orden</label>
                 <select id="orden_merito" name="orden_merito[]" class="form-select orden-multiple select2" multiple required disabled>
+                    <option value="todos" {{ in_array('todos', old('orden_merito', [])) ? 'selected' : '' }}>
+                        Todos
+                    </option>
                     @foreach($ordenesDisponibles as $orden)
                         <option value="{{ $orden }}" {{ in_array($orden, old('orden_merito', [])) ? 'selected' : '' }}>
                             {{ $orden }}° lugar

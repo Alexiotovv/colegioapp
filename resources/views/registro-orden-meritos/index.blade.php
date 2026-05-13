@@ -258,11 +258,27 @@
                 <label for="aula_id" class="form-label required-field">Aula</label>
                 <select class="form-select" id="aula_id" required>
                     <option value="">Seleccionar aula</option>
-                    @foreach($aulas as $aula)
-                        <option value="{{ $aula->id }}">
-                            {{ $aula->grado->nivel->nombre ?? '' }} - {{ $aula->grado->nombre ?? '' }}
-                            "{{ $aula->seccion->nombre ?? '' }}" ({{ $aula->turno_nombre }}) - {{ $aula->anioAcademico->anio ?? '' }}
-                        </option>
+                    @php
+                        $aulasOrdenadas = $aulas->sortBy(function ($aula) {
+                            $nivel = mb_strtolower((string) ($aula->grado->nivel->nombre ?? ''));
+                            $grado = mb_strtolower((string) ($aula->grado->nombre ?? ''));
+                            $seccion = mb_strtolower((string) ($aula->seccion->nombre ?? ''));
+                            $turno = mb_strtolower((string) ($aula->turno_nombre ?? ''));
+                            $anio = (string) ($aula->anioAcademico->anio ?? '');
+
+                            return $nivel . '|' . $grado . '|' . $seccion . '|' . $turno . '|' . $anio;
+                        });
+                    @endphp
+
+                    @foreach($aulasOrdenadas->groupBy(function ($aula) { return $aula->grado->nivel->nombre ?? 'Sin nivel'; }) as $nivelNombre => $aulasNivel)
+                        <optgroup label="{{ $nivelNombre }}">
+                            @foreach($aulasNivel as $aula)
+                                <option value="{{ $aula->id }}">
+                                    {{ $aula->grado->nivel->nombre ?? '' }} - {{ $aula->grado->nombre ?? '' }}
+                                    "{{ $aula->seccion->nombre ?? '' }}" ({{ $aula->turno_nombre }}) - {{ $aula->anioAcademico->anio ?? '' }}
+                                </option>
+                            @endforeach
+                        </optgroup>
                     @endforeach
                 </select>
             </div>

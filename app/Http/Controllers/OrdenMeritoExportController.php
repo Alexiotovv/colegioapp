@@ -67,19 +67,28 @@ class OrdenMeritoExportController extends Controller
             'anio_id' => ['required', 'exists:anio_academicos,id'],
             'nivel_id' => ['required', 'string'],
             'orden_merito' => ['required', 'array', 'min:1'],
-            'orden_merito.*' => ['integer', 'min:1', 'max:40'],
+            'orden_merito.*' => ['required'],
         ]);
 
         $anioId = (int) $request->input('anio_id');
         $nivelInput = $request->input('nivel_id');
         $esTodos = $nivelInput === 'todos';
         $nivelId = $esTodos ? null : (int) $nivelInput;
-        $ordenesMerito = collect($request->input('orden_merito', []))
-            ->map(fn ($valor) => (int) $valor)
-            ->filter(fn ($valor) => $valor >= 1 && $valor <= 40)
-            ->unique()
-            ->values()
-            ->all();
+        $ordenSeleccionado = collect($request->input('orden_merito', []))
+            ->map(fn ($valor) => is_string($valor) ? trim($valor) : $valor)
+            ->filter(fn ($valor) => $valor !== '' && $valor !== null)
+            ->values();
+
+        if ($ordenSeleccionado->contains('todos')) {
+            $ordenesMerito = range(1, 40);
+        } else {
+            $ordenesMerito = $ordenSeleccionado
+                ->map(fn ($valor) => (int) $valor)
+                ->filter(fn ($valor) => $valor >= 1 && $valor <= 40)
+                ->unique()
+                ->values()
+                ->all();
+        }
 
         if (empty($ordenesMerito)) {
             return back()->with('error', 'Debes seleccionar al menos un orden de mérito válido.');
