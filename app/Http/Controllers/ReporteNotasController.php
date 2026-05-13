@@ -11,6 +11,7 @@ use App\Models\Matricula;
 use App\Models\Nota;
 use App\Models\Periodo;
 use App\Models\RegistroCompetenciaTransversal;
+use App\Models\RegistroEvaluacion;
 use App\Models\RegistroEvaluacionActitudinal;
 use App\Models\RegistroOtraEvaluacion;
 use Illuminate\Http\Request;
@@ -531,6 +532,7 @@ class ReporteNotasController extends Controller
     {
         $this->crearHojaCompetenciasTransversales($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaApreciaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaEvaluacionPadre($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaEvaluacionActitudinal($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaOtrasEvaluaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
     }
@@ -570,6 +572,72 @@ class ReporteNotasController extends Controller
             $valoracion = $reg->valoracion_nombre ?? $reg->valoracion ?? '—';
             return "{$nombre}: {$valoracion}";
         })->toArray();
+    }
+
+    private function obtenerEvaluacionPadreAlumno(int $matriculaId, int $periodoId): array
+    {
+        $registros = RegistroEvaluacion::with('evaluacion')
+            ->where('matricula_id', $matriculaId)
+            ->where('periodo_id', $periodoId)
+            ->get();
+
+        return $registros->map(function ($reg) {
+            $nombre = $reg->evaluacion?->nombre ?? 'Sin nombre';
+            $valoracion = $reg->valoracion_nombre ?? $reg->valoracion ?? '—';
+            return "{$nombre}: {$valoracion}";
+        })->toArray();
+    }
+
+    private function crearHojaEvaluacionPadre(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Evaluación Padre');
+        $sheet->setShowGridLines(false);
+
+        $sheet->mergeCells('A1:D1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:D2');
+        $sheet->setCellValue('A2', 'EVALUACIÓN AL PADRE DE FAMILIA');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:D3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'Evaluación Padre de Familia');
+        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $evaluaciones = $this->obtenerEvaluacionPadreAlumno($matricula->id, $periodo->id);
+            $texto = implode("\n", $evaluaciones);
+
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $texto);
+            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setWidth(40);
+        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
     }
 
     private function obtenerOtrasEvaluacionesAlumno(int $matriculaId, int $periodoId): array

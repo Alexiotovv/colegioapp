@@ -800,23 +800,19 @@ $(document).ready(function() {
         let registros = [];
         let periodoId = $('#periodo_id').val();
         
-        // Recorrer solo los selects que tienen valor seleccionado
+        // Recorrer todos los selects: si está vacío, el backend limpiará ese registro.
         $('.valoracion-select').each(function() {
             let valoracion = $(this).val();
-            
-            // Solo guardar si hay una valoración seleccionada
-            if (valoracion) {
-                let matriculaId = $(this).data('matricula');
-                let evaluacionId = $(this).data('evaluacion');
-                let comentario = $(this).closest('tr').find('.comentario-input').val();
-                
-                registros.push({
-                    matricula_id: matriculaId,
-                    evaluacion_id: evaluacionId,
-                    valoracion: valoracion,
-                    comentario: comentario || ''
-                });
-            }
+            let matriculaId = $(this).data('matricula');
+            let evaluacionId = $(this).data('evaluacion');
+            let comentario = $(this).closest('tr').find('.comentario-input').val();
+
+            registros.push({
+                matricula_id: matriculaId,
+                evaluacion_id: evaluacionId,
+                valoracion: valoracion || '',
+                comentario: comentario || ''
+            });
         });
         
         if (registros.length === 0) {

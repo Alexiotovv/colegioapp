@@ -165,8 +165,19 @@ class RegistroEvaluacionController extends Controller
             $valoracionesPermitidas = ['SIEMPRE', 'CASI SIEMPRE', 'ALGUNAS VECES', 'NUNCA'];
             
             foreach ($request->registros as $item) {
-                if (!in_array($item['valoracion'], $valoracionesPermitidas)) {
-                    throw new \Exception("Valoración no válida: " . $item['valoracion']);
+                $valoracion = trim((string) ($item['valoracion'] ?? ''));
+
+                // Si llega vacío desde "Seleccionar", se limpia el registro existente.
+                if ($valoracion === '') {
+                    RegistroEvaluacion::where('matricula_id', $item['matricula_id'])
+                        ->where('evaluacion_id', $item['evaluacion_id'])
+                        ->where('periodo_id', $request->periodo_id)
+                        ->delete();
+                    continue;
+                }
+
+                if (!in_array($valoracion, $valoracionesPermitidas)) {
+                    throw new \Exception("Valoración no válida: " . $valoracion);
                 }
                 
                 RegistroEvaluacion::updateOrCreate(
@@ -177,7 +188,7 @@ class RegistroEvaluacionController extends Controller
                     ],
                     [
                         'docente_id' => $docenteId,
-                        'valoracion' => $item['valoracion'],
+                        'valoracion' => $valoracion,
                         'comentario' => $item['comentario'] ?? null,
                         'fecha_registro' => now(),
                     ]
