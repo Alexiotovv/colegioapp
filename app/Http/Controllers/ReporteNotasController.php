@@ -13,6 +13,7 @@ use App\Models\Periodo;
 use App\Models\RegistroCompetenciaTransversal;
 use App\Models\RegistroEvaluacion;
 use App\Models\RegistroEvaluacionActitudinal;
+use App\Models\RegistroOrdenMerito;
 use App\Models\RegistroOtraEvaluacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -127,6 +128,9 @@ class ReporteNotasController extends Controller
         if ($exportarCompleto) {
             $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         }
+
+        // Se incluye siempre para ambas opciones de descarga del reporte.
+        $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
 
         $nombreArchivo = sprintf(
             'reporte_notas_%s_%s_%s.xlsx',
@@ -565,6 +569,7 @@ class ReporteNotasController extends Controller
 
         $this->crearHojaUnificadaCursos($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
         $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
 
         $nombreArchivo = sprintf(
             'reporte_unificado_%s_%s_%s.xlsx',
@@ -599,11 +604,11 @@ class ReporteNotasController extends Controller
             ];
         });
 
-        // Total dynamic columns: N°, ID(hidden), Cód, Nombre + (comp*2 per curso) + CT + Apreciacion + EvalPadre + EvalActitudinal + OtrasEval
+        // Total dynamic columns: N°, ID(hidden), Cód, Nombre + (comp*2 por curso) + columnas complementarias
         $colCursosStart = 5; // 1=N°, 2=ID, 3=Cód, 4=Nombre
         $totalCursosCols = $cursosData->sum(fn($d) => max(1, $d['competencias']->count()) * 2);
         $colComplementariosStart = $colCursosStart + $totalCursosCols;
-        $totalCols = $colComplementariosStart + 4; // CT, Apreciación, EvalPadre, EvalActitudinal, OtrasEval
+        $totalCols = $colComplementariosStart + 5; // CT, Apreciación, EvalPadre, EvalActitudinal, OtrasEval, OrdenMerito
         $lastCol = Coordinate::stringFromColumnIndex($totalCols);
 
         // ── Row 1: Institution name ──────────────────────────────────────────
@@ -672,12 +677,14 @@ class ReporteNotasController extends Controller
         $colEP   = Coordinate::stringFromColumnIndex($colComplementariosStart + 2);
         $colEA   = Coordinate::stringFromColumnIndex($colComplementariosStart + 3);
         $colOE   = Coordinate::stringFromColumnIndex($colComplementariosStart + 4);
+        $colOM   = Coordinate::stringFromColumnIndex($colComplementariosStart + 5);
 
         $sheet->mergeCells("{$colCT}4:{$colCT}5");  $sheet->setCellValue("{$colCT}4", 'Comp. Transversales');
         $sheet->mergeCells("{$colApr}4:{$colApr}5"); $sheet->setCellValue("{$colApr}4", 'Apreciación Tutor');
         $sheet->mergeCells("{$colEP}4:{$colEP}5");  $sheet->setCellValue("{$colEP}4", 'Evaluación Padre');
         $sheet->mergeCells("{$colEA}4:{$colEA}5");  $sheet->setCellValue("{$colEA}4", 'Eval. Actitudinal');
         $sheet->mergeCells("{$colOE}4:{$colOE}5");  $sheet->setCellValue("{$colOE}4", 'Otras Evaluaciones');
+        $sheet->mergeCells("{$colOM}4:{$colOM}5");  $sheet->setCellValue("{$colOM}4", 'Orden de Mérito');
 
         // Apply header styles
         $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#065f46'));
@@ -686,6 +693,7 @@ class ReporteNotasController extends Controller
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setWrapText(true);
 
         // ── Data rows ────────────────────────────────────────────────────────
+        $ordenesMerito = $this->obtenerOrdenMeritoPorMatriculas($alumnos, $periodo->id);
         $row = 6;
         foreach ($alumnos as $index => $matricula) {
             $alumno = $matricula->alumno;
@@ -725,6 +733,7 @@ class ReporteNotasController extends Controller
             $ep  = $this->obtenerEvaluacionPadreAlumno($matricula->id, $periodo->id);
             $ea  = $this->obtenerEvaluacionActitudinalAlumno($matricula->id, $periodo->id);
             $oe  = $this->obtenerOtrasEvaluacionesAlumno($matricula->id, $periodo->id);
+            $ordenMerito = $ordenesMerito[$matricula->id] ?? null;
 
             $sheet->setCellValue("{$colCT}{$row}", implode("\n", $ct));
             $sheet->getStyle("{$colCT}{$row}")->getAlignment()->setWrapText(true);
@@ -736,6 +745,7 @@ class ReporteNotasController extends Controller
             $sheet->getStyle("{$colEA}{$row}")->getAlignment()->setWrapText(true);
             $sheet->setCellValue("{$colOE}{$row}", implode("\n", $oe));
             $sheet->getStyle("{$colOE}{$row}")->getAlignment()->setWrapText(true);
+            $sheet->setCellValue("{$colOM}{$row}", $ordenMerito?->nota_valor ?? '—');
 
             $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $row++;
@@ -763,6 +773,7 @@ class ReporteNotasController extends Controller
         $sheet->getColumnDimension($colEP)->setWidth(30);
         $sheet->getColumnDimension($colEA)->setWidth(30);
         $sheet->getColumnDimension($colOE)->setWidth(30);
+        $sheet->getColumnDimension($colOM)->setWidth(16);
     }
 
     private function crearHojasComplementarias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
@@ -772,6 +783,20 @@ class ReporteNotasController extends Controller
         $this->crearHojaEvaluacionPadre($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaEvaluacionActitudinal($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaOtrasEvaluaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+    }
+
+    private function obtenerOrdenMeritoPorMatriculas(Collection $alumnos, int $periodoId): Collection
+    {
+        $matriculaIds = $alumnos->pluck('id')->filter()->values();
+        if ($matriculaIds->isEmpty()) {
+            return collect();
+        }
+
+        return RegistroOrdenMerito::query()
+            ->where('periodo_id', $periodoId)
+            ->whereIn('matricula_id', $matriculaIds)
+            ->get()
+            ->keyBy('matricula_id');
     }
 
     private function obtenerCompetenciasTransversalesAlumno(int $matriculaId, int $periodoId): array
@@ -1101,6 +1126,62 @@ class ReporteNotasController extends Controller
         $sheet->getColumnDimension('C')->setAutoSize(true);
         $sheet->getColumnDimension('D')->setWidth(40);
         $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+    }
+
+    private function crearHojaOrdenMerito(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
+    {
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle($this->sanitizarTituloHoja('Orden Mérito'));
+        $sheet->setShowGridLines(false);
+
+        $sheet->mergeCells('A1:E1');
+        $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A2:E2');
+        $sheet->setCellValue('A2', 'ORDEN DE MÉRITO');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->mergeCells('A3:E3');
+        $sheet->setCellValue('A3', sprintf(
+            'Año: %s | Periodo: %s | Aula: %s',
+            $anio->anio,
+            $periodo->nombre,
+            $aula->nombre_completo
+        ));
+        $sheet->getStyle('A3')->getFont()->setItalic(true);
+
+        $sheet->setCellValue('A4', 'N°');
+        $sheet->setCellValue('B4', 'Cód. Estudiante');
+        $sheet->setCellValue('C4', 'Apellidos y Nombres');
+        $sheet->setCellValue('D4', 'N° de Orden');
+        $sheet->setCellValue('E4', 'Observación');
+        $sheet->getStyle('A4:E4')->applyFromArray($this->headerStyle('#065f46'));
+
+        $ordenesMerito = $this->obtenerOrdenMeritoPorMatriculas($alumnos, $periodo->id);
+
+        $row = 5;
+        foreach ($alumnos as $index => $matricula) {
+            $alumno = $matricula->alumno;
+            $registro = $ordenesMerito[$matricula->id] ?? null;
+
+            $sheet->setCellValue("A{$row}", $index + 1);
+            $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
+            $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
+            $sheet->setCellValue("D{$row}", $registro?->nota_valor ?? '—');
+            $sheet->setCellValue("E{$row}", $registro?->observacion ?? '');
+            $sheet->getStyle("E{$row}")->getAlignment()->setWrapText(true);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setVisible(false);
+        $sheet->getColumnDimension('C')->setAutoSize(true);
+        $sheet->getColumnDimension('D')->setAutoSize(true);
+        $sheet->getColumnDimension('E')->setWidth(45);
     }
 }
 
