@@ -488,7 +488,7 @@ $(document).ready(function() {
                             </div>
                             <div class="text-end">
                                 <div class="porcentaje-texto">${porcentaje}%</div>
-                                <small>Avance</small>
+                                <small>Sólo Área Curricular / Cursos - Avance</small>
                             </div>
                         </div>
                     </div>
@@ -513,7 +513,7 @@ $(document).ready(function() {
                           sinEstudiantes ? '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + estadoTexto + '</span>' :
                           `<div class="d-flex justify-content-between align-items-center">
                             <span><i class="fas fa-check-circle text-success"></i> Notas: ${item.total_registrado || 0}/${item.total_esperado || 0}</span>
-                            <span class="libreta-badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}">Libreta ${item.libreta_porcentaje || 0}%</span>
+                            <span class="libreta-badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}">Otras Evaluaciones ${item.libreta_porcentaje || 0}%</span>
                           </div>
                           ${renderCuadrosMini(item.cuadros_avance || {})}`}
                     </div>
