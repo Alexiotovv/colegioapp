@@ -546,9 +546,6 @@ $(document).ready(function() {
             url: '{{ route("csrf.token") }}',
             method: 'GET',
             cache: false,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
         }).then(function(response) {
             if (response && response.token) {
                 setCsrfToken(response.token);
@@ -572,6 +569,14 @@ $(document).ready(function() {
     function limpiarRespaldoLocalDeGuardado() {
         localStorage.removeItem(CSRF_BACKUP_KEY);
     }
+
+    // Inyectar token CSRF en todas las peticiones AJAX automáticamente
+    $.ajaxSetup({
+        beforeSend: function(xhr) {
+            xhr.setRequestHeader('X-CSRF-TOKEN', getCsrfToken());
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        }
+    });
 
     // ==================== CARGAR OPCIONES DE NOTAS ====================
     function cargarOpcionesNotas() {
@@ -1111,7 +1116,6 @@ $(document).ready(function() {
             conclusiones: conclusiones,
             aula_id: $('#aula_id').val(),
             periodo_id: periodoId,
-            _token: getCsrfToken()
         };
 
         guardarRespaldoLocalAntesDeEnviar(payload);
@@ -1120,15 +1124,9 @@ $(document).ready(function() {
         btn.html('<span class="loading-spinner me-2"></span> Guardando...');
 
         function enviarGuardado(reintentado) {
-            payload._token = getCsrfToken();
-
             $.ajax({
                 url: '{{ route("admin.notas.save") }}',
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
                 data: payload,
                 success: function(response) {
                     if (response.success) {
@@ -1270,11 +1268,6 @@ $(document).ready(function() {
             data: {
                 nota_id: notaId,
                 conclusion: conclusion,
-                _token: getCsrfToken()
-            },
-            headers: {
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
                 if (response.success) {
@@ -1311,11 +1304,6 @@ $(document).ready(function() {
             method: 'POST',
             data: {
                 periodo_id: periodoId,
-                _token: getCsrfToken()
-            },
-            headers: {
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(response) {
                 if (response.success) {
