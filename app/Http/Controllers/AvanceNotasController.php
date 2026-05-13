@@ -251,7 +251,16 @@ class AvanceNotasController extends Controller
                 $otrasCount = DB::table('tipos_otras_evaluaciones')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
                 if ($otrasCount > 0) {
                     $e = $totalEst * $otrasCount;
-                    $r = min(DB::table('registro_otras_evaluaciones')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valor')->where('valor', '!=', '')->count(), $e);
+                    $r = min(
+                        DB::table('registro_otras_evaluaciones')
+                            ->whereIn('matricula_id', $matriculaIds)
+                            ->where('periodo_id', $periodoId)
+                            ->whereNotNull('valor')
+                            ->where('valor', '!=', '')
+                            ->distinct()
+                            ->count(DB::raw("CONCAT(matricula_id, '-', tipo_otra_evaluacion_id)")),
+                        $e
+                    );
                     $cuadrosAvance['otras_evaluaciones'] = ['label' => 'Comportamiento', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
                     $libreraReg += $r; $libreraEsp += $e;
                 }
@@ -490,7 +499,7 @@ class AvanceNotasController extends Controller
                 ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
                 ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
                 ->whereNotNull('r.valor')->where('r.valor', '!=', '')
-                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->select('m.aula_id', DB::raw("COUNT(DISTINCT CONCAT(r.matricula_id, '-', r.tipo_otra_evaluacion_id)) as total"))->groupBy('m.aula_id')
                 ->pluck('total', 'm.aula_id') : collect();
 
         $aulasConAvance = [];

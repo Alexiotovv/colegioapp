@@ -440,7 +440,7 @@ $(document).ready(function() {
 
                     $('#completitudTablaBody').html(`
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-muted">No hay aulas disponibles para los filtros seleccionados</td>
+                            <td colspan="6" class="text-center py-4 text-muted">No hay aulas disponibles para los filtros seleccionados</td>
                         </tr>
                     `);
                     $('#completitudResumen').text('No hay datos de completitud para los filtros seleccionados.');
@@ -528,7 +528,7 @@ $(document).ready(function() {
         if (!Array.isArray(data) || data.length === 0) {
             $('#completitudTablaBody').html(`
                 <tr>
-                    <td colspan="5" class="text-center py-4 text-muted">No hay datos de completitud para mostrar</td>
+                    <td colspan="6" class="text-center py-4 text-muted">No hay datos de completitud para mostrar</td>
                 </tr>
             `);
             $('#completitudResumen').text('No se encontró información de completitud por aula.');
