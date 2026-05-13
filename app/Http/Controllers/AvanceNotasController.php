@@ -194,6 +194,70 @@ class AvanceNotasController extends Controller
         $porcentajeGlobal = $totalEsperadoGlobal > 0 
             ? round(($totalRegistradoGlobal / $totalEsperadoGlobal) * 100, 2) 
             : 0;
+
+        // Cuadros de libreta para el modal de detalle
+        $nivelIdAula = $aula->nivel_id;
+        $cuadrosConfigAula = \App\Models\ConfiguracionLibretaCuadro::where('nivel_id', $nivelIdAula)->first();
+        $cuadrosHabAula = $cuadrosConfigAula ? ($cuadrosConfigAula->cuadros ?? []) : null;
+        $isEnAula = fn($k) => $cuadrosHabAula === null || in_array($k, $cuadrosHabAula);
+        $totalEst = $matriculas->count();
+        $cuadrosAvance = [];
+        $libreraReg = $totalRegistradoGlobal;
+        $libreraEsp = $totalEsperadoGlobal;
+
+        if ($matriculaIds->isNotEmpty() && $totalEst > 0) {
+            if ($isEnAula('competencias_transversales')) {
+                $ctCount = DB::table('competencias_transversales')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                if ($ctCount > 0) {
+                    $e = $totalEst * $ctCount;
+                    $r = min(DB::table('registro_competencias_transversales')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('nota')->where('nota', '!=', '')->count(), $e);
+                    $cuadrosAvance['competencias_transversales'] = ['label' => 'Comp. Transversales', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                    $libreraReg += $r; $libreraEsp += $e;
+                }
+            }
+            if ($isEnAula('apreciaciones_tutor')) {
+                $r = min(DB::table('apreciaciones')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('apreciacion')->where('apreciacion', '!=', '')->count(), $totalEst);
+                $cuadrosAvance['apreciaciones_tutor'] = ['label' => 'Apreciaciones', 'registrado' => $r, 'esperado' => $totalEst, 'porcentaje' => round($r/$totalEst*100,1)];
+                $libreraReg += $r; $libreraEsp += $totalEst;
+            }
+            if ($isEnAula('evaluacion_padre')) {
+                $evalCount = DB::table('evaluaciones')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                if ($evalCount > 0) {
+                    $e = $totalEst * $evalCount;
+                    $r = min(DB::table('registro_evaluaciones')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valoracion')->where('valoracion', '!=', '')->count(), $e);
+                    $cuadrosAvance['evaluacion_padre'] = ['label' => 'Eval. Padre', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                    $libreraReg += $r; $libreraEsp += $e;
+                }
+            }
+            if ($isEnAula('evaluaciones_actitudinales')) {
+                $evalCount = DB::table('eval_actitudinales')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                if ($evalCount > 0) {
+                    $e = $totalEst * $evalCount;
+                    $r = min(DB::table('reg_eval_actitudinales')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valoracion')->where('valoracion', '!=', '')->count(), $e);
+                    $cuadrosAvance['evaluaciones_actitudinales'] = ['label' => 'Eval. Actitudinal', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                    $libreraReg += $r; $libreraEsp += $e;
+                }
+            }
+            if ($isEnAula('inasistencias')) {
+                $inasCount = DB::table('tipos_inasistencia')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                if ($inasCount > 0) {
+                    $e = $totalEst * $inasCount;
+                    $r = min(DB::table('registro_asistencias')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('cantidad')->count(), $e);
+                    $cuadrosAvance['inasistencias'] = ['label' => 'Inasistencias', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                    $libreraReg += $r; $libreraEsp += $e;
+                }
+            }
+            if ($isEnAula('otras_evaluaciones')) {
+                $otrasCount = DB::table('tipos_otras_evaluaciones')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                if ($otrasCount > 0) {
+                    $e = $totalEst * $otrasCount;
+                    $r = min(DB::table('registro_otras_evaluaciones')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valor')->where('valor', '!=', '')->count(), $e);
+                    $cuadrosAvance['otras_evaluaciones'] = ['label' => 'Comportamiento', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                    $libreraReg += $r; $libreraEsp += $e;
+                }
+            }
+        }
+        $libretaPorcentaje = $libreraEsp > 0 ? round($libreraReg/$libreraEsp*100,1) : 0;
         
         return response()->json([
             'success' => true,
@@ -221,7 +285,9 @@ class AvanceNotasController extends Controller
                     'total_esperado' => $totalEsperadoGlobal,
                     'total_registrado' => $totalRegistradoGlobal,
                     'porcentaje_global' => $porcentajeGlobal,
-                    'color' => $this->getColorByPercentage($porcentajeGlobal)
+                    'color' => $this->getColorByPercentage($porcentajeGlobal),
+                    'cuadros_avance' => $cuadrosAvance,
+                    'libreta_porcentaje' => $libretaPorcentaje,
                 ]
             ]
         ]);
@@ -348,6 +414,85 @@ class AvanceNotasController extends Controller
                 return $row->aula_id . '-' . $row->curso_id;
             });
 
+        // ==================== CUADROS DE LIBRETA ====================
+        $todosNivelIds = $aulas->pluck('nivel_id')->filter()->unique()->values();
+        $cuadrosConfigMap = \App\Models\ConfiguracionLibretaCuadro::whereIn('nivel_id', $todosNivelIds)
+            ->get()->keyBy('nivel_id')->map(fn($c) => $c->cuadros ?? []);
+
+        $ctPorNivel = DB::table('competencias_transversales')
+            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
+            ->pluck('total', 'nivel_id');
+        $evalPadrePorNivel = DB::table('evaluaciones')
+            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
+            ->pluck('total', 'nivel_id');
+        $evalActitudinalPorNivel = DB::table('eval_actitudinales')
+            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
+            ->pluck('total', 'nivel_id');
+        $inasistenciasPorNivel = DB::table('tipos_inasistencia')
+            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
+            ->pluck('total', 'nivel_id');
+        $otrasEvalPorNivel = DB::table('tipos_otras_evaluaciones')
+            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
+            ->pluck('total', 'nivel_id');
+
+        $todosMatriculaIds = DB::table('matriculas as m')
+            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
+            ->whereIn('m.aula_id', $aulaIds)->where('al.estado', 'activo')
+            ->pluck('m.id');
+
+        $registradosCT = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('registro_competencias_transversales as r')
+                ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
+                ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
+                ->whereNotNull('r.nota')->where('r.nota', '!=', '')
+                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
+        $registradosApreciaciones = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('apreciaciones as a')
+                ->join('matriculas as m', 'm.id', '=', 'a.matricula_id')
+                ->whereIn('a.matricula_id', $todosMatriculaIds)->where('a.periodo_id', $periodoId)
+                ->whereNotNull('a.apreciacion')->where('a.apreciacion', '!=', '')
+                ->select('m.aula_id', DB::raw('COUNT(a.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
+        $registradosEvalPadre = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('registro_evaluaciones as r')
+                ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
+                ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
+                ->whereNotNull('r.valoracion')->where('r.valoracion', '!=', '')
+                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
+        $registradosEvalActitudinal = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('reg_eval_actitudinales as r')
+                ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
+                ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
+                ->whereNotNull('r.valoracion')->where('r.valoracion', '!=', '')
+                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
+        $registradosInasistencias = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('registro_asistencias as r')
+                ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
+                ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
+                ->whereNotNull('r.cantidad')
+                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
+        $registradosOtrasEval = $todosMatriculaIds->isNotEmpty()
+            ? DB::table('registro_otras_evaluaciones as r')
+                ->join('matriculas as m', 'm.id', '=', 'r.matricula_id')
+                ->whereIn('r.matricula_id', $todosMatriculaIds)->where('r.periodo_id', $periodoId)
+                ->whereNotNull('r.valor')->where('r.valor', '!=', '')
+                ->select('m.aula_id', DB::raw('COUNT(r.id) as total'))->groupBy('m.aula_id')
+                ->pluck('total', 'm.aula_id') : collect();
+
         $aulasConAvance = [];
         $aulasCompletitud = [];
 
@@ -372,7 +517,9 @@ class AvanceNotasController extends Controller
                     'aula' => $baseAula,
                     'porcentaje' => 0,
                     'color' => '#dc3545',
-                    'sin_cursos' => true
+                    'sin_cursos' => true,
+                    'cuadros_avance' => [],
+                    'libreta_porcentaje' => 0,
                 ];
 
                 $aulasCompletitud[] = [
@@ -384,7 +531,9 @@ class AvanceNotasController extends Controller
                     'total_cursos_evaluables' => 0,
                     'total_esperado' => 0,
                     'total_registrado' => 0,
-                    'sin_cursos' => true
+                    'sin_cursos' => true,
+                    'cuadros_avance' => [],
+                    'libreta_porcentaje' => 0,
                 ];
                 continue;
             }
@@ -394,7 +543,9 @@ class AvanceNotasController extends Controller
                     'aula' => $baseAula,
                     'porcentaje' => 0,
                     'color' => '#ffc107',
-                    'sin_estudiantes' => true
+                    'sin_estudiantes' => true,
+                    'cuadros_avance' => [],
+                    'libreta_porcentaje' => 0,
                 ];
 
                 $aulasCompletitud[] = [
@@ -406,7 +557,9 @@ class AvanceNotasController extends Controller
                     'total_cursos_evaluables' => (int) $cursosConCompetencias->count(),
                     'total_esperado' => 0,
                     'total_registrado' => 0,
-                    'sin_estudiantes' => true
+                    'sin_estudiantes' => true,
+                    'cuadros_avance' => [],
+                    'libreta_porcentaje' => 0,
                 ];
                 continue;
             }
@@ -442,12 +595,59 @@ class AvanceNotasController extends Controller
                 ? round(($totalCursosCompletos / $totalCursosEvaluables) * 100, 2)
                 : 0;
 
+            // Calcular cuadros_avance
+            $nivelId = $aula->nivel_id;
+            $cuadrosHab = $cuadrosConfigMap->has($nivelId) ? ($cuadrosConfigMap->get($nivelId) ?? []) : null;
+            $isEn = fn($k) => $cuadrosHab === null || in_array($k, $cuadrosHab);
+            $cuadrosAvance = [];
+            $libreraReg = $totalRegistrado;
+            $libreraEsp = $totalEsperado;
+
+            if ($isEn('competencias_transversales') && ($ctPorNivel[$nivelId] ?? 0) > 0) {
+                $c = (int)$ctPorNivel[$nivelId]; $e = $totalEstudiantes * $c;
+                $r = min((int)($registradosCT[$aulaId] ?? 0), $e);
+                $cuadrosAvance['competencias_transversales'] = ['label' => 'Comp. Transversales', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                $libreraReg += $r; $libreraEsp += $e;
+            }
+            if ($isEn('apreciaciones_tutor') && $totalEstudiantes > 0) {
+                $r = min((int)($registradosApreciaciones[$aulaId] ?? 0), $totalEstudiantes);
+                $cuadrosAvance['apreciaciones_tutor'] = ['label' => 'Apreciaciones', 'registrado' => $r, 'esperado' => $totalEstudiantes, 'porcentaje' => round($r/$totalEstudiantes*100,1)];
+                $libreraReg += $r; $libreraEsp += $totalEstudiantes;
+            }
+            if ($isEn('evaluacion_padre') && ($evalPadrePorNivel[$nivelId] ?? 0) > 0) {
+                $c = (int)$evalPadrePorNivel[$nivelId]; $e = $totalEstudiantes * $c;
+                $r = min((int)($registradosEvalPadre[$aulaId] ?? 0), $e);
+                $cuadrosAvance['evaluacion_padre'] = ['label' => 'Eval. Padre', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                $libreraReg += $r; $libreraEsp += $e;
+            }
+            if ($isEn('evaluaciones_actitudinales') && ($evalActitudinalPorNivel[$nivelId] ?? 0) > 0) {
+                $c = (int)$evalActitudinalPorNivel[$nivelId]; $e = $totalEstudiantes * $c;
+                $r = min((int)($registradosEvalActitudinal[$aulaId] ?? 0), $e);
+                $cuadrosAvance['evaluaciones_actitudinales'] = ['label' => 'Eval. Actitudinal', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                $libreraReg += $r; $libreraEsp += $e;
+            }
+            if ($isEn('inasistencias') && ($inasistenciasPorNivel[$nivelId] ?? 0) > 0) {
+                $c = (int)$inasistenciasPorNivel[$nivelId]; $e = $totalEstudiantes * $c;
+                $r = min((int)($registradosInasistencias[$aulaId] ?? 0), $e);
+                $cuadrosAvance['inasistencias'] = ['label' => 'Inasistencias', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                $libreraReg += $r; $libreraEsp += $e;
+            }
+            if ($isEn('otras_evaluaciones') && ($otrasEvalPorNivel[$nivelId] ?? 0) > 0) {
+                $c = (int)$otrasEvalPorNivel[$nivelId]; $e = $totalEstudiantes * $c;
+                $r = min((int)($registradosOtrasEval[$aulaId] ?? 0), $e);
+                $cuadrosAvance['otras_evaluaciones'] = ['label' => 'Comportamiento', 'registrado' => $r, 'esperado' => $e, 'porcentaje' => $e > 0 ? round($r/$e*100,1) : 0];
+                $libreraReg += $r; $libreraEsp += $e;
+            }
+            $libretaPorcentaje = $libreraEsp > 0 ? round($libreraReg/$libreraEsp*100,1) : 0;
+
             $aulasConAvance[] = [
                 'aula' => $baseAula,
                 'porcentaje' => $porcentaje,
                 'color' => $this->getColorByPercentage($porcentaje),
                 'total_esperado' => $totalEsperado,
-                'total_registrado' => $totalRegistrado
+                'total_registrado' => $totalRegistrado,
+                'cuadros_avance' => $cuadrosAvance,
+                'libreta_porcentaje' => $libretaPorcentaje,
             ];
 
             $aulasCompletitud[] = [
@@ -458,7 +658,9 @@ class AvanceNotasController extends Controller
                 'total_cursos_completos' => $totalCursosCompletos,
                 'total_cursos_evaluables' => $totalCursosEvaluables,
                 'total_esperado' => $totalEsperado,
-                'total_registrado' => $totalRegistrado
+                'total_registrado' => $totalRegistrado,
+                'cuadros_avance' => $cuadrosAvance,
+                'libreta_porcentaje' => $libretaPorcentaje,
             ];
         }
 

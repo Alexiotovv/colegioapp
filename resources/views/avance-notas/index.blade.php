@@ -155,6 +155,32 @@
         margin-bottom: 12px;
     }
 
+    .libreta-badge {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 20px;
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .cuadros-mini-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .cuadro-mini-pill {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: #f0f0f0;
+        color: #444;
+        white-space: nowrap;
+    }
+
     .table-completitud {
         font-size: 13px;
     }
@@ -263,7 +289,8 @@
                                     <th>Grado/Sección</th>
                                     <th class="text-center">Cursos completos</th>
                                     <th class="text-center">Notas registradas</th>
-                                    <th class="text-center">Avance</th>
+                                    <th class="text-center">Notas %</th>
+                                    <th class="text-center">Libreta %</th>
                                 </tr>
                             </thead>
                             <tbody id="completitudTablaBody"></tbody>
@@ -315,6 +342,34 @@
 <script>
 $(document).ready(function() {
     let completitudChart = null;
+
+    function getColorByPct(pct) {
+        if (pct >= 90) return '#28a745';
+        if (pct >= 70) return '#17a2b8';
+        if (pct >= 50) return '#ffc107';
+        if (pct >= 25) return '#fd7e14';
+        return '#dc3545';
+    }
+
+    function renderCuadrosMini(cuadros) {
+        const entries = Object.entries(cuadros);
+        if (!entries.length) return '';
+        let pills = entries.map(([k, c]) => {
+            const color = getColorByPct(c.porcentaje);
+            return `<span class="cuadro-mini-pill" style="border-left:3px solid ${color}">${c.label}: ${c.porcentaje}%</span>`;
+        }).join('');
+        return `<div class="cuadros-mini-grid">${pills}</div>`;
+    }
+
+    function renderCuadrosMiniTooltip(cuadros) {
+        const entries = Object.entries(cuadros);
+        if (!entries.length) return '';
+        let pills = entries.map(([k, c]) => {
+            const color = getColorByPct(c.porcentaje);
+            return `<span class="cuadro-mini-pill" style="border-left:3px solid ${color}">${c.label}: ${c.porcentaje}%</span>`;
+        }).join('');
+        return `<div class="cuadros-mini-grid">${pills}</div>`;
+    }
     
     // Cargar grados según nivel seleccionado
     $('#nivel_id').on('change', function() {
@@ -456,7 +511,11 @@ $(document).ready(function() {
                     <div class="aula-card-footer">
                         ${sinCursos ? '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> ' + estadoTexto + '</span>' : 
                           sinEstudiantes ? '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + estadoTexto + '</span>' :
-                          `<span><i class="fas fa-check-circle text-success"></i> Registrados: ${item.total_registrado || 0} / ${item.total_esperado || 0}</span>`}
+                          `<div class="d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-check-circle text-success"></i> Notas: ${item.total_registrado || 0}/${item.total_esperado || 0}</span>
+                            <span class="libreta-badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}">Libreta ${item.libreta_porcentaje || 0}%</span>
+                          </div>
+                          ${renderCuadrosMini(item.cuadros_avance || {})}`}
                     </div>
                 </div>
             `;
@@ -567,6 +626,10 @@ $(document).ready(function() {
                     <td class="text-center">${cursosCompletos}/${cursosEvaluables}</td>
                     <td class="text-center">${totalRegistrado}/${totalEsperado}</td>
                     <td class="text-center"><span class="badge" style="background:${item.color}; color:#fff;">${porcentaje}%</span></td>
+                    <td class="text-center">
+                        <span class="badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}; color:#fff;">${item.libreta_porcentaje || 0}%</span>
+                        ${renderCuadrosMiniTooltip(item.cuadros_avance || {})}
+                    </td>
                 </tr>
             `;
         }
@@ -654,8 +717,29 @@ $(document).ready(function() {
                 <strong>Resumen:</strong> ${resumen.total_registrado} de ${resumen.total_esperado} notas registradas 
                 (${resumen.porcentaje_global}% completado)
             </div>
-            
-            <h6 class="mb-3"><i class="fas fa-book me-2"></i>Avance por Curso</h6>
+        `;
+
+        // Cuadros de libreta
+        const cuadros = resumen.cuadros_avance || {};
+        const cuadrosEntries = Object.entries(cuadros);
+        if (cuadrosEntries.length > 0) {
+            html += `<h6 class="mb-2 mt-3"><i class="fas fa-th-list me-2"></i>Avance por Cuadro de Libreta
+                <small class="text-muted fw-normal ms-2">Libreta completa: <span style="color:${getColorByPct(resumen.libreta_porcentaje || 0)};font-weight:700;">${resumen.libreta_porcentaje || 0}%</span></small>
+            </h6>
+            <div class="row g-2 mb-3">`;
+            for (const [key, c] of cuadrosEntries) {
+                const color = getColorByPct(c.porcentaje);
+                html += `<div class="col-6 col-md-4">
+                    <div class="d-flex align-items-center justify-content-between rounded p-2" style="background:#f8f9fa;border-left:4px solid ${color};">
+                        <small class="text-muted">${c.label}</small>
+                        <span class="ms-2 fw-bold" style="color:${color};">${c.porcentaje}%</span>
+                    </div>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+
+        html += `<h6 class="mb-3"><i class="fas fa-book me-2"></i>Avance por Curso</h6>
         `;
         
         for (let curso of cursos) {
