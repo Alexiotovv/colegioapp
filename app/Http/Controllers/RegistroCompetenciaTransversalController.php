@@ -4,7 +4,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\RegistroCompetenciaTransversal;
-use App\Models\CargaHoraria;
 use App\Models\Aula;
 use App\Models\CompetenciaTransversal;
 use App\Models\Periodo;
@@ -24,38 +23,33 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class RegistroCompetenciaTransversalController extends Controller
 {
+    private function esUsuarioPrivilegiado($user): bool
+    {
+        $rol = strtolower(trim((string) ($user->role->nombre ?? $user->rol ?? '')));
+
+        return in_array($rol, ['admin', 'director', 'director_subdirector'], true);
+    }
+
     public function index()
     {
         $user = auth()->user();
-        $esAdmin = $user->isAdmin();
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
         
         // Obtener aulas según el rol
         $aulasQuery = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
             ->where('activo', true);
 
-        if (!$esAdmin) {
-            // Para docentes no-admin: aulas donde es tutor asignado (docente_id)
-            // o donde tiene carga horaria activa asignada
-            $aulasQuery->where(function ($q) use ($docenteId) {
-                $q->where('docente_id', $docenteId)
-                  ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                      $q2->where('docente_id', $docenteId)
-                         ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                  });
-            });
+        if (!$esUsuarioPrivilegiado) {
+            // Para usuarios no privilegiados (no admin/director/subdirector):
+            // solo mostrar el aula donde es tutor asignado.
+            $aulasQuery->where('docente_id', $docenteId);
 
             // Regla adicional:
             // si el usuario (cualquier rol no-admin) tiene aulas de Primaria asignadas,
             // en el registro solo deben mostrarse las de Primaria (nada más).
             $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                ->where(function ($q) use ($docenteId) {
-                    $q->where('docente_id', $docenteId)
-                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                          $q2->where('docente_id', $docenteId)
-                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                      });
-                })
+                ->where('docente_id', $docenteId)
                 ->whereHas('grado.nivel', function ($q) {
                     $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
                 })
@@ -79,7 +73,7 @@ class RegistroCompetenciaTransversalController extends Controller
             ->where('activo', true);
         
         // Si no es admin, aplicar lógica de asignaciones
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             // Verificar si este docente tiene asignaciones específicas
             $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             
@@ -113,22 +107,16 @@ class RegistroCompetenciaTransversalController extends Controller
         $periodoId = $request->periodo_id;
         
         $user = auth()->user();
-        $esAdmin = $user->isAdmin();
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
         
         // Verificar permisos
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             // Regla adicional:
             // si el usuario tiene aulas de Primaria asignadas,
             // no se permite seleccionar aulas de Secundaria en este módulo.
             $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                ->where(function ($q) use ($docenteId) {
-                    $q->where('docente_id', $docenteId)
-                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                          $q2->where('docente_id', $docenteId)
-                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                      });
-                })
+                ->where('docente_id', $docenteId)
                 ->whereHas('grado.nivel', function ($q) {
                     $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
                 })
@@ -149,13 +137,7 @@ class RegistroCompetenciaTransversalController extends Controller
 
             $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('activo', true)
-                ->where(function ($q) use ($docenteId) {
-                    $q->where('docente_id', $docenteId)
-                      ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                          $q2->where('docente_id', $docenteId)
-                             ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                      });
-                })
+                ->where('docente_id', $docenteId)
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -197,7 +179,7 @@ class RegistroCompetenciaTransversalController extends Controller
             });
 
         $tieneAsignacionesEspecificas = false;
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             if ($tieneAsignacionesEspecificas) {
                 // Si tiene asignaciones específicas, limitar el listado solo a las asignadas
@@ -210,7 +192,7 @@ class RegistroCompetenciaTransversalController extends Controller
         $competencias = $competenciasQuery->orderBy('orden')->get();
         
         // Para docentes no-admin, marcar cuáles competencias están asignadas
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $competenciasAsignadasIds = [];
             if ($tieneAsignacionesEspecificas) {
                 $competenciasAsignadasIds = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
@@ -280,20 +262,14 @@ class RegistroCompetenciaTransversalController extends Controller
     public function saveRegistros(Request $request)
     {
         $user = auth()->user();
-        $esAdmin = $user->isAdmin();
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
         
         // Verificar acceso al aula
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAcceso = Aula::where('id', $request->aula_id)
                 ->where('activo', true)
-                ->where(function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($query) use ($docenteId) {
-                            $query->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                        });
-                })
+                ->where('docente_id', $docenteId)
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -321,7 +297,7 @@ class RegistroCompetenciaTransversalController extends Controller
         $matriculaIds = collect($request->registros)->pluck('matricula_id')->unique()->toArray();
         $competenciaIds = collect($request->registros)->pluck('competencia_transversal_id')->unique()->toArray();
 
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             if ($tieneAsignacionesEspecificas) {
                 $competenciasPermitidas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
@@ -469,10 +445,10 @@ class RegistroCompetenciaTransversalController extends Controller
         ]);
         
         $user = auth()->user();
-        $esAdmin = $user->isAdmin();
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
 
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             if ($tieneAsignacionesEspecificas) {
                 $permitida = AsignacionCompetenciaTransversal::where('user_id', $docenteId)
@@ -489,7 +465,7 @@ class RegistroCompetenciaTransversalController extends Controller
         }
         
         // Verificar acceso al aula
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $matricula = Matricula::with('aula')->find($request->matricula_id);
             if (!$matricula) {
                 return response()->json(['error' => 'Matrícula no encontrada'], 404);
@@ -497,13 +473,7 @@ class RegistroCompetenciaTransversalController extends Controller
             
             $tieneAcceso = Aula::where('id', $matricula->aula_id)
                 ->where('activo', true)
-                ->where(function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($query) use ($docenteId) {
-                            $query->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                        });
-                })
+                ->where('docente_id', $docenteId)
                 ->exists();
             
             if (!$tieneAcceso) {
@@ -591,19 +561,13 @@ class RegistroCompetenciaTransversalController extends Controller
         $periodoId = (int) $request->input('periodo_id');
 
         $user = auth()->user();
-        $esAdmin = $user->isAdmin();
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
 
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAcceso = Aula::where('id', $aulaId)
                 ->where('activo', true)
-                ->where(function ($query) use ($docenteId) {
-                    $query->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($query) use ($docenteId) {
-                            $query->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO);
-                        });
-                })
+                ->where('docente_id', $docenteId)
                 ->exists();
 
             abort_if(!$tieneAcceso, 403, 'No tienes acceso a este aula.');
@@ -631,7 +595,7 @@ class RegistroCompetenciaTransversalController extends Controller
                 });
             });
 
-        if (!$esAdmin) {
+        if (!$esUsuarioPrivilegiado) {
             $tieneAsignacionesEspecificas = AsignacionCompetenciaTransversal::where('user_id', $docenteId)->exists();
             if ($tieneAsignacionesEspecificas) {
                 $competenciasQuery->whereHas('usuariosAsignados', function ($query) use ($docenteId) {

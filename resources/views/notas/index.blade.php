@@ -1093,8 +1093,7 @@ $(document).ready(function() {
                 notas.push({
                     matricula_id: $(this).data('matricula'),
                     competencia_id: $(this).data('competencia'),
-                    nota: nota,
-                    observacion: ''
+                    nota: nota
                 });
             }
         });
@@ -1118,10 +1117,10 @@ $(document).ready(function() {
         let originalHtml = btn.html();
         let esperandoReintento = false;
         let payload = {
-            notas: notas,
-            conclusiones: conclusiones,
             aula_id: $('#aula_id').val(),
             periodo_id: periodoId,
+            notas: notas,
+            conclusiones: conclusiones,
         };
 
         guardarRespaldoLocalAntesDeEnviar(payload);
@@ -1133,7 +1132,8 @@ $(document).ready(function() {
             $.ajax({
                 url: '{{ route("admin.notas.save") }}',
                 method: 'POST',
-                data: payload,
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
                 success: function(response) {
                     if (response.success) {
                         limpiarRespaldoLocalDeGuardado();
