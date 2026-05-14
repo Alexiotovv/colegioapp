@@ -6,7 +6,10 @@ use App\Models\AnioAcademico;
 use App\Models\Apreciacion;
 use App\Models\Aula;
 use App\Models\CargaHoraria;
+use App\Models\CompetenciaTransversal;
 use App\Models\ConfiguracionInstitucion;
+use App\Models\Evaluacion;
+use App\Models\EvaluacionActitudinal;
 use App\Models\Matricula;
 use App\Models\Nota;
 use App\Models\Periodo;
@@ -16,6 +19,8 @@ use App\Models\RegistroEvaluacionActitudinal;
 use App\Models\RegistroAsistencia;
 use App\Models\RegistroOrdenMerito;
 use App\Models\RegistroOtraEvaluacion;
+use App\Models\TipoInasistencia;
+use App\Models\TipoOtraEvaluacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -359,7 +364,7 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('D14', 'COMPETENCIAS');
         $sheet->setCellValue('E14', 'ALUMNOS');
         $sheet->setCellValue('F14', 'OBSERVACIÓN');
-        $sheet->getStyle('A14:F14')->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle('A14:F14')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
         $row = 15;
         foreach ($cargas as $carga) {
@@ -373,10 +378,6 @@ class ReporteNotasController extends Controller
             $row++;
         }
 
-        $sheet->mergeCells('A' . ($row + 1) . ':F' . ($row + 1));
-        $sheet->setCellValue('A' . ($row + 1), 'Leyenda: NL = Nivel de logro alcanzado. Cada hoja del archivo contiene una competencia y su conclusión descriptiva cuando exista.');
-        $sheet->getStyle('A' . ($row + 1))->getAlignment()->setWrapText(true);
-        $sheet->getStyle('A4:B12')->getFont()->setBold(true);
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('C')->setAutoSize(true);
@@ -571,8 +572,10 @@ class ReporteNotasController extends Controller
         $spreadsheet = new Spreadsheet();
         $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
 
+        $this->crearHojaGeneralidades($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos);
         $this->crearHojaUnificadaCursos($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
         $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaInasistencias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
         $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
 
         $nombreArchivo = sprintf(
@@ -595,72 +598,97 @@ class ReporteNotasController extends Controller
 
     private function crearHojaUnificadaCursos(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $cargas, Collection $alumnos, Collection $notasGlobales): void
     {
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Todas las Áreas');
         $sheet->setShowGridLines(false);
 
-        // Precalculate competencias per curso
-        $cursosData = $cargas->map(function ($carga) {
-            return [
-                'carga'        => $carga,
-                'curso'        => $carga->curso,
-                'competencias' => $carga->curso?->competencias?->where('activo', true)->sortBy('orden')->values() ?? collect(),
-            ];
-        });
+        $nivelId       = $aula->nivel_id;
+        $matriculaIds  = $alumnos->pluck('id')->filter()->values()->toArray();
 
-        // Total dynamic columns: N°, ID(hidden), Cód, Nombre + (comp*2 por curso) + columnas complementarias
-        $colCursosStart = 5; // 1=N°, 2=ID, 3=Cód, 4=Nombre
+        // ── Tipos de evaluación del nivel ─────────────────────────────────────
+        $ctItems  = CompetenciaTransversal::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->orderBy('nombre')->get();
+        $epItems  = Evaluacion::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
+        $eaItems  = EvaluacionActitudinal::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
+        $inaItems = TipoInasistencia::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
+        $oeItems  = TipoOtraEvaluacion::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
+
+        // ── Registros complementarios en bloque (evita N+1) ──────────────────
+        $regCT  = !empty($matriculaIds) ? RegistroCompetenciaTransversal::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->competencia_transversal_id) : collect();
+        $regApr = !empty($matriculaIds) ? Apreciacion::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy('matricula_id') : collect();
+        $regEP  = !empty($matriculaIds) ? RegistroEvaluacion::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->evaluacion_id) : collect();
+        $regEA  = !empty($matriculaIds) ? RegistroEvaluacionActitudinal::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->eval_actitudinal_id) : collect();
+        $regIna = !empty($matriculaIds) ? RegistroAsistencia::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->tipo_inasistencia_id) : collect();
+        $regOE  = !empty($matriculaIds) ? RegistroOtraEvaluacion::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->tipo_otra_evaluacion_id) : collect();
+
+        // ── Estructura de columnas por curso ─────────────────────────────────
+        $cursosData = $cargas->map(fn($carga) => [
+            'carga'        => $carga,
+            'curso'        => $carga->curso,
+            'competencias' => $carga->curso?->competencias?->where('activo', true)->sortBy('orden')->values() ?? collect(),
+        ]);
+
+        $colFixed       = 4; // N°, ID(hidden), Cód, Nombre
+        $colCursosStart = $colFixed + 1;
         $totalCursosCols = $cursosData->sum(fn($d) => max(1, $d['competencias']->count()) * 2);
-        $colComplementariosStart = $colCursosStart + $totalCursosCols;
-        $totalCols = $colComplementariosStart + 6; // CT, Apreciación, EvalPadre, EvalActitudinal, Inasistencias, OtrasEval, OrdenMerito
-        $lastCol = Coordinate::stringFromColumnIndex($totalCols);
 
-        // ── Row 1: Institution name ──────────────────────────────────────────
+        // ── Secciones complementarias: [label, items, ancho_por_col] ─────────
+        $secciones = [];
+        if ($ctItems->isNotEmpty())  $secciones[] = ['label' => 'Comp. Transversales', 'items' => $ctItems,  'key' => 'ct',  'width' => 14];
+        $secciones[]                               = ['label' => 'Apreciación Tutor',   'items' => collect([null]), 'key' => 'apr', 'width' => 30];
+        if ($epItems->isNotEmpty())  $secciones[] = ['label' => 'Evaluación Padre',     'items' => $epItems,  'key' => 'ep',  'width' => 14];
+        if ($eaItems->isNotEmpty())  $secciones[] = ['label' => 'Eval. Actitudinal',    'items' => $eaItems,  'key' => 'ea',  'width' => 14];
+        if ($inaItems->isNotEmpty()) $secciones[] = ['label' => 'Inasistencias',        'items' => $inaItems, 'key' => 'ina', 'width' => 10];
+        if ($oeItems->isNotEmpty())  $secciones[] = ['label' => 'Otras Evaluaciones',   'items' => $oeItems,  'key' => 'oe',  'width' => 14];
+        $secciones[]                               = ['label' => 'Orden de Mérito',     'items' => collect([null]), 'key' => 'om',  'width' => 14];
+
+        // Calcular el offset de inicio de cada sección
+        $offset = $colCursosStart + $totalCursosCols;
+        foreach ($secciones as &$sec) {
+            $sec['colStart'] = $offset;
+            $sec['count']    = $sec['items']->count();
+            $offset         += $sec['count'];
+        }
+        unset($sec);
+
+        $totalCols = $offset - 1;
+        $lastCol   = Coordinate::stringFromColumnIndex($totalCols);
+
+        // ── Filas 1-3: cabecera ───────────────────────────────────────────────
         $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // ── Row 2: Report title ──────────────────────────────────────────────
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'REPORTE UNIFICADO DE NOTAS');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // ── Row 3: Subtitle ──────────────────────────────────────────────────
         $sheet->mergeCells("A3:{$lastCol}3");
-        $sheet->setCellValue('A3', sprintf(
-            'Año académico: %s | Periodo: %s | Aula: %s',
-            $anio->anio, $periodo->nombre, $aula->nombre_completo
-        ));
+        $sheet->setCellValue('A3', sprintf('Año académico: %s | Periodo: %s | Aula: %s', $anio->anio, $periodo->nombre, $aula->nombre_completo));
         $sheet->getStyle('A3')->getFont()->setItalic(true);
         $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // ── Rows 4-5: Headers ────────────────────────────────────────────────
-        // Fixed columns — span rows 4 and 5
+        // ── Fila 4-5: headers ─────────────────────────────────────────────────
         $sheet->mergeCells('A4:A5'); $sheet->setCellValue('A4', 'N°');
         $sheet->mergeCells('B4:B5'); $sheet->setCellValue('B4', 'ID');
         $sheet->mergeCells('C4:C5'); $sheet->setCellValue('C4', 'Cód. Estudiante');
         $sheet->mergeCells('D4:D5'); $sheet->setCellValue('D4', 'Apellidos y Nombres');
 
-        // Course headers (merged across competencias*2 cols)
+        // Headers de cursos
         $col = $colCursosStart;
         foreach ($cursosData as $item) {
             $numComps = max(1, $item['competencias']->count());
             $spanCols = $numComps * 2;
-            $colStart = Coordinate::stringFromColumnIndex($col);
-            $colEnd   = Coordinate::stringFromColumnIndex($col + $spanCols - 1);
-
-            // Row 4: merged course name
+            $cStart   = Coordinate::stringFromColumnIndex($col);
+            $cEnd     = Coordinate::stringFromColumnIndex($col + $spanCols - 1);
             if ($spanCols > 1) {
-                $sheet->mergeCells("{$colStart}4:{$colEnd}4");
+                $sheet->mergeCells("{$cStart}4:{$cEnd}4");
             }
-            $sheet->setCellValue("{$colStart}4", $item['curso']?->nombre ?? '—');
-
-            // Row 5: competencia sub-headers (NL + Conclusión pairs)
+            $sheet->setCellValue("{$cStart}4", $item['curso']?->nombre ?? '—');
             $subCol = $col;
             foreach ($item['competencias'] as $idx => $comp) {
-                $code = str_pad((string) ($comp->orden ?: ($idx + 1)), 2, '0', STR_PAD_LEFT);
+                $code    = str_pad((string) ($comp->orden ?: ($idx + 1)), 2, '0', STR_PAD_LEFT);
                 $nlCol   = Coordinate::stringFromColumnIndex($subCol);
                 $concCol = Coordinate::stringFromColumnIndex($subCol + 1);
                 $sheet->setCellValue("{$nlCol}5", $code . ' NL');
@@ -668,37 +696,39 @@ class ReporteNotasController extends Controller
                 $subCol += 2;
             }
             if ($item['competencias']->isEmpty()) {
-                $sheet->setCellValue("{$colStart}5", 'NL');
+                $sheet->setCellValue("{$cStart}5", 'NL');
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($col + 1) . '5', 'Conclusión');
             }
-
             $col += $spanCols;
         }
 
-        // Complementary headers (span rows 4-5)
-        $colCT   = Coordinate::stringFromColumnIndex($colComplementariosStart);
-        $colApr  = Coordinate::stringFromColumnIndex($colComplementariosStart + 1);
-        $colEP   = Coordinate::stringFromColumnIndex($colComplementariosStart + 2);
-        $colEA   = Coordinate::stringFromColumnIndex($colComplementariosStart + 3);
-        $colIna  = Coordinate::stringFromColumnIndex($colComplementariosStart + 4);
-        $colOE   = Coordinate::stringFromColumnIndex($colComplementariosStart + 5);
-        $colOM   = Coordinate::stringFromColumnIndex($colComplementariosStart + 6);
+        // Headers de secciones complementarias
+        foreach ($secciones as $sec) {
+            $colIni = Coordinate::stringFromColumnIndex($sec['colStart']);
+            $colFin = Coordinate::stringFromColumnIndex($sec['colStart'] + $sec['count'] - 1);
+            if ($sec['count'] > 1) {
+                $sheet->mergeCells("{$colIni}4:{$colFin}4");
+            } else {
+                $sheet->mergeCells("{$colIni}4:{$colIni}5");
+            }
+            $sheet->setCellValue("{$colIni}4", $sec['label']);
 
-        $sheet->mergeCells("{$colCT}4:{$colCT}5");  $sheet->setCellValue("{$colCT}4", 'Comp. Transversales');
-        $sheet->mergeCells("{$colApr}4:{$colApr}5"); $sheet->setCellValue("{$colApr}4", 'Apreciación Tutor');
-        $sheet->mergeCells("{$colEP}4:{$colEP}5");  $sheet->setCellValue("{$colEP}4", 'Evaluación Padre');
-        $sheet->mergeCells("{$colEA}4:{$colEA}5");  $sheet->setCellValue("{$colEA}4", 'Eval. Actitudinal');
-        $sheet->mergeCells("{$colIna}4:{$colIna}5"); $sheet->setCellValue("{$colIna}4", 'Inasistencias');
-        $sheet->mergeCells("{$colOE}4:{$colOE}5");  $sheet->setCellValue("{$colOE}4", 'Otras Evaluaciones');
-        $sheet->mergeCells("{$colOM}4:{$colOM}5");  $sheet->setCellValue("{$colOM}4", 'Orden de Mérito');
+            // Sub-headers fila 5 (sólo si hay más de 1 item, es decir tiene nombres individuales)
+            if ($sec['count'] > 1) {
+                foreach ($sec['items'] as $idx => $item) {
+                    $subColLetter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                    $nombre = $item?->nombre ?? '';
+                    $sheet->setCellValue("{$subColLetter}5", $nombre);
+                }
+            }
+        }
 
-        // Apply header styles
         $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#065f46'));
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setWrapText(true);
 
-        // ── Data rows ────────────────────────────────────────────────────────
+        // ── Filas de datos ────────────────────────────────────────────────────
         $ordenesMerito = $this->obtenerOrdenMeritoPorMatriculas($alumnos, $periodo->id);
         $row = 6;
         foreach ($alumnos as $index => $matricula) {
@@ -707,83 +737,98 @@ class ReporteNotasController extends Controller
             $sheet->setCellValue("C{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("D{$row}", $this->nombreCompletoAlumno($alumno));
 
+            // Notas por curso
             $col = $colCursosStart;
             foreach ($cursosData as $item) {
                 $numComps = max(1, $item['competencias']->count());
-                $subCol = $col;
-                if ($item['competencias']->isNotEmpty()) {
-                    foreach ($item['competencias'] as $comp) {
-                        $nota = $notasGlobales[$matricula->id . '_' . $comp->id] ?? null;
-                        $sheet->setCellValueExplicit(
-                            Coordinate::stringFromColumnIndex($subCol) . $row,
-                            $nota?->nota ?? '',
-                            \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-                        $sheet->setCellValueExplicit(
-                            Coordinate::stringFromColumnIndex($subCol + 1) . $row,
-                            $nota?->conclusionDescriptiva?->conclusion ?? '',
-                            \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-                        $subCol += 2;
-                    }
-                } else {
-                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($subCol) . $row, '');
-                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($subCol + 1) . $row, '');
+                $subCol   = $col;
+                foreach ($item['competencias'] as $comp) {
+                    $nota = $notasGlobales[$matricula->id . '_' . $comp->id] ?? null;
+                    $sheet->setCellValueExplicit(Coordinate::stringFromColumnIndex($subCol) . $row, $nota?->nota ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit(Coordinate::stringFromColumnIndex($subCol + 1) . $row, $nota?->conclusionDescriptiva?->conclusion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                    $subCol += 2;
                 }
                 $col += $numComps * 2;
             }
 
-            // Complementary columns
-            $ct  = $this->obtenerCompetenciasTransversalesAlumno($matricula->id, $periodo->id);
-            $apr = $this->obtenerApreciacionAlumno($matricula->id, $periodo->id);
-            $ep  = $this->obtenerEvaluacionPadreAlumno($matricula->id, $periodo->id);
-            $ea  = $this->obtenerEvaluacionActitudinalAlumno($matricula->id, $periodo->id);
-            $ina = $this->obtenerInasistenciasAlumno($matricula->id, $periodo->id);
-            $oe  = $this->obtenerOtrasEvaluacionesAlumno($matricula->id, $periodo->id);
-            $ordenMerito = $ordenesMerito[$matricula->id] ?? null;
-
-            $sheet->setCellValue("{$colCT}{$row}", implode("\n", $ct));
-            $sheet->getStyle("{$colCT}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colApr}{$row}", $apr);
-            $sheet->getStyle("{$colApr}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colEP}{$row}", implode("\n", $ep));
-            $sheet->getStyle("{$colEP}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colEA}{$row}", implode("\n", $ea));
-            $sheet->getStyle("{$colEA}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colIna}{$row}", implode("\n", $ina));
-            $sheet->getStyle("{$colIna}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colOE}{$row}", implode("\n", $oe));
-            $sheet->getStyle("{$colOE}{$row}")->getAlignment()->setWrapText(true);
-            $sheet->setCellValue("{$colOM}{$row}", $ordenMerito?->nota_valor ?? '—');
+            // Secciones complementarias
+            foreach ($secciones as $sec) {
+                switch ($sec['key']) {
+                    case 'ct':
+                        foreach ($ctItems as $idx => $ctItem) {
+                            $reg = $regCT[$matricula->id . '_' . $ctItem->id] ?? null;
+                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                            $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->nota ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        }
+                        break;
+                    case 'apr':
+                        $reg = $regApr[$matricula->id] ?? null;
+                        $letter = Coordinate::stringFromColumnIndex($sec['colStart']);
+                        $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->apreciacion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        $sheet->getStyle("{$letter}{$row}")->getAlignment()->setWrapText(true);
+                        break;
+                    case 'ep':
+                        foreach ($epItems as $idx => $epItem) {
+                            $reg = $regEP[$matricula->id . '_' . $epItem->id] ?? null;
+                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                            $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->valoracion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        }
+                        break;
+                    case 'ea':
+                        foreach ($eaItems as $idx => $eaItem) {
+                            $reg = $regEA[$matricula->id . '_' . $eaItem->id] ?? null;
+                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                            $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->valoracion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        }
+                        break;
+                    case 'ina':
+                        foreach ($inaItems as $idx => $inaItem) {
+                            $reg = $regIna[$matricula->id . '_' . $inaItem->id] ?? null;
+                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                            $sheet->setCellValue("{$letter}{$row}", $reg?->cantidad ?? 0);
+                        }
+                        break;
+                    case 'oe':
+                        foreach ($oeItems as $idx => $oeItem) {
+                            $reg = $regOE[$matricula->id . '_' . $oeItem->id] ?? null;
+                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
+                            $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->valor ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                        }
+                        break;
+                    case 'om':
+                        $ordenMerito = $ordenesMerito[$matricula->id] ?? null;
+                        $letter = Coordinate::stringFromColumnIndex($sec['colStart']);
+                        $sheet->setCellValue("{$letter}{$row}", $ordenMerito?->nota_valor ?? '—');
+                        break;
+                }
+            }
 
             $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
             $row++;
         }
 
-        // ── Column widths ─────────────────────────────────────────────────────
+        // ── Anchos de columna ─────────────────────────────────────────────────
         $sheet->getColumnDimension('A')->setWidth(5);
         $sheet->getColumnDimension('B')->setVisible(false);
         $sheet->getColumnDimension('C')->setWidth(14);
         $sheet->getColumnDimension('C')->setVisible(false);
         $sheet->getColumnDimension('D')->setWidth(30);
-        // curso columns: narrow NL, wider conclusion
+
         $col = $colCursosStart;
         foreach ($cursosData as $item) {
             $numComps = max(1, $item['competencias']->count());
             for ($i = 0; $i < $numComps; $i++) {
-                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2))->setWidth(6);       // NL
-                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2 + 1))->setWidth(22); // Conclusión
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2))->setWidth(6);
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2 + 1))->setWidth(22);
             }
             $col += $numComps * 2;
         }
-        // Complementary columns
-        $sheet->getColumnDimension($colCT)->setWidth(30);
-        $sheet->getColumnDimension($colApr)->setWidth(30);
-        $sheet->getColumnDimension($colEP)->setWidth(30);
-        $sheet->getColumnDimension($colEA)->setWidth(30);
-        $sheet->getColumnDimension($colIna)->setWidth(30);
-        $sheet->getColumnDimension($colOE)->setWidth(30);
-        $sheet->getColumnDimension($colOM)->setWidth(16);
+
+        foreach ($secciones as $sec) {
+            for ($i = 0; $i < $sec['count']; $i++) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($sec['colStart'] + $i))->setWidth($sec['width']);
+            }
+        }
     }
 
     private function crearHojasComplementarias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
