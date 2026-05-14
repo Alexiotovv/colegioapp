@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Models\RegistroEvaluacion;
 use App\Models\Aula;
+use App\Models\CargaHoraria;
 use App\Models\Evaluacion;
 use App\Models\Periodo;
 use App\Models\Matricula;
@@ -35,7 +36,14 @@ class RegistroEvaluacionController extends Controller
                 ->get();
         } else {
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
-                ->where('docente_id', $docenteId)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                            $q2->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
                 ->where('activo', true)
                 ->orderBy('nombre')
                 ->get();
@@ -65,7 +73,14 @@ class RegistroEvaluacionController extends Controller
         // Verificar permisos
         if ($rol !== 'admin') {
             $tieneAcceso = Aula::where('id', $aulaId)
-                ->where('docente_id', $docenteId)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                            $q2->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
                 ->where('activo', true)
                 ->exists();
             
@@ -282,7 +297,14 @@ class RegistroEvaluacionController extends Controller
 
         if ($rol !== 'admin') {
             $tieneAcceso = Aula::where('id', $aulaId)
-                ->where('docente_id', $docenteId)
+                ->where(function ($q) use ($docenteId) {
+                    $q->where('docente_id', $docenteId)
+                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                            $q2->where('docente_id', $docenteId)
+                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                ->whereNull('deleted_at');
+                        });
+                })
                 ->where('activo', true)
                 ->exists();
 

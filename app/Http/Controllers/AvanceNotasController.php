@@ -206,7 +206,7 @@ class AvanceNotasController extends Controller
 
         if ($matriculaIds->isNotEmpty() && $totalEst > 0) {
             if ($isEnAula('competencias_transversales')) {
-                $ctCount = DB::table('competencias_transversales')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                $ctCount = DB::table('competencias_transversales')->where('activo', true)->whereNull('deleted_at')->where('nivel_id', $nivelIdAula)->count();
                 if ($ctCount > 0) {
                     $e = $totalEst * $ctCount;
                     $r = min(DB::table('registro_competencias_transversales')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('nota')->where('nota', '!=', '')->count(), $e);
@@ -220,7 +220,7 @@ class AvanceNotasController extends Controller
                 $libreraReg += $r; $libreraEsp += $totalEst;
             }
             if ($isEnAula('evaluacion_padre')) {
-                $evalCount = DB::table('evaluaciones')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                $evalCount = DB::table('evaluaciones')->where('activo', true)->whereNull('deleted_at')->where('nivel_id', $nivelIdAula)->count();
                 if ($evalCount > 0) {
                     $e = $totalEst * $evalCount;
                     $r = min(DB::table('registro_evaluaciones')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valoracion')->where('valoracion', '!=', '')->count(), $e);
@@ -229,7 +229,7 @@ class AvanceNotasController extends Controller
                 }
             }
             if ($isEnAula('evaluaciones_actitudinales')) {
-                $evalCount = DB::table('eval_actitudinales')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                $evalCount = DB::table('eval_actitudinales')->where('activo', true)->whereNull('deleted_at')->where('nivel_id', $nivelIdAula)->count();
                 if ($evalCount > 0) {
                     $e = $totalEst * $evalCount;
                     $r = min(DB::table('reg_eval_actitudinales')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('valoracion')->where('valoracion', '!=', '')->count(), $e);
@@ -238,7 +238,7 @@ class AvanceNotasController extends Controller
                 }
             }
             if ($isEnAula('inasistencias')) {
-                $inasCount = DB::table('tipos_inasistencia')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                $inasCount = DB::table('tipos_inasistencia')->where('activo', true)->whereNull('deleted_at')->where('nivel_id', $nivelIdAula)->count();
                 if ($inasCount > 0) {
                     $e = $totalEst * $inasCount;
                     $r = min(DB::table('registro_asistencias')->whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodoId)->whereNotNull('cantidad')->count(), $e);
@@ -247,7 +247,7 @@ class AvanceNotasController extends Controller
                 }
             }
             if ($isEnAula('otras_evaluaciones')) {
-                $otrasCount = DB::table('tipos_otras_evaluaciones')->where('activo', true)->where('nivel_id', $nivelIdAula)->count();
+                $otrasCount = DB::table('tipos_otras_evaluaciones')->where('activo', true)->whereNull('deleted_at')->where('nivel_id', $nivelIdAula)->count();
                 if ($otrasCount > 0) {
                     $e = $totalEst * $otrasCount;
                     $r = min(
@@ -427,23 +427,23 @@ class AvanceNotasController extends Controller
             ->get()->keyBy('nivel_id')->map(fn($c) => $c->cuadros ?? []);
 
         $ctPorNivel = DB::table('competencias_transversales')
-            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->where('activo', true)->whereNull('deleted_at')->whereIn('nivel_id', $todosNivelIds)
             ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
             ->pluck('total', 'nivel_id');
         $evalPadrePorNivel = DB::table('evaluaciones')
-            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->where('activo', true)->whereNull('deleted_at')->whereIn('nivel_id', $todosNivelIds)
             ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
             ->pluck('total', 'nivel_id');
         $evalActitudinalPorNivel = DB::table('eval_actitudinales')
-            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->where('activo', true)->whereNull('deleted_at')->whereIn('nivel_id', $todosNivelIds)
             ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
             ->pluck('total', 'nivel_id');
         $inasistenciasPorNivel = DB::table('tipos_inasistencia')
-            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->where('activo', true)->whereNull('deleted_at')->whereIn('nivel_id', $todosNivelIds)
             ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
             ->pluck('total', 'nivel_id');
         $otrasEvalPorNivel = DB::table('tipos_otras_evaluaciones')
-            ->where('activo', true)->whereIn('nivel_id', $todosNivelIds)
+            ->where('activo', true)->whereNull('deleted_at')->whereIn('nivel_id', $todosNivelIds)
             ->select('nivel_id', DB::raw('COUNT(*) as total'))->groupBy('nivel_id')
             ->pluck('total', 'nivel_id');
 
