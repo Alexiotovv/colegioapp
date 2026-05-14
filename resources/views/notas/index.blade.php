@@ -1129,10 +1129,15 @@ $(document).ready(function() {
         btn.html('<span class="loading-spinner me-2"></span> Guardando...');
 
         function enviarGuardado(reintentado) {
+            const saveUrl = `{{ route("admin.notas.save") }}?aula_id=${encodeURIComponent(payload.aula_id || '')}&periodo_id=${encodeURIComponent(payload.periodo_id || '')}`;
             $.ajax({
-                url: '{{ route("admin.notas.save") }}',
+                url: saveUrl,
                 method: 'POST',
                 contentType: 'application/json',
+                headers: {
+                    'X-Aula-Id': payload.aula_id || '',
+                    'X-Periodo-Id': payload.periodo_id || ''
+                },
                 data: JSON.stringify(payload),
                 success: function(response) {
                     if (response.success) {

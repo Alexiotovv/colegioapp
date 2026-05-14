@@ -204,6 +204,31 @@ class NotaController extends Controller
     // Guardar o actualizar notas
     public function saveNotas(Request $request)
     {
+        // Blindaje adicional para clientes con payload truncado o formatos mixtos:
+        // intentar recuperar IDs críticos desde query params, headers o cuerpo JSON crudo.
+        $aulaId = $request->input('aula_id')
+            ?? $request->query('aula_id')
+            ?? $request->header('X-Aula-Id');
+
+        $periodoId = $request->input('periodo_id')
+            ?? $request->query('periodo_id')
+            ?? $request->header('X-Periodo-Id');
+
+        if ((!$aulaId || !$periodoId) && $request->getContent()) {
+            $rawBody = json_decode($request->getContent(), true);
+            if (is_array($rawBody)) {
+                $aulaId = $aulaId ?: ($rawBody['aula_id'] ?? null);
+                $periodoId = $periodoId ?: ($rawBody['periodo_id'] ?? null);
+            }
+        }
+
+        if ($aulaId !== null || $periodoId !== null) {
+            $request->merge([
+                'aula_id' => $aulaId,
+                'periodo_id' => $periodoId,
+            ]);
+        }
+
         $request->validate([
             'notas' => 'required|array',
             'aula_id' => 'required|exists:aulas,id',
