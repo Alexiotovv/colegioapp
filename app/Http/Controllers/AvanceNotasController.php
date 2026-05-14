@@ -81,6 +81,7 @@ class AvanceNotasController extends Controller
         
         $periodoId = $request->periodo_id;
         $aulaId = $request->aula_id;
+        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA, Matricula::ESTADO_RETIRADA];
         $user = auth()->user();
         $esAdmin = $user && $user->isAdmin();
         $docenteId = auth()->id();
@@ -126,9 +127,7 @@ class AvanceNotasController extends Controller
         // Obtener las matrículas del aula
         $matriculas = Matricula::where('aula_id', $aulaId)
             ->with('alumno')
-            ->whereHas('alumno', function($q) {
-                $q->where('estado', 'activo');
-            })
+            ->whereIn('estado', $estadosMatriculaIncluidos)
             ->get();
         
         $matriculaIds = $matriculas->pluck('id');
@@ -314,6 +313,7 @@ class AvanceNotasController extends Controller
         ]);
         
         $periodoId = $request->periodo_id;
+        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA, Matricula::ESTADO_RETIRADA];
         $anioActivo = AnioAcademico::where('activo', true)->first();
         $user = auth()->user();
         $esAdmin = $user && $user->isAdmin();
@@ -362,9 +362,8 @@ class AvanceNotasController extends Controller
         $aulaIds = $aulas->pluck('id');
 
         $estudiantesPorAula = DB::table('matriculas as m')
-            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
             ->whereIn('m.aula_id', $aulaIds)
-            ->where('al.estado', 'activo')
+            ->whereIn('m.estado', $estadosMatriculaIncluidos)
             ->select('m.aula_id', DB::raw('COUNT(m.id) as total_estudiantes'))
             ->groupBy('m.aula_id')
             ->pluck('total_estudiantes', 'm.aula_id');
@@ -393,7 +392,6 @@ class AvanceNotasController extends Controller
 
         $registradasPorCursoAula = DB::table('notas as n')
             ->join('matriculas as m', 'm.id', '=', 'n.matricula_id')
-            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
             ->join('competencias as c', function($join) {
                 $join->on('c.id', '=', 'n.competencia_id')
                     ->where('c.activo', true);
@@ -404,7 +402,7 @@ class AvanceNotasController extends Controller
                     ->whereNull('ch.deleted_at');
             })
             ->whereIn('m.aula_id', $aulaIds)
-            ->where('al.estado', 'activo')
+            ->whereIn('m.estado', $estadosMatriculaIncluidos)
             ->where('n.periodo_id', $periodoId)
             ->where('n.tipo_evaluacion', 'BIMESTRAL')
             ->whereNotNull('n.nota')
@@ -450,8 +448,8 @@ class AvanceNotasController extends Controller
             ->pluck('total', 'nivel_id');
 
         $todosMatriculaIds = DB::table('matriculas as m')
-            ->join('alumnos as al', 'al.id', '=', 'm.alumno_id')
-            ->whereIn('m.aula_id', $aulaIds)->where('al.estado', 'activo')
+            ->whereIn('m.aula_id', $aulaIds)
+            ->whereIn('m.estado', $estadosMatriculaIncluidos)
             ->pluck('m.id');
 
         $registradosCT = $todosMatriculaIds->isNotEmpty()
