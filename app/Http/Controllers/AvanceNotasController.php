@@ -81,7 +81,7 @@ class AvanceNotasController extends Controller
         
         $periodoId = $request->periodo_id;
         $aulaId = $request->aula_id;
-        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA, Matricula::ESTADO_RETIRADA];
+        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA];
         $user = auth()->user();
         $esAdmin = $user && $user->isAdmin();
         $docenteId = auth()->id();
@@ -313,7 +313,7 @@ class AvanceNotasController extends Controller
         ]);
         
         $periodoId = $request->periodo_id;
-        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA, Matricula::ESTADO_RETIRADA];
+        $estadosMatriculaIncluidos = [Matricula::ESTADO_ACTIVA];
         $anioActivo = AnioAcademico::where('activo', true)->first();
         $user = auth()->user();
         $esAdmin = $user && $user->isAdmin();
