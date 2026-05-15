@@ -488,8 +488,14 @@ class ReporteNotasController extends Controller
                 $legendRow++;
             }
 
+            // Evita que las conclusiones descriptivas se ensanchen por textos largos.
             foreach (range(1, $maxCol) as $i) {
-                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+                $esColConclusion = $i >= 6 && (($i - 6) % 2 === 0);
+                if ($esColConclusion) {
+                    $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setWidth(32);
+                } else {
+                    $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+                }
             }
             $sheet->getColumnDimension('B')->setVisible(false);
             $sheet->getColumnDimension('C')->setVisible(false);
