@@ -22,14 +22,29 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class RegistroEvaluacionController extends Controller
 {
+    private function esUsuarioPrivilegiado($user): bool
+    {
+        $rol = strtolower(trim((string) ($user->role->nombre ?? $user->rol ?? '')));
+        return in_array($rol, ['admin', 'director_subdirector'], true);
+    }
+
+    private function esAulaSecundaria(int $aulaId): bool
+    {
+        return Aula::where('id', $aulaId)
+            ->whereHas('grado.nivel', function ($q) {
+                $q->whereRaw('LOWER(nombre) like ?', ['%secundaria%']);
+            })
+            ->exists();
+    }
+
     public function index()
     {
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
         
         // Obtener aulas según el rol
-        if ($rol === 'admin') {
+        if ($esUsuarioPrivilegiado) {
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
                 ->where('activo', true)
                 ->orderBy('nombre')
@@ -37,12 +52,26 @@ class RegistroEvaluacionController extends Controller
         } else {
             $aulas = Aula::with(['grado.nivel', 'seccion', 'anioAcademico'])
                 ->where(function ($q) use ($docenteId) {
-                    $q->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
-                            $q2->where('docente_id', $docenteId)
-                                ->where('estado', CargaHoraria::ESTADO_ACTIVO)
-                                ->whereNull('deleted_at');
+                    // Secundaria: solo aulas donde es tutor.
+                    $q->where(function ($qs) use ($docenteId) {
+                        $qs->where('docente_id', $docenteId)
+                            ->whereHas('grado.nivel', function ($qNivel) {
+                                $qNivel->whereRaw('LOWER(nombre) like ?', ['%secundaria%']);
+                            });
+                    })
+                    // Resto de niveles: mantener lógica actual (tutor o carga activa).
+                    ->orWhere(function ($qo) use ($docenteId) {
+                        $qo->whereHas('grado.nivel', function ($qNivel) {
+                            $qNivel->whereRaw('LOWER(nombre) not like ?', ['%secundaria%']);
+                        })->where(function ($qNiveles) use ($docenteId) {
+                            $qNiveles->where('docente_id', $docenteId)
+                                ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                                    $q2->where('docente_id', $docenteId)
+                                        ->where('estado', CargaHoraria::ESTADO_ACTIVO)
+                                        ->whereNull('deleted_at');
+                                });
                         });
+                    });
                 })
                 ->where('activo', true)
                 ->orderBy('nombre')
@@ -63,32 +92,43 @@ class RegistroEvaluacionController extends Controller
     
     public function getDataForRegistro(Request $request)
     {
-        $aulaId = $request->aula_id;
+        $aulaId = (int) $request->aula_id;
         $periodoId = $request->periodo_id;
         
         $user = auth()->user();
-        $rol = $user->role->nombre ?? $user->rol;
+        $esUsuarioPrivilegiado = $this->esUsuarioPrivilegiado($user);
         $docenteId = auth()->id();
         
         // Verificar permisos
-        if ($rol !== 'admin') {
-            $tieneAcceso = Aula::where('id', $aulaId)
-                ->where(function ($q) use ($docenteId) {
-                    $q->where('docente_id', $docenteId)
-                        ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+        if (!$esUsuarioPrivilegiado) {
+            $aulaEsSecundaria = $this->esAulaSecundaria($aulaId);
+
+            if ($aulaEsSecundaria) {
+                // En secundaria solo puede acceder al aula donde es tutor.
+                $tieneAcceso = Aula::where('id', $aulaId)
+                    ->where('docente_id', $docenteId)
+                    ->where('activo', true)
+                    ->exists();
+            } else {
+                // Para otros niveles, mantener lógica actual (tutor o carga activa).
+                $tieneAcceso = Aula::where('id', $aulaId)
+                    ->where(function ($q) use ($docenteId) {
+                        $q->where('docente_id', $docenteId)
+                            ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
                             $q2->where('docente_id', $docenteId)
                                 ->where('estado', CargaHoraria::ESTADO_ACTIVO)
                                 ->whereNull('deleted_at');
-                        });
-                })
-                ->where('activo', true)
-                ->exists();
-            
+                            });
+                    })
+                    ->where('activo', true)
+                    ->exists();
+            }
+
             if (!$tieneAcceso) {
                 return response()->json(['error' => 'No tienes acceso a este aula'], 403);
             }
         }
-        
+
         // Obtener alumnos matriculados en el aula
         // $matriculas = Matricula::with(['alumno'])
         //     ->where('aula_id', $aulaId)
