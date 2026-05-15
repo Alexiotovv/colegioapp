@@ -57,6 +57,43 @@
         border-radius: 8px;
     }
 
+    .actions-row {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .actions-note {
+        width: 100%;
+    }
+
+    .export-options-row {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding-left: 0;
+    }
+
+    .export-options-row .form-check-label {
+        margin-bottom: 0;
+    }
+
+    .export-options-row .form-check-input {
+        margin-left: 0;
+        margin-top: 0;
+    }
+
+    .export-options-row .form-check-input {
+        float: none;
+        margin-left: 0;
+        margin-top: 0;
+        flex: 0 0 auto;
+    }
+
     /* Select2 styling */
     .select2-container--default .select2-selection--single {
         border-radius: 8px !important;
@@ -207,28 +244,29 @@
                     </select>
                 </div>
 
-                <div class="d-flex flex-column gap-2">
+                <div class="actions-row">
                     <button type="submit" id="btnDescargar" class="btn-descargar">
-                        <i class="fas fa-file-excel me-2"></i> Descargar Excel
+                        <i class="fas fa-file-excel me-2"></i> Descarga Final
                     </button>
                     <button type="button" id="btnDescargarUnificado" class="btn-descargar-unificado">
-                        <i class="fas fa-layer-group me-2"></i> Descargar Unificado Excel
+                        <i class="fas fa-layer-group me-2"></i> Descargar Excel Unificado (Para Apreciaciones)
                     </button>
+                    
                     @if(auth()->user()->isAdmin())
-                        <span class="small-note">Como administrador, puedes descargar reportes de cualquier aula del sistema.</span>
+                        <span class="small-note actions-note">Como administrador, puedes descargar reportes de cualquier aula del sistema.</span>
                     @elseif(auth()->user()->isDirector() || strtolower(trim((string) optional(auth()->user()->role)->nombre)) === 'subdirector')
-                        <span class="small-note">Puedes descargar reportes completos de las aulas que tienes asignadas.</span>
+                        <span class="small-note actions-note">Puedes descargar reportes completos de las aulas que tienes asignadas.</span>
                     @else
-                        <span class="small-note">Solo puedes descargar reportes de las aulas en las que tienes cursos asignados.</span>
+                        <span class="small-note actions-note">Solo puedes descargar reportes de las aulas en las que tienes cursos asignados.</span>
                     @endif
                 </div>
 
                 @if($puedeExportarCompleto ?? false)
-                    <div class="form-check ps-0">
+                    <div class="form-check ps-0 export-options-row">
                         <input class="form-check-input" type="checkbox" id="exportarCompleto" name="exportar_completo" value="1">
                         <label class="form-check-label" for="exportarCompleto">
-                            <strong>Exportar completo</strong>
-                            <small class="d-block text-muted">Incluye: competencias transversales, apreciaciones, evaluación actitudinal y otras evaluaciones (una fila por alumno)</small>
+                            <strong>Incluir otras evaluaciones</strong>
+                            <small class="text-muted">Incluye: competencias transversales, apreciaciones, evaluación actitudinal, evaluación padre, otras evaluaciones, inasistencias y orden de mérito.</small>
                         </label>
                     </div>
                 @endif
@@ -253,6 +291,7 @@
         const aulaSelect = document.getElementById('aula_id');
         const btnDescargar = document.getElementById('btnDescargar');
         const btnDescargarUnificado = document.getElementById('btnDescargarUnificado');
+        const exportarCompletoCheck = document.getElementById('exportarCompleto');
 
         // Inicializar Select2 para el aula
         const select2Instance = $('#aula_id').select2({
@@ -345,6 +384,9 @@
                 periodo_id: periodoSelect.value,
                 aula_id: aulaSelect.value,
             });
+            if (exportarCompletoCheck && exportarCompletoCheck.checked) {
+                params.set('exportar_completo', '1');
+            }
             window.location.href = endpointUnificado + '?' + params.toString();
         });
     })();

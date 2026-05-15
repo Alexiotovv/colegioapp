@@ -8,6 +8,7 @@ use App\Models\Aula;
 use App\Models\CargaHoraria;
 use App\Models\CompetenciaTransversal;
 use App\Models\ConfiguracionInstitucion;
+use App\Models\ConfiguracionLibretaCuadro;
 use App\Models\Evaluacion;
 use App\Models\EvaluacionActitudinal;
 use App\Models\Matricula;
@@ -124,6 +125,7 @@ class ReporteNotasController extends Controller
 
         $institucion = ConfiguracionInstitucion::getConfig();
         $notasGlobales = $this->obtenerNotasGlobales($periodoId, $alumnos, $cargas);
+        $cuadrosHabilitados = ConfiguracionLibretaCuadro::getCuadrosForNivel($aula->nivel_id);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
@@ -132,14 +134,16 @@ class ReporteNotasController extends Controller
         $this->crearHojasPorCurso($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
 
         if ($exportarCompleto) {
-            $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+            $this->crearHojasComplementariasSegunConfig(
+                $spreadsheet,
+                $institucion,
+                $anio,
+                $periodo,
+                $aula,
+                $alumnos,
+                $cuadrosHabilitados
+            );
         }
-
-        // Inasistencias siempre se incluyen en ambos tipos de reporte.
-        $this->crearHojaInasistencias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
-
-        // Se incluye siempre para ambas opciones de descarga del reporte.
-        $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
 
         $nombreArchivo = sprintf(
             'reporte_notas_%s_%s_%s.xlsx',
@@ -543,12 +547,17 @@ class ReporteNotasController extends Controller
             'anio_id'    => ['required', 'exists:anio_academicos,id'],
             'periodo_id' => ['required', 'exists:periodos,id'],
             'aula_id'    => ['required', 'exists:aulas,id'],
+            'exportar_completo' => ['nullable', 'in:0,1'],
         ]);
 
         $user     = auth()->user();
         $anioId   = (int) $request->input('anio_id');
         $periodoId = (int) $request->input('periodo_id');
         $aulaId   = (int) $request->input('aula_id');
+        $exportarCompleto = (bool) $request->input('exportar_completo', false);
+        if ($exportarCompleto && !$this->puedeExportarCompleto($user)) {
+            $exportarCompleto = false;
+        }
 
         $anio    = AnioAcademico::findOrFail($anioId);
         $periodo = Periodo::with('anioAcademico')->findOrFail($periodoId);
@@ -568,15 +577,36 @@ class ReporteNotasController extends Controller
 
         $institucion   = ConfiguracionInstitucion::getConfig();
         $notasGlobales = $this->obtenerNotasGlobales($periodoId, $alumnos, $cargas);
+        $cuadrosHabilitados = ConfiguracionLibretaCuadro::getCuadrosForNivel($aula->nivel_id);
 
         $spreadsheet = new Spreadsheet();
         $spreadsheet->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
 
         $this->crearHojaGeneralidades($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos);
-        $this->crearHojaUnificadaCursos($spreadsheet, $institucion, $anio, $periodo, $aula, $cargas, $alumnos, $notasGlobales);
-        $this->crearHojasComplementarias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
-        $this->crearHojaInasistencias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
-        $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        $this->crearHojaUnificadaCursos(
+            $spreadsheet,
+            $institucion,
+            $anio,
+            $periodo,
+            $aula,
+            $cargas,
+            $alumnos,
+            $notasGlobales,
+            $exportarCompleto,
+            $cuadrosHabilitados
+        );
+
+        if ($exportarCompleto) {
+            $this->crearHojasComplementariasSegunConfig(
+                $spreadsheet,
+                $institucion,
+                $anio,
+                $periodo,
+                $aula,
+                $alumnos,
+                $cuadrosHabilitados
+            );
+        }
 
         $nombreArchivo = sprintf(
             'reporte_unificado_%s_%s_%s.xlsx',
@@ -596,7 +626,18 @@ class ReporteNotasController extends Controller
         ]);
     }
 
-    private function crearHojaUnificadaCursos(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $cargas, Collection $alumnos, Collection $notasGlobales): void
+    private function crearHojaUnificadaCursos(
+        Spreadsheet $spreadsheet,
+        $institucion,
+        AnioAcademico $anio,
+        Periodo $periodo,
+        Aula $aula,
+        Collection $cargas,
+        Collection $alumnos,
+        Collection $notasGlobales,
+        bool $incluirOtrosCuadros,
+        ?array $cuadrosHabilitados
+    ): void
     {
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Todas las Áreas');
@@ -610,7 +651,6 @@ class ReporteNotasController extends Controller
         $epItems  = Evaluacion::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
         $eaItems  = EvaluacionActitudinal::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
         $inaItems = TipoInasistencia::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
-        $oeItems  = TipoOtraEvaluacion::where('activo', true)->where('nivel_id', $nivelId)->whereNull('deleted_at')->orderBy('orden')->get();
 
         // ── Registros complementarios en bloque (evita N+1) ──────────────────
         $regCT  = !empty($matriculaIds) ? RegistroCompetenciaTransversal::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->competencia_transversal_id) : collect();
@@ -618,7 +658,21 @@ class ReporteNotasController extends Controller
         $regEP  = !empty($matriculaIds) ? RegistroEvaluacion::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->evaluacion_id) : collect();
         $regEA  = !empty($matriculaIds) ? RegistroEvaluacionActitudinal::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->eval_actitudinal_id) : collect();
         $regIna = !empty($matriculaIds) ? RegistroAsistencia::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->tipo_inasistencia_id) : collect();
-        $regOE  = !empty($matriculaIds) ? RegistroOtraEvaluacion::whereIn('matricula_id', $matriculaIds)->where('periodo_id', $periodo->id)->get()->keyBy(fn($r) => $r->matricula_id . '_' . $r->tipo_otra_evaluacion_id) : collect();
+        $regComportamiento = !empty($matriculaIds)
+            ? RegistroOtraEvaluacion::with('tipoOtraEvaluacion')
+                ->whereIn('matricula_id', $matriculaIds)
+                ->where('periodo_id', $periodo->id)
+                ->get()
+                ->groupBy('matricula_id')
+                ->map(function (Collection $items) {
+                    $preferido = $items->first(function ($registro) {
+                        $nombre = mb_strtolower((string) ($registro->tipoOtraEvaluacion?->nombre ?? ''), 'UTF-8');
+                        return str_contains($nombre, 'comport');
+                    });
+
+                    return ($preferido ?? $items->first())?->valor ?? '';
+                })
+            : collect();
 
         // ── Estructura de columnas por curso ─────────────────────────────────
         $cursosData = $cargas->map(fn($carga) => [
@@ -629,17 +683,27 @@ class ReporteNotasController extends Controller
 
         $colFixed       = 4; // N°, ID(hidden), Cód, Nombre
         $colCursosStart = $colFixed + 1;
-        $totalCursosCols = $cursosData->sum(fn($d) => max(1, $d['competencias']->count()) * 2);
+        $totalCursosCols = $cursosData->sum(fn($d) => max(1, $d['competencias']->count()));
 
         // ── Secciones complementarias: [label, items, ancho_por_col] ─────────
         $secciones = [];
-        if ($ctItems->isNotEmpty())  $secciones[] = ['label' => 'Comp. Transversales', 'items' => $ctItems,  'key' => 'ct',  'width' => 14];
-        $secciones[]                               = ['label' => 'Apreciación Tutor',   'items' => collect([null]), 'key' => 'apr', 'width' => 30];
-        if ($epItems->isNotEmpty())  $secciones[] = ['label' => 'Evaluación Padre',     'items' => $epItems,  'key' => 'ep',  'width' => 14];
-        if ($eaItems->isNotEmpty())  $secciones[] = ['label' => 'Eval. Actitudinal',    'items' => $eaItems,  'key' => 'ea',  'width' => 14];
-        if ($inaItems->isNotEmpty()) $secciones[] = ['label' => 'Inasistencias',        'items' => $inaItems, 'key' => 'ina', 'width' => 10];
-        if ($oeItems->isNotEmpty())  $secciones[] = ['label' => 'Otras Evaluaciones',   'items' => $oeItems,  'key' => 'oe',  'width' => 14];
-        $secciones[]                               = ['label' => 'Orden de Mérito',     'items' => collect([null]), 'key' => 'om',  'width' => 14];
+        if ($incluirOtrosCuadros && $this->cuadroHabilitado($cuadrosHabilitados, 'competencias_transversales') && $ctItems->isNotEmpty()) {
+            $secciones[] = ['label' => 'Comp. Transversales', 'items' => $ctItems, 'key' => 'ct', 'width' => 14];
+        }
+        if ($incluirOtrosCuadros && $this->cuadroHabilitado($cuadrosHabilitados, 'apreciaciones_tutor')) {
+            $secciones[] = ['label' => 'Apreciación Tutor', 'items' => collect([null]), 'key' => 'apr', 'width' => 30];
+        }
+        if ($incluirOtrosCuadros && $this->cuadroHabilitado($cuadrosHabilitados, 'evaluacion_padre') && $epItems->isNotEmpty()) {
+            $secciones[] = ['label' => 'Evaluación Padre', 'items' => $epItems, 'key' => 'ep', 'width' => 14];
+        }
+        if ($incluirOtrosCuadros && $this->cuadroHabilitado($cuadrosHabilitados, 'evaluaciones_actitudinales') && $eaItems->isNotEmpty()) {
+            $secciones[] = ['label' => 'Eval. Actitudinal', 'items' => $eaItems, 'key' => 'ea', 'width' => 14];
+        }
+        if ($incluirOtrosCuadros && $this->cuadroHabilitado($cuadrosHabilitados, 'inasistencias') && $inaItems->isNotEmpty()) {
+            $secciones[] = ['label' => 'Inasistencias', 'items' => $inaItems, 'key' => 'ina', 'width' => 10];
+        }
+        $secciones[] = ['label' => 'COMPORTAMIENTO', 'items' => collect([null]), 'key' => 'comp', 'width' => 7];
+        $secciones[] = ['label' => 'Orden de Mérito', 'items' => collect([null]), 'key' => 'om', 'width' => 7];
 
         // Calcular el offset de inicio de cada sección
         $offset = $colCursosStart + $totalCursosCols;
@@ -679,7 +743,7 @@ class ReporteNotasController extends Controller
         $col = $colCursosStart;
         foreach ($cursosData as $item) {
             $numComps = max(1, $item['competencias']->count());
-            $spanCols = $numComps * 2;
+            $spanCols = $numComps;
             $cStart   = Coordinate::stringFromColumnIndex($col);
             $cEnd     = Coordinate::stringFromColumnIndex($col + $spanCols - 1);
             if ($spanCols > 1) {
@@ -690,14 +754,11 @@ class ReporteNotasController extends Controller
             foreach ($item['competencias'] as $idx => $comp) {
                 $code    = str_pad((string) ($comp->orden ?: ($idx + 1)), 2, '0', STR_PAD_LEFT);
                 $nlCol   = Coordinate::stringFromColumnIndex($subCol);
-                $concCol = Coordinate::stringFromColumnIndex($subCol + 1);
                 $sheet->setCellValue("{$nlCol}5", $code . ' NL');
-                $sheet->setCellValue("{$concCol}5", $code . ' Conclusión');
-                $subCol += 2;
+                $subCol += 1;
             }
             if ($item['competencias']->isEmpty()) {
                 $sheet->setCellValue("{$cStart}5", 'NL');
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($col + 1) . '5', 'Conclusión');
             }
             $col += $spanCols;
         }
@@ -727,6 +788,8 @@ class ReporteNotasController extends Controller
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setWrapText(true);
+        $sheet->getRowDimension(4)->setRowHeight(95);
+        $sheet->getRowDimension(5)->setRowHeight(22);
 
         // ── Filas de datos ────────────────────────────────────────────────────
         $ordenesMerito = $this->obtenerOrdenMeritoPorMatriculas($alumnos, $periodo->id);
@@ -745,10 +808,9 @@ class ReporteNotasController extends Controller
                 foreach ($item['competencias'] as $comp) {
                     $nota = $notasGlobales[$matricula->id . '_' . $comp->id] ?? null;
                     $sheet->setCellValueExplicit(Coordinate::stringFromColumnIndex($subCol) . $row, $nota?->nota ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheet->setCellValueExplicit(Coordinate::stringFromColumnIndex($subCol + 1) . $row, $nota?->conclusionDescriptiva?->conclusion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $subCol += 2;
+                    $subCol += 1;
                 }
-                $col += $numComps * 2;
+                $col += $numComps;
             }
 
             // Secciones complementarias
@@ -788,12 +850,9 @@ class ReporteNotasController extends Controller
                             $sheet->setCellValue("{$letter}{$row}", $reg?->cantidad ?? 0);
                         }
                         break;
-                    case 'oe':
-                        foreach ($oeItems as $idx => $oeItem) {
-                            $reg = $regOE[$matricula->id . '_' . $oeItem->id] ?? null;
-                            $letter = Coordinate::stringFromColumnIndex($sec['colStart'] + $idx);
-                            $sheet->setCellValueExplicit("{$letter}{$row}", $reg?->valor ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                        }
+                    case 'comp':
+                        $letter = Coordinate::stringFromColumnIndex($sec['colStart']);
+                        $sheet->setCellValueExplicit("{$letter}{$row}", (string) ($regComportamiento[$matricula->id] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                         break;
                     case 'om':
                         $ordenMerito = $ordenesMerito[$matricula->id] ?? null;
@@ -818,10 +877,9 @@ class ReporteNotasController extends Controller
         foreach ($cursosData as $item) {
             $numComps = max(1, $item['competencias']->count());
             for ($i = 0; $i < $numComps; $i++) {
-                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2))->setWidth(6);
-                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i * 2 + 1))->setWidth(22);
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col + $i))->setWidth(6);
             }
-            $col += $numComps * 2;
+            $col += $numComps;
         }
 
         foreach ($secciones as $sec) {
@@ -829,6 +887,49 @@ class ReporteNotasController extends Controller
                 $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($sec['colStart'] + $i))->setWidth($sec['width']);
             }
         }
+    }
+
+    private function crearHojasComplementariasSegunConfig(
+        Spreadsheet $spreadsheet,
+        $institucion,
+        AnioAcademico $anio,
+        Periodo $periodo,
+        Aula $aula,
+        Collection $alumnos,
+        ?array $cuadrosHabilitados
+    ): void {
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'competencias_transversales')) {
+            $this->crearHojaCompetenciasTransversales($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'apreciaciones_tutor')) {
+            $this->crearHojaApreciaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'evaluacion_padre')) {
+            $this->crearHojaEvaluacionPadre($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'evaluaciones_actitudinales')) {
+            $this->crearHojaEvaluacionActitudinal($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'otras_evaluaciones')) {
+            $this->crearHojaOtrasEvaluaciones($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'inasistencias')) {
+            $this->crearHojaInasistencias($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+
+        if ($this->cuadroHabilitado($cuadrosHabilitados, 'orden_merito')) {
+            $this->crearHojaOrdenMerito($spreadsheet, $institucion, $anio, $periodo, $aula, $alumnos);
+        }
+    }
+
+    private function cuadroHabilitado(?array $cuadrosHabilitados, string $clave): bool
+    {
+        return $cuadrosHabilitados === null || in_array($clave, $cuadrosHabilitados, true);
     }
 
     private function crearHojasComplementarias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
