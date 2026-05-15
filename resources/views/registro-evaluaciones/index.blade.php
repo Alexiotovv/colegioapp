@@ -13,18 +13,37 @@
         margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+
+        .filter-card #aula_id,
+        .filter-card #periodo_id {
+            font-size: 0.92rem;
+            min-height: 36px;
+            padding-top: 0.32rem;
+            padding-bottom: 0.32rem;
+        }
     
     .table-container {
         background: white;
         border-radius: 12px;
         padding: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        overflow-x: auto;
+        overflow: hidden;
         position: relative;
     }
 
+    .table-scroll-top {
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: 14px;
+        margin-bottom: 8px;
+    }
+
+    .table-scroll-top-inner {
+        height: 1px;
+    }
+
     .table-evaluaciones {
-        font-size: 13px;
+        font-size: 12px;
         width: 100%;
         border-collapse: collapse;
         min-width: 800px;
@@ -32,7 +51,7 @@
 
     .table-evaluaciones th, 
     .table-evaluaciones td {
-        padding: 10px 8px;
+        padding: 8px 6px;
         vertical-align: middle;
         border: 1px solid #dee2e6;
     }
@@ -43,24 +62,28 @@
     .table-evaluaciones th:first-child {
         position: sticky;
         left: 0;
+        min-width: 55px;
+        width: 55px;
         background-color: white;
-        z-index: 11;
+        z-index: 40;
     }
     .table-evaluaciones th:nth-child(2),
     .table-evaluaciones td:nth-child(2) {
         position: sticky;
-        left: 60px;
-        background-color: white;
-        z-index: 11;
+        left: 55px;
         min-width: 120px;
+        width: 120px;
+        background-color: white;
+        z-index: 40;
     }
     .table-evaluaciones th:nth-child(3),
     .table-evaluaciones td:nth-child(3) {
         position: sticky;
-        left: 180px;
+        left: 175px;
+        min-width: 210px;
+        width: 210px;
         background-color: white;
-        z-index: 11;
-        min-width: 220px;
+        z-index: 40;
     }
 
     .table-evaluaciones td:first-child::after,
@@ -82,18 +105,15 @@
     .table-evaluaciones th:nth-child(2),
     .table-evaluaciones th:nth-child(3) {
         background-color: #f8f9fa;
-        z-index: 12;
-    }
-
-
-    .table-evaluaciones th:first-child {
-        background-color: #f8f9fa;
-        z-index: 12;
+        z-index: 60;
     }
     
     .valoracion-select {
-        width: 90px;
-        padding: 4px 6px;
+        width: 74px;
+        padding: 2px 4px;
+        font-size: 11px;
+        line-height: 1.2;
+        min-height: 23px;
         border-radius: 6px;
         border: 1px solid #ced4da;
         background-color: white;
@@ -146,23 +166,23 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
-    table-evaluaciones th {
+    .table-evaluaciones thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
-        z-index: 10;
+        z-index: 50;
     }
 
     .table-evaluaciones th:first-child {
-        z-index: 13;
+        z-index: 70;
     }
 
     .table-evaluaciones th:nth-child(2) {
-        z-index: 13;
+        z-index: 70;
     }
 
     .table-evaluaciones th:nth-child(3) {
-        z-index: 13;
+        z-index: 70;
     }
 
     .registro-guardado {
@@ -249,9 +269,10 @@
     }
     @media (max-width: 768px) {
         .valoracion-select {
-            width: 90px;
-            font-size: 11px;
-            padding: 3px 4px;
+            width: 70px;
+            font-size: 10px;
+            padding: 2px 3px;
+            min-height: 22px;
         }
         
         .comentario-input {
@@ -284,8 +305,8 @@
     .progress-container {
         background: white;
         border-radius: 12px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
@@ -293,8 +314,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
-        font-size: 12px;
+        margin-bottom: 8px;
+        font-size: 11px;
         color: #555;
     }
 
@@ -310,7 +331,7 @@
     .progress-bar-container {
         background-color: #e9ecef;
         border-radius: 10px;
-        height: 8px;
+        height: 7px;
         overflow: hidden;
     }
 
@@ -325,7 +346,7 @@
     .progress-stats {
         display: flex;
         justify-content: space-between;
-        margin-top: 8px;
+        margin-top: 6px;
         font-size: 10px;
         color: #888;
     }
@@ -350,7 +371,7 @@
     .select-wrapper {
         position: relative;
         display: inline-block;
-        z-index: 20; /* 👈 clave */
+        z-index: 1;
     }
 
     .select-wrapper.modified::after {
@@ -363,7 +384,7 @@
         background: #dc3545;
         border-radius: 50%;
         box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
-        z-index: 30; /* 👈 MÁS alto que la tabla */
+        z-index: 5;
     }
 </style>
 @endsection
@@ -437,16 +458,20 @@
             <i class="fas fa-info-circle me-2"></i>
             <span id="infoPeriodoText"></span>
         </div>
+
+        <div class="table-scroll-top" id="tablaScrollTop" style="display: none;">
+            <div class="table-scroll-top-inner" id="tablaScrollTopInner"></div>
+        </div>
         
         <div class="table-responsive">
             <table class="table table-bordered table-evaluaciones" id="tablaEvaluaciones">
                 <thead id="tablaHeader">
                     <tr>
                         <th style="min-width: 60px;">N°</th>
-                        <th style="min-width: 150px;">Código</th>
-                        <th style="min-width: 250px;">Alumno</th>
+                        <th style="min-width: 120px;">Código</th>
+                        <th style="min-width: 210px;">Alumno</th>
                         <!-- Las evaluaciones se agregarán dinámicamente -->
-                        <th style="min-width: 250px;">Comentario General</th>
+                        <th style="min-width: 210px;">Comentario General</th>
                     </tr>
                 </thead>
                 <tbody id="tablaBody">
@@ -481,6 +506,46 @@ $(document).ready(function() {
     let registrosData = {};
     let registrosHabilitados = false;
     let esAdmin = {{ auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin') ? 'true' : 'false' }};
+    let sincronizandoScroll = false;
+
+    function sincronizarBarraHorizontalSuperior() {
+        const $contenedorInferior = $('#tablaContainer .table-responsive');
+        const $barraSuperior = $('#tablaScrollTop');
+        const $contenidoSuperior = $('#tablaScrollTopInner');
+
+        if ($contenedorInferior.length === 0) {
+            return;
+        }
+
+        const scrollWidth = $contenedorInferior.get(0).scrollWidth;
+        const clientWidth = $contenedorInferior.get(0).clientWidth;
+        $contenidoSuperior.width(scrollWidth);
+
+        if (scrollWidth > clientWidth + 1) {
+            $barraSuperior.show();
+        } else {
+            $barraSuperior.hide();
+            $barraSuperior.scrollLeft(0);
+        }
+    }
+
+    $('#tablaScrollTop').on('scroll', function() {
+        if (sincronizandoScroll) return;
+        sincronizandoScroll = true;
+        $('#tablaContainer .table-responsive').scrollLeft(this.scrollLeft);
+        sincronizandoScroll = false;
+    });
+
+    $('#tablaContainer .table-responsive').on('scroll', function() {
+        if (sincronizandoScroll) return;
+        sincronizandoScroll = true;
+        $('#tablaScrollTop').scrollLeft(this.scrollLeft);
+        sincronizandoScroll = false;
+    });
+
+    $(window).on('resize', function() {
+        sincronizarBarraHorizontalSuperior();
+    });
 
     function getCsrfToken() {
         return $('meta[name="csrf-token"]').attr('content') || '';
@@ -566,12 +631,13 @@ $(document).ready(function() {
         $('#tablaHeader').html(`
             <tr>
                 <th style="min-width: 60px;">N°</th>
-                <th style="min-width: 150px;">Código</th>
-                <th style="min-width: 250px;">Alumno</th>
-                <th style="min-width: 250px;">Comentario General</th>
+                <th style="min-width: 120px;">Código</th>
+                <th style="min-width: 210px;">Alumno</th>
+                <th style="min-width: 210px;">Comentario General</th>
             </tr>
         `);
         $('#tablaContainer').hide();
+        $('#tablaScrollTop').hide();
         $('#infoPeriodo').hide();
         progressBar.hide();
         actualizarEstadoBotonGuardar();
@@ -615,6 +681,7 @@ $(document).ready(function() {
                 $('#infoPeriodo').show();
 
                 renderTabla();
+                sincronizarBarraHorizontalSuperior();
                 progressBar.show().update();
                 $('#tablaContainer').show();
             },
@@ -699,8 +766,8 @@ $(document).ready(function() {
         let headerHtml = `
             <tr>
                 <th style="min-width: 60px;">N°</th>
-                <th style="min-width: 150px;">Código</th>
-                <th style="min-width: 250px;">Alumno</th>
+                <th style="min-width: 120px;">Código</th>
+                <th style="min-width: 210px;">Alumno</th>
         `;
         
         for (let evaluacion of evaluacionesData) {
@@ -732,7 +799,7 @@ $(document).ready(function() {
                 bodyHtml += `
                     <td style="text-align: center;">
                         <div class="select-wrapper">
-                            <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 110px; margin: 0 auto;">
+                            <select class="form-select valoracion-select" data-matricula="${matricula.id}" data-evaluacion="${evaluacion.id}" ${!registrosHabilitados ? 'disabled' : ''} style="width: 74px; margin: 0 auto;">
                                 <option value="">Seleccionar</option>
                                 ${Object.keys(valoraciones).map(key => `<option value="${key}" ${valoracionValue === key ? 'selected' : ''}>${valoraciones[key]}</option>`).join('')}
                             </select>
@@ -789,6 +856,7 @@ $(document).ready(function() {
         
         // Actualizar estado del botón Guardar según los datos
         actualizarEstadoBotonGuardar();
+        sincronizarBarraHorizontalSuperior();
     }
     
     function guardarTodasLasEvaluaciones() {
