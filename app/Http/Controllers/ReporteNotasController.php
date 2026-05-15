@@ -1023,21 +1023,29 @@ class ReporteNotasController extends Controller
 
     private function crearHojaEvaluacionPadre(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
     {
+        $evaluaciones = Evaluacion::where('nivel_id', $aula->nivel_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+
+        $totalCols = 3 + $evaluaciones->count();
+        $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
+
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Evaluación Padre');
         $sheet->setShowGridLines(false);
 
-        $sheet->mergeCells('A1:D1');
+        $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A2:D2');
+        $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'EVALUACIÓN AL PADRE DE FAMILIA');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A3:D3');
+        $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->setCellValue('A3', sprintf(
             'Año: %s | Periodo: %s | Aula: %s',
             $anio->anio,
@@ -1049,29 +1057,51 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('A4', 'N°');
         $sheet->setCellValue('B4', 'Cód. Estudiante');
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
-        $sheet->setCellValue('D4', 'Evaluación Padre de Familia');
-        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        foreach ($evaluaciones as $i => $ev) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->setCellValue("{$col}4", $ev->nombre);
+            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+        }
+
+        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+
+        // Bulk load registros
+        $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
+        $registros = RegistroEvaluacion::whereIn('matricula_id', $matriculaIds)
+            ->where('periodo_id', $periodo->id)
+            ->get()
+            ->groupBy('matricula_id');
 
         $row = 5;
         foreach ($alumnos as $index => $matricula) {
-            $alumno = $matricula->alumno;
-            $evaluaciones = $this->obtenerEvaluacionPadreAlumno($matricula->id, $periodo->id);
-            $texto = implode("\n", $evaluaciones);
+            $alumno     = $matricula->alumno;
+            $regsAlumno = $registros->get($matricula->id, collect())->keyBy('evaluacion_id');
 
             $sheet->setCellValue("A{$row}", $index + 1);
             $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
-            $sheet->setCellValue("D{$row}", $texto);
-            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+
+            foreach ($evaluaciones as $i => $ev) {
+                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $reg = $regsAlumno->get($ev->id);
+                $valor = $reg ? (RegistroEvaluacion::VALORACIONES[$reg->valoracion] ?? $reg->valoracion ?? '—') : '—';
+                $sheet->setCellValue("{$col}{$row}", $valor);
+                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+
             $row++;
         }
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setVisible(false);
-        $sheet->getColumnDimension('C')->setAutoSize(true);
-        $sheet->getColumnDimension('D')->setWidth(40);
-        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('C')->setWidth(30);
+
+        foreach ($evaluaciones as $i => $ev) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->getColumnDimension($col)->setWidth(20);
+        }
     }
 
     private function obtenerOtrasEvaluacionesAlumno(int $matriculaId, int $periodoId): array
@@ -1090,21 +1120,29 @@ class ReporteNotasController extends Controller
 
     private function crearHojaCompetenciasTransversales(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
     {
+        $competencias = CompetenciaTransversal::where('nivel_id', $aula->nivel_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+
+        $totalCols = 3 + $competencias->count();
+        $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
+
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Competencias Transversales');
         $sheet->setShowGridLines(false);
 
-        $sheet->mergeCells('A1:D1');
+        $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A2:D2');
+        $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'COMPETENCIAS TRANSVERSALES');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A3:D3');
+        $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->setCellValue('A3', sprintf(
             'Año: %s | Periodo: %s | Aula: %s',
             $anio->anio,
@@ -1116,29 +1154,50 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('A4', 'N°');
         $sheet->setCellValue('B4', 'Cód. Estudiante');
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
-        $sheet->setCellValue('D4', 'Competencias Transversales');
-        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        foreach ($competencias as $i => $ct) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->setCellValue("{$col}4", $ct->nombre);
+            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+        }
+
+        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+
+        // Bulk load registros
+        $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
+        $registros = RegistroCompetenciaTransversal::whereIn('matricula_id', $matriculaIds)
+            ->where('periodo_id', $periodo->id)
+            ->get()
+            ->groupBy('matricula_id');
 
         $row = 5;
         foreach ($alumnos as $index => $matricula) {
-            $alumno = $matricula->alumno;
-            $competencias = $this->obtenerCompetenciasTransversalesAlumno($matricula->id, $periodo->id);
-            $texto = implode("\n", $competencias);
-            
+            $alumno     = $matricula->alumno;
+            $regsAlumno = $registros->get($matricula->id, collect())->keyBy('competencia_transversal_id');
+
             $sheet->setCellValue("A{$row}", $index + 1);
             $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
-            $sheet->setCellValue("D{$row}", $texto);
-            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+
+            foreach ($competencias as $i => $ct) {
+                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $reg = $regsAlumno->get($ct->id);
+                $sheet->setCellValue("{$col}{$row}", $reg?->nota ?? '—');
+                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+
             $row++;
         }
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setVisible(false);
-        $sheet->getColumnDimension('C')->setAutoSize(true);
-        $sheet->getColumnDimension('D')->setWidth(40);
-        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('C')->setWidth(30);
+
+        foreach ($competencias as $i => $ct) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->getColumnDimension($col)->setWidth(18);
+        }
     }
 
     private function crearHojaApreciaciones(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
@@ -1248,21 +1307,33 @@ class ReporteNotasController extends Controller
 
     private function crearHojaOtrasEvaluaciones(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
     {
+        $tipos = TipoOtraEvaluacion::where('nivel_id', $aula->nivel_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+
+        $totalCols = 3 + $tipos->count();
+        $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
+
+        $tituloHoja = $tipos->isNotEmpty()
+            ? $this->sanitizarTituloHoja($tipos->first()->nombre)
+            : 'Otras Evaluaciones';
+
         $sheet = $spreadsheet->createSheet();
-        $sheet->setTitle('Otras Evaluaciones');
+        $sheet->setTitle($tituloHoja);
         $sheet->setShowGridLines(false);
 
-        $sheet->mergeCells('A1:D1');
+        $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A2:D2');
+        $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'OTRAS EVALUACIONES');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A3:D3');
+        $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->setCellValue('A3', sprintf(
             'Año: %s | Periodo: %s | Aula: %s',
             $anio->anio,
@@ -1274,48 +1345,77 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('A4', 'N°');
         $sheet->setCellValue('B4', 'Cód. Estudiante');
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
-        $sheet->setCellValue('D4', 'Evaluaciones');
-        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        foreach ($tipos as $i => $tipo) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->setCellValue("{$col}4", $tipo->nombre);
+            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+        }
+
+        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+
+        // Bulk load registros
+        $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
+        $registros = RegistroOtraEvaluacion::whereIn('matricula_id', $matriculaIds)
+            ->where('periodo_id', $periodo->id)
+            ->get()
+            ->groupBy('matricula_id');
 
         $row = 5;
         foreach ($alumnos as $index => $matricula) {
-            $alumno = $matricula->alumno;
-            $evaluaciones = $this->obtenerOtrasEvaluacionesAlumno($matricula->id, $periodo->id);
-            $texto = implode("\n", $evaluaciones);
-            
+            $alumno     = $matricula->alumno;
+            $regsAlumno = $registros->get($matricula->id, collect())->keyBy('tipo_otra_evaluacion_id');
+
             $sheet->setCellValue("A{$row}", $index + 1);
             $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
-            $sheet->setCellValue("D{$row}", $texto);
-            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+
+            foreach ($tipos as $i => $tipo) {
+                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $reg = $regsAlumno->get($tipo->id);
+                $sheet->setCellValue("{$col}{$row}", $reg?->valor ?? '—');
+                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+
             $row++;
         }
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setVisible(false);
-        $sheet->getColumnDimension('C')->setAutoSize(true);
-        $sheet->getColumnDimension('D')->setWidth(40);
-        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('C')->setWidth(30);
+
+        foreach ($tipos as $i => $tipo) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->getColumnDimension($col)->setWidth(18);
+        }
     }
 
     private function crearHojaInasistencias(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
     {
+        $tipos = TipoInasistencia::where('nivel_id', $aula->nivel_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+
+        $totalCols = 3 + $tipos->count();
+        $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
+
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Inasistencias');
         $sheet->setShowGridLines(false);
 
-        $sheet->mergeCells('A1:D1');
+        $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A2:D2');
+        $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'INASISTENCIAS');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A3:D3');
+        $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->setCellValue('A3', sprintf(
             'Año: %s | Periodo: %s | Aula: %s',
             $anio->anio,
@@ -1327,29 +1427,51 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('A4', 'N°');
         $sheet->setCellValue('B4', 'Cód. Estudiante');
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
-        $sheet->setCellValue('D4', 'Inasistencias');
-        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        foreach ($tipos as $i => $tipo) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->setCellValue("{$col}4", $tipo->nombre);
+            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+        }
+
+        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+
+        // Bulk load registros
+        $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
+        $registros = RegistroAsistencia::whereIn('matricula_id', $matriculaIds)
+            ->where('periodo_id', $periodo->id)
+            ->whereNotNull('cantidad')
+            ->get()
+            ->groupBy('matricula_id');
 
         $row = 5;
         foreach ($alumnos as $index => $matricula) {
-            $alumno = $matricula->alumno;
-            $inasistencias = $this->obtenerInasistenciasAlumno($matricula->id, $periodo->id);
-            $texto = implode("\n", $inasistencias);
+            $alumno     = $matricula->alumno;
+            $regsAlumno = $registros->get($matricula->id, collect())->keyBy('tipo_inasistencia_id');
 
             $sheet->setCellValue("A{$row}", $index + 1);
             $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
-            $sheet->setCellValue("D{$row}", $texto);
-            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+
+            foreach ($tipos as $i => $tipo) {
+                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $reg = $regsAlumno->get($tipo->id);
+                $sheet->setCellValue("{$col}{$row}", $reg?->cantidad ?? 0);
+                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+
             $row++;
         }
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setVisible(false);
-        $sheet->getColumnDimension('C')->setAutoSize(true);
-        $sheet->getColumnDimension('D')->setWidth(40);
-        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('C')->setWidth(30);
+
+        foreach ($tipos as $i => $tipo) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->getColumnDimension($col)->setWidth(18);
+        }
     }
 
     private function crearHojaOrdenMerito(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
