@@ -1254,21 +1254,29 @@ class ReporteNotasController extends Controller
 
     private function crearHojaEvaluacionActitudinal(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
     {
+        $evaluaciones = EvaluacionActitudinal::where('nivel_id', $aula->nivel_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+
+        $totalCols = 3 + $evaluaciones->count();
+        $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
+
         $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Evaluación Actitudinal');
         $sheet->setShowGridLines(false);
 
-        $sheet->mergeCells('A1:D1');
+        $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->setCellValue('A1', strtoupper($institucion->nombre ?? 'INSTITUCIÓN EDUCATIVA'));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A2:D2');
+        $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->setCellValue('A2', 'EVALUACIÓN ACTITUDINAL');
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A3:D3');
+        $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->setCellValue('A3', sprintf(
             'Año: %s | Periodo: %s | Aula: %s',
             $anio->anio,
@@ -1280,29 +1288,50 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('A4', 'N°');
         $sheet->setCellValue('B4', 'Cód. Estudiante');
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
-        $sheet->setCellValue('D4', 'Conducta');
-        $sheet->getStyle('A4:D4')->applyFromArray($this->headerStyle('#065f46'));
+
+        foreach ($evaluaciones as $i => $evaluacion) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->setCellValue("{$col}4", $evaluacion->nombre);
+            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+        }
+
+        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+
+        $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
+        $registros = RegistroEvaluacionActitudinal::whereIn('matricula_id', $matriculaIds)
+            ->where('periodo_id', $periodo->id)
+            ->get()
+            ->groupBy('matricula_id');
 
         $row = 5;
         foreach ($alumnos as $index => $matricula) {
             $alumno = $matricula->alumno;
-            $evaluaciones = $this->obtenerEvaluacionActitudinalAlumno($matricula->id, $periodo->id);
-            $texto = implode("\n", $evaluaciones);
-            
+            $regsAlumno = $registros->get($matricula->id, collect())->keyBy('eval_actitudinal_id');
+
             $sheet->setCellValue("A{$row}", $index + 1);
             $sheet->setCellValue("B{$row}", $alumno?->codigo_estudiante ?? $alumno?->dni ?? '');
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
-            $sheet->setCellValue("D{$row}", $texto);
-            $sheet->getStyle("D{$row}")->getAlignment()->setWrapText(true);
+
+            foreach ($evaluaciones as $i => $evaluacion) {
+                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $reg = $regsAlumno->get($evaluacion->id);
+                $valor = $reg ? (RegistroEvaluacionActitudinal::VALORACIONES[$reg->valoracion] ?? $reg->valoracion ?? '—') : '—';
+                $sheet->setCellValue("{$col}{$row}", $valor);
+                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+
             $row++;
         }
 
         $sheet->getColumnDimension('A')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setAutoSize(true);
         $sheet->getColumnDimension('B')->setVisible(false);
-        $sheet->getColumnDimension('C')->setAutoSize(true);
-        $sheet->getColumnDimension('D')->setWidth(40);
-        $sheet->getStyle('D4:D' . ($row - 1))->getAlignment()->setWrapText(true);
+        $sheet->getColumnDimension('C')->setWidth(30);
+
+        foreach ($evaluaciones as $i => $evaluacion) {
+            $col = Coordinate::stringFromColumnIndex(4 + $i);
+            $sheet->getColumnDimension($col)->setWidth(20);
+        }
     }
 
     private function crearHojaOtrasEvaluaciones(Spreadsheet $spreadsheet, $institucion, AnioAcademico $anio, Periodo $periodo, Aula $aula, Collection $alumnos): void
