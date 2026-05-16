@@ -991,7 +991,7 @@ $(document).ready(function() {
         }
 
         let ruleActivePrimaria = requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(valor);
-        let ruleActiveSecundaria = requiereConclusionBSecundaria && aulaEsSecundaria && valor === 'B';
+        let ruleActiveSecundaria = requiereConclusionBSecundaria && aulaEsSecundaria && valor === 'C';
         let tieneConclusion = btnMensaje.data('tiene-conclusion') === 1 || btnMensaje.data('tiene-conclusion') === '1';
 
         if (tieneConclusion) {
@@ -999,7 +999,7 @@ $(document).ready(function() {
         } else if (ruleActivePrimaria || ruleActiveSecundaria) {
             let mensaje = ruleActivePrimaria
                 ? 'Las notas B/C en Primaria requieren una conclusión descriptiva. Abra el icono de comentario para registrarla.'
-                : 'La nota B en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
+                : 'La nota C en Secundaria requiere una conclusión descriptiva. Abra el icono de comentario para registrarla.';
             // Swal.fire('Atención', mensaje, 'info');
             btnMensaje.find('i').css('color', '#dc3545');
         } else {

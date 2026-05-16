@@ -357,12 +357,12 @@ class RegistroCompetenciaTransversalController extends Controller
                     }
                 }
 
-                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'B') {
+                if ($requiereConclusionBSecundaria && $esSecundaria && $notaValor === 'C') {
                     if (! $tieneConclusion && ! $existingConclusion) {
                         DB::rollBack();
                         return response()->json([
                             'success' => false,
-                            'message' => 'La nota B en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión antes de guardar.'
+                            'message' => 'La nota C en aulas de Secundaria requiere una conclusión descriptiva. Por favor registre la conclusión antes de guardar.'
                         ], 422);
                     }
                 }
