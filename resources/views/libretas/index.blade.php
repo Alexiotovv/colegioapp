@@ -306,6 +306,11 @@ $(document).ready(function() {
         let periodoId = $(this).data('periodo-id');
         let soloPagosAlDia = $('#soloPagosAlDia').is(':checked');
         let mesLimite = $('#mesLimite').val();
+
+        if (soloPagosAlDia && !mesLimite) {
+            Swal.fire('Atención', 'Selecciona el mes límite para aplicar el filtro de pagos al día.', 'warning');
+            return;
+        }
         
         let url = '/admin/libretas/previsualizar-aula?aula_id=' + aulaId + '&periodo_id=' + periodoId;
         

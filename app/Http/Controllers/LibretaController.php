@@ -189,10 +189,15 @@ class LibretaController extends Controller
             ->orderBy('alumnos.apellido_materno', 'ASC')
             ->orderBy('alumnos.nombres', 'ASC')
             ->get();
+
+        $periodo = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $anioEmision = $aula->anioAcademico->anio
+            ?? ($periodo->anioAcademico->anio ?? null)
+            ?? now()->year;
         
         // Filtrar por pagos al día si está habilitado
         if ($soloPagosAlDia && $mesLimite) {
-            $matriculas = $this->filtrarPorPagosAlDia($matriculas, $mesLimite);
+            $matriculas = $this->filtrarPorPagosAlDia($matriculas, $mesLimite, (int) $anioEmision);
         }
         
         $configInstitucion = ConfiguracionInstitucion::getConfig();
@@ -205,7 +210,7 @@ class LibretaController extends Controller
      * Filtra las matrículas según los pagos al día en la tabla pagos_importados
      * Valida doc_facturacion_dni vs dni_est
      */
-    private function filtrarPorPagosAlDia($matriculas, $mesLimite)
+    private function filtrarPorPagosAlDia($matriculas, $mesLimite, int $anioEmision)
     {
         $mesesOrdenados = ['marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
         $mesIndex = array_search($mesLimite, $mesesOrdenados);
@@ -217,48 +222,58 @@ class LibretaController extends Controller
         $mesesRequeridos = array_slice($mesesOrdenados, 0, $mesIndex + 1);
         
         // Obtener todos los pagos importados de una vez
-        $pagosImportados = PagoImportado::where('anio_emision', 2026)->get();
+        $pagosImportados = PagoImportado::where('anio_emision', $anioEmision)->get();
         
-        // Crear un mapa de DNI => pagos para búsqueda rápida
+        // Crear un mapa de DNI => lista de pagos para búsqueda rápida
         $pagosMap = [];
         foreach ($pagosImportados as $pago) {
-            $dniPago = null;
+            $dniPago = '';
             
             // Validar doc_facturacion_dni
-            if (strlen($pago->doc_facturacion_dni) > 8) {
+            if (strlen((string) $pago->doc_facturacion_dni) > 8) {
                 // Si supera 8 caracteres, obtener dni_est
-                $dniPago = $pago->dni_est;
+                $dniPago = preg_replace('/\D+/', '', (string) $pago->dni_est);
             } else {
                 // Si no, usar doc_facturacion_dni
-                $dniPago = $pago->doc_facturacion_dni;
+                $dniPago = preg_replace('/\D+/', '', (string) $pago->doc_facturacion_dni);
             }
             
             if ($dniPago) {
-                // Convertir a string para asegurar consistencia
-                $pagosMap[(string) $dniPago] = $pago;
+                $pagosMap[(string) $dniPago][] = $pago;
             }
         }
         
         // Filtrar las matrículas
         return $matriculas->filter(function ($matricula) use ($mesesRequeridos, $pagosMap) {
-            $dni = (string) $matricula->alumno->dni;
+            $dni = preg_replace('/\D+/', '', (string) ($matricula->alumno->dni ?? ''));
+
+            if ($dni === '') {
+                return false;
+            }
             
             // Buscar si existe un pago para este DNI
             if (!isset($pagosMap[$dni])) {
                 return false;
             }
-            
-            $pago = $pagosMap[$dni];
-            
-            // Verificar si el alumno tiene pagos hasta el mes límite
-            foreach ($mesesRequeridos as $mes) {
-                $monto = (float) ($pago->{$mes} ?? 0);
-                if ($monto <= 0) {
-                    return false;
+
+            foreach ($pagosMap[$dni] as $pago) {
+                $cumpleMeses = true;
+
+                // Verificar si el alumno tiene pagos hasta el mes límite
+                foreach ($mesesRequeridos as $mes) {
+                    $monto = (float) ($pago->{$mes} ?? 0);
+                    if ($monto <= 0) {
+                        $cumpleMeses = false;
+                        break;
+                    }
+                }
+
+                if ($cumpleMeses) {
+                    return true;
                 }
             }
-            
-            return true;
+
+            return false;
         })->values();
     }
 }
