@@ -126,7 +126,7 @@
         const previewContent = document.getElementById('preview-content');
         const celdasEditor = document.getElementById('celdas-editor');
         const initialCeldas = @json(isset($cuadro) && isset($cuadro->opciones['celdas']) ? $cuadro->opciones['celdas'] : []);
-        let currentCeldas = Array.isArray(initialCeldas) ? JSON.parse(JSON.stringify(initialCeldas)) : [];
+        let currentCeldas = [];
 
         function escapeHtml(unsafe) {
             return String(unsafe)
@@ -221,12 +221,12 @@
             const columnas = parseInt((document.querySelector('input[name="columnas_count"]') || { value: 3 }).value, 10) || 3;
             const filas = parseInt((document.querySelector('input[name="filas_count"]') || { value: 4 }).value, 10) || 0;
 
-            if (currentCeldas.length === 0 && initialCeldas.length > 0) {
-                currentCeldas = JSON.parse(JSON.stringify(initialCeldas));
-            } else {
+            const existingInputs = celdasEditor.querySelector('input[name^="celdas["]');
+            if (existingInputs) {
                 snapshotCurrentCeldas();
             }
-            const matrix = ensureMatrixSize(currentCeldas, filas, columnas);
+            const sourceCeldas = currentCeldas.length > 0 ? currentCeldas : (Array.isArray(initialCeldas) ? initialCeldas : []);
+            const matrix = ensureMatrixSize(sourceCeldas, filas, columnas);
             currentCeldas = matrix;
             let html = '<table class="table table-sm" style="width:100%;">';
             html += '<thead><tr><th></th>';
