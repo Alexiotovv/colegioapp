@@ -191,8 +191,20 @@ class Alumno extends Model
     public static function generarCodigoEstudiante(): string
     {
         $year = date('Y');
-        $last = self::whereYear('created_at', $year)->count();
-        $numero = str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+
+        // Buscar el último código del año actual, incluyendo eliminados lógicos,
+        // para mantener secuencia y evitar duplicados por soft delete.
+        $ultimoCodigo = self::withTrashed()
+            ->where('codigo_estudiante', 'like', $year . '%')
+            ->orderByDesc('codigo_estudiante')
+            ->value('codigo_estudiante');
+
+        $ultimoNumero = 0;
+        if ($ultimoCodigo && strlen($ultimoCodigo) > 4) {
+            $ultimoNumero = (int) substr($ultimoCodigo, 4);
+        }
+
+        $numero = str_pad($ultimoNumero + 1, 4, '0', STR_PAD_LEFT);
         return "{$year}{$numero}";
     }
 }

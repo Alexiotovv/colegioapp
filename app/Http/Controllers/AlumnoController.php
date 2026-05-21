@@ -58,7 +58,7 @@ class AlumnoController extends Controller
         ]);
         
         $alumno = Alumno::create([
-            'codigo_estudiante' => $request->codigo_estudiante ?? Alumno::generarCodigoEstudiante(),
+            'codigo_estudiante' => Alumno::generarCodigoEstudiante(),
             'dni' => $request->dni,
             'nombres' => $request->nombres,
             'apellido_paterno' => $request->apellido_paterno,

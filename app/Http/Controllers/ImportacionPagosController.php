@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ImportacionPagosController extends Controller
@@ -188,17 +189,17 @@ class ImportacionPagosController extends Controller
                     'nivel' => $nivel,
                     'grado' => $grado,
                     'seccion' => $seccion,
-                    'marzo' => $this->moneyOnly($sheet->getCell("I{$row}")->getCalculatedValue()),
-                    'abril' => $this->moneyOnly($sheet->getCell("J{$row}")->getCalculatedValue()),
-                    'mayo' => $this->moneyOnly($sheet->getCell("K{$row}")->getCalculatedValue()),
-                    'junio' => $this->moneyOnly($sheet->getCell("L{$row}")->getCalculatedValue()),
-                    'julio' => $this->moneyOnly($sheet->getCell("M{$row}")->getCalculatedValue()),
-                    'agosto' => $this->moneyOnly($sheet->getCell("N{$row}")->getCalculatedValue()),
-                    'setiembre' => $this->moneyOnly($sheet->getCell("O{$row}")->getCalculatedValue()),
-                    'octubre' => $this->moneyOnly($sheet->getCell("P{$row}")->getCalculatedValue()),
-                    'noviembre' => $this->moneyOnly($sheet->getCell("Q{$row}")->getCalculatedValue()),
-                    'diciembre' => $this->moneyOnly($sheet->getCell("R{$row}")->getCalculatedValue()),
-                    'total' => $this->moneyOnly($sheet->getCell("S{$row}")->getCalculatedValue()),
+                    'marzo' => $this->moneyFromCell($sheet, "J{$row}"),
+                    'abril' => $this->moneyFromCell($sheet, "K{$row}"),
+                    'mayo' => $this->moneyFromCell($sheet, "L{$row}"),
+                    'junio' => $this->moneyFromCell($sheet, "M{$row}"),
+                    'julio' => $this->moneyFromCell($sheet, "N{$row}"),
+                    'agosto' => $this->moneyFromCell($sheet, "O{$row}"),
+                    'setiembre' => $this->moneyFromCell($sheet, "P{$row}"),
+                    'octubre' => $this->moneyFromCell($sheet, "Q{$row}"),
+                    'noviembre' => $this->moneyFromCell($sheet, "R{$row}"),
+                    'diciembre' => $this->moneyFromCell($sheet, "S{$row}"),
+                    'total' => $this->moneyFromCell($sheet, "T{$row}"),
                 ];
 
                 PagoImportado::create($rowData);
@@ -259,17 +260,54 @@ class ImportacionPagosController extends Controller
         return $matches[1] ?? null;
     }
 
-    private function moneyOnly($value): ?string
+    private function moneyFromCell(Worksheet $sheet, string $cellRef): ?string
+    {
+        $cell = $sheet->getCell($cellRef);
+        $rawValue = $cell->getValue();
+
+        if ($rawValue instanceof RichText) {
+            $rawValue = $rawValue->getPlainText();
+        }
+
+        return $this->moneyOnly(
+            $cell->getCalculatedValue(),
+            $cell->getFormattedValue(),
+            $rawValue
+        );
+    }
+
+    private function moneyOnly($value, $formattedValue = null, $rawValue = null): ?string
     {
         $value = trim((string) $value);
-        if ($value === '') {
+        $formattedValue = trim((string) ($formattedValue ?? ''));
+        $rawValue = trim((string) ($rawValue ?? ''));
+
+        if ($this->containsDebe($value) || $this->containsDebe($formattedValue) || $this->containsDebe($rawValue)) {
             return null;
         }
 
-        $value = str_replace(['S/', 's/', ' '], '', $value);
-        $value = str_replace(',', '', $value);
+        $candidate = $value !== '' ? $value : ($formattedValue !== '' ? $formattedValue : $rawValue);
 
-        return is_numeric($value) ? number_format((float) $value, 2, '.', '') : null;
+        if ($candidate === '') {
+            return null;
+        }
+
+        $candidate = str_replace(['S/', 's/', ' '], '', $candidate);
+        $candidate = str_replace(',', '', $candidate);
+
+        // If any alphabetic text remains (e.g. "(DEBE)"), treat as unpaid and do not import amount.
+        if (preg_match('/[[:alpha:]]/u', $candidate) === 1) {
+            return null;
+        }
+
+        $candidate = str_replace(['(', ')'], '', $candidate);
+
+        return is_numeric($candidate) ? number_format((float) $candidate, 2, '.', '') : null;
+    }
+
+    private function containsDebe(string $value): bool
+    {
+        return stripos($value, 'debe') !== false;
     }
 
     private function normalizeString($value): string

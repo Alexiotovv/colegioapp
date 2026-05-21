@@ -213,13 +213,11 @@ class LibretaController extends Controller
     private function filtrarPorPagosAlDia($matriculas, $mesLimite, int $anioEmision)
     {
         $mesesOrdenados = ['marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
-        $mesIndex = array_search($mesLimite, $mesesOrdenados);
+        $mesSeleccionado = strtolower((string) $mesLimite);
         
-        if ($mesIndex === false) {
+        if (!in_array($mesSeleccionado, $mesesOrdenados, true)) {
             return $matriculas;
         }
-        
-        $mesesRequeridos = array_slice($mesesOrdenados, 0, $mesIndex + 1);
         
         // Obtener todos los pagos importados de una vez
         $pagosImportados = PagoImportado::where('anio_emision', $anioEmision)->get();
@@ -244,7 +242,7 @@ class LibretaController extends Controller
         }
         
         // Filtrar las matrículas
-        return $matriculas->filter(function ($matricula) use ($mesesRequeridos, $pagosMap) {
+        return $matriculas->filter(function ($matricula) use ($mesSeleccionado, $pagosMap) {
             $dni = preg_replace('/\D+/', '', (string) ($matricula->alumno->dni ?? ''));
 
             if ($dni === '') {
@@ -257,18 +255,9 @@ class LibretaController extends Controller
             }
 
             foreach ($pagosMap[$dni] as $pago) {
-                $cumpleMeses = true;
-
-                // Verificar si el alumno tiene pagos hasta el mes límite
-                foreach ($mesesRequeridos as $mes) {
-                    $monto = (float) ($pago->{$mes} ?? 0);
-                    if ($monto <= 0) {
-                        $cumpleMeses = false;
-                        break;
-                    }
-                }
-
-                if ($cumpleMeses) {
+                // Validar solo el mes seleccionado.
+                $monto = (float) ($pago->{$mesSeleccionado} ?? 0);
+                if ($monto > 0) {
                     return true;
                 }
             }
