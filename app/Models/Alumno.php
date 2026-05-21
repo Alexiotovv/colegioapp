@@ -127,12 +127,16 @@ class Alumno extends Model
     
     public function scopeSearch($query, $search)
     {
+        $search = trim((string) $search);
+
         return $query->where(function($q) use ($search) {
             $q->where('nombres', 'LIKE', "%{$search}%")
               ->orWhere('apellido_paterno', 'LIKE', "%{$search}%")
               ->orWhere('apellido_materno', 'LIKE', "%{$search}%")
               ->orWhere('dni', 'LIKE', "%{$search}%")
-              ->orWhere('codigo_estudiante', 'LIKE', "%{$search}%");
+              ->orWhere('codigo_estudiante', 'LIKE', "%{$search}%")
+              ->orWhereRaw("CONCAT(apellido_paterno, ' ', apellido_materno) LIKE ?", ["%{$search}%"])
+              ->orWhereRaw("CONCAT(apellido_paterno, ' ', apellido_materno, ' ', nombres) LIKE ?", ["%{$search}%"]);
         });
     }
     
