@@ -316,6 +316,20 @@
             page-break-inside: avoid;
             break-inside: avoid;
         }
+
+        .cuadro-transversales-no-split {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .cuadro-transversales-no-split thead,
+        .cuadro-transversales-no-split tbody,
+        .cuadro-transversales-no-split tr,
+        .cuadro-transversales-no-split td,
+        .cuadro-transversales-no-split th {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
         
         .libreta-content {
             page-break-after: always;

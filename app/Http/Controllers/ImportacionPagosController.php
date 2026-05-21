@@ -6,6 +6,7 @@ use App\Models\PagoImportado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -164,6 +165,7 @@ class ImportacionPagosController extends Controller
         DB::transaction(function () use ($sheet, $highestRow, $anioEmision, &$importados, &$eliminados) {
             // Reemplazo total por anio: elimina y vuelve a cargar el Excel actualizado.
             $eliminados = PagoImportado::where('anio_emision', $anioEmision)->delete();
+            $columnasMeses = $this->detectarColumnasMeses($sheet);
 
             for ($row = 5; $row <= $highestRow; $row++) {
                 $numeroFila = $this->normalizeString($sheet->getCell("A{$row}")->getCalculatedValue());
@@ -189,17 +191,17 @@ class ImportacionPagosController extends Controller
                     'nivel' => $nivel,
                     'grado' => $grado,
                     'seccion' => $seccion,
-                    'marzo' => $this->moneyFromCell($sheet, "J{$row}"),
-                    'abril' => $this->moneyFromCell($sheet, "K{$row}"),
-                    'mayo' => $this->moneyFromCell($sheet, "L{$row}"),
-                    'junio' => $this->moneyFromCell($sheet, "M{$row}"),
-                    'julio' => $this->moneyFromCell($sheet, "N{$row}"),
-                    'agosto' => $this->moneyFromCell($sheet, "O{$row}"),
-                    'setiembre' => $this->moneyFromCell($sheet, "P{$row}"),
-                    'octubre' => $this->moneyFromCell($sheet, "Q{$row}"),
-                    'noviembre' => $this->moneyFromCell($sheet, "R{$row}"),
-                    'diciembre' => $this->moneyFromCell($sheet, "S{$row}"),
-                    'total' => $this->moneyFromCell($sheet, "T{$row}"),
+                    'marzo' => $this->moneyByKey($sheet, $columnasMeses, 'marzo', $row),
+                    'abril' => $this->moneyByKey($sheet, $columnasMeses, 'abril', $row),
+                    'mayo' => $this->moneyByKey($sheet, $columnasMeses, 'mayo', $row),
+                    'junio' => $this->moneyByKey($sheet, $columnasMeses, 'junio', $row),
+                    'julio' => $this->moneyByKey($sheet, $columnasMeses, 'julio', $row),
+                    'agosto' => $this->moneyByKey($sheet, $columnasMeses, 'agosto', $row),
+                    'setiembre' => $this->moneyByKey($sheet, $columnasMeses, 'setiembre', $row),
+                    'octubre' => $this->moneyByKey($sheet, $columnasMeses, 'octubre', $row),
+                    'noviembre' => $this->moneyByKey($sheet, $columnasMeses, 'noviembre', $row),
+                    'diciembre' => $this->moneyByKey($sheet, $columnasMeses, 'diciembre', $row),
+                    'total' => $this->moneyByKey($sheet, $columnasMeses, 'total', $row),
                 ];
 
                 PagoImportado::create($rowData);
@@ -258,6 +260,83 @@ class ImportacionPagosController extends Controller
         preg_match('/(\d+)/', $value, $matches);
 
         return $matches[1] ?? null;
+    }
+
+    private function detectarColumnasMeses(Worksheet $sheet): array
+    {
+        $map = [
+            'marzo' => null,
+            'abril' => null,
+            'mayo' => null,
+            'junio' => null,
+            'julio' => null,
+            'agosto' => null,
+            'setiembre' => null,
+            'octubre' => null,
+            'noviembre' => null,
+            'diciembre' => null,
+            'total' => null,
+        ];
+
+        $headerRow = 4;
+        $highestColumn = $sheet->getHighestColumn($headerRow);
+        $highestIndex = Coordinate::columnIndexFromString($highestColumn);
+
+        for ($i = 1; $i <= $highestIndex; $i++) {
+            $col = Coordinate::stringFromColumnIndex($i);
+            $texto = $this->normalizeHeader((string) $sheet->getCell("{$col}{$headerRow}")->getCalculatedValue());
+
+            if ($texto === '') {
+                continue;
+            }
+
+            foreach (array_keys($map) as $key) {
+                if ($texto === $key || str_contains($texto, $key)) {
+                    $map[$key] = $col;
+                }
+            }
+        }
+
+        // Fallback fijo esperado por plantilla actual (incluye columna Matricula antes de marzo).
+        $fallback = [
+            'marzo' => 'J',
+            'abril' => 'K',
+            'mayo' => 'L',
+            'junio' => 'M',
+            'julio' => 'N',
+            'agosto' => 'O',
+            'setiembre' => 'P',
+            'octubre' => 'Q',
+            'noviembre' => 'R',
+            'diciembre' => 'S',
+            'total' => 'T',
+        ];
+
+        foreach ($fallback as $key => $columna) {
+            if ($map[$key] === null) {
+                $map[$key] = $columna;
+            }
+        }
+
+        return $map;
+    }
+
+    private function moneyByKey(Worksheet $sheet, array $columnasMeses, string $key, int $row): ?string
+    {
+        $col = $columnasMeses[$key] ?? null;
+        if (!$col) {
+            return null;
+        }
+
+        return $this->moneyFromCell($sheet, "{$col}{$row}");
+    }
+
+    private function normalizeHeader(string $value): string
+    {
+        $value = trim(mb_strtolower($value));
+        $value = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $value);
+
+        return preg_replace('/\s+/', ' ', $value) ?? '';
     }
 
     private function moneyFromCell(Worksheet $sheet, string $cellRef): ?string
