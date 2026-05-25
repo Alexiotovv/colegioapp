@@ -183,14 +183,9 @@ class LibretaController extends Controller
         $matricula = Matricula::with(['alumno', 'aula.grado.nivel', 'aula.seccion', 'aula.anioAcademico', 'aula.docente'])
             ->find($matriculaId);
         
-        $periodosQuery = Periodo::with('anioAcademico')
-            ->orderBy('orden');
-
-        if ($periodoId) {
-            $periodosQuery->where('id', $periodoId);
-        }
-
-        $periodos = $periodosQuery->get();
+        $periodos = Periodo::with('anioAcademico')
+            ->orderBy('orden')
+            ->get();
         
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
@@ -227,14 +222,9 @@ class LibretaController extends Controller
                 ->find($aulaId);
         }
         
-        $periodosQuery = Periodo::with('anioAcademico')
-            ->orderBy('orden');
-
-        if ($matriculaId && $periodoId) {
-            $periodosQuery->where('id', $periodoId);
-        }
-
-        $periodos = $periodosQuery->get();
+        $periodos = Periodo::with('anioAcademico')
+            ->orderBy('orden')
+            ->get();
         
         $matriculas = null;
         if ($aulaId && !$matriculaId) {
