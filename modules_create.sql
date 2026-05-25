@@ -25,6 +25,7 @@ INSERT INTO modulos (codigo, nombre, ruta, icono, orden, activo) VALUES
 
 -- Reportes
 ('libretas', 'Libretas', 'admin.libretas.index', 'fa-print', 60, 1),
+('exportar-por-alumno', 'Exportar Libreta por Alumno', 'admin.libretas.exportar-por-alumno.index', 'fa-user-graduate', 61, 1),
 
 -- Configuración del sistema
 ('configuracion-sistema', 'Configuración Sistema', 'admin.configuracion.index', 'fa-cog', 70, 1),

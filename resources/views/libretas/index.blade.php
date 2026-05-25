@@ -88,11 +88,18 @@
             <i class="fas fa-print me-2" style="color: var(--primary-color);"></i>
             Exportar Libretas
         </h4>
-        @if(auth()->user()->puedeAccederModulo('orden-merito-exportar'))
-            <a href="{{ route('admin.libretas.orden-merito.index') }}" class="btn btn-outline-success">
-                <i class="fas fa-file-excel me-2"></i> Exportar Orden de Mérito
-            </a>
-        @endif
+        <div class="d-flex gap-2">
+            @if(auth()->user()->puedeAccederModulo('exportar-por-alumno'))
+                <a href="{{ route('admin.libretas.exportar-por-alumno.index') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-user-graduate me-2"></i> Exportar Libreta por Alumno
+                </a>
+            @endif
+            @if(auth()->user()->puedeAccederModulo('orden-merito-exportar'))
+                <a href="{{ route('admin.libretas.orden-merito.index') }}" class="btn btn-outline-success">
+                    <i class="fas fa-file-excel me-2"></i> Exportar Orden de Mérito
+                </a>
+            @endif
+        </div>
     </div>
     
     <div class="filter-card">

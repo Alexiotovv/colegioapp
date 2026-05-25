@@ -55,6 +55,85 @@ class LibretaController extends Controller
         
         return response()->json($matriculas);
     }
+
+    public function indexAlumno()
+    {
+        $periodos = Periodo::with('anioAcademico')
+            ->orderBy('orden')
+            ->get();
+
+        $anioActivo = AnioAcademico::where('activo', true)->first();
+
+        return view('libretas.index-alumno', compact('periodos', 'anioActivo'));
+    }
+
+    public function buscarAlumnos(Request $request)
+    {
+        $termino = trim((string) $request->input('q', ''));
+
+        if (mb_strlen($termino) < 2) {
+            return response()->json([]);
+        }
+
+        $anioActivo = AnioAcademico::where('activo', true)->first();
+
+        $query = Matricula::with([
+            'alumno:id,codigo_estudiante,dni,nombres,apellido_paterno,apellido_materno',
+            'aula:id,grado_id,seccion_id,anio_academico_id,turno',
+            'aula.grado:id,nombre,nivel_id',
+            'aula.grado.nivel:id,nombre',
+            'aula.seccion:id,nombre',
+            'aula.anioAcademico:id,anio',
+        ])
+            ->select('matriculas.*')
+            ->where('matriculas.estado', 'activa')
+            ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
+            ->where(function ($q) use ($termino) {
+                $q->where('alumnos.dni', 'LIKE', "%{$termino}%")
+                    ->orWhere('alumnos.apellido_paterno', 'LIKE', "%{$termino}%")
+                    ->orWhere('alumnos.apellido_materno', 'LIKE', "%{$termino}%")
+                    ->orWhere('alumnos.nombres', 'LIKE', "%{$termino}%")
+                    ->orWhereRaw("CONCAT(alumnos.apellido_paterno, ' ', alumnos.apellido_materno) LIKE ?", ["%{$termino}%"])
+                    ->orWhereRaw("CONCAT(alumnos.apellido_paterno, ' ', alumnos.apellido_materno, ' ', alumnos.nombres) LIKE ?", ["%{$termino}%"]);
+            });
+
+        if ($anioActivo) {
+            $query->whereHas('aula', function ($q) use ($anioActivo) {
+                $q->where('anio_academico_id', $anioActivo->id);
+            });
+        }
+
+        $matriculas = $query
+            ->orderBy('alumnos.apellido_paterno', 'ASC')
+            ->orderBy('alumnos.apellido_materno', 'ASC')
+            ->orderBy('alumnos.nombres', 'ASC')
+            ->limit(50)
+            ->get();
+
+        $resultado = $matriculas->map(function ($matricula) {
+            $alumno = $matricula->alumno;
+            $aula = $matricula->aula;
+
+            return [
+                'matricula_id' => $matricula->id,
+                'codigo_estudiante' => $alumno->codigo_estudiante ?? '',
+                'dni' => $alumno->dni ?? '',
+                'apellido_paterno' => $alumno->apellido_paterno ?? '',
+                'apellido_materno' => $alumno->apellido_materno ?? '',
+                'nombres' => $alumno->nombres ?? '',
+                'aula_texto' => sprintf(
+                    '%s - %s "%s" (%s) - %s',
+                    $aula->grado->nivel->nombre ?? '',
+                    $aula->grado->nombre ?? '',
+                    $aula->seccion->nombre ?? '',
+                    $aula->turno_nombre ?? '',
+                    $aula->anioAcademico->anio ?? ''
+                ),
+            ];
+        })->values();
+
+        return response()->json($resultado);
+    }
     
     public function exportarAula(Request $request)
     {
@@ -104,9 +183,14 @@ class LibretaController extends Controller
         $matricula = Matricula::with(['alumno', 'aula.grado.nivel', 'aula.seccion', 'aula.anioAcademico', 'aula.docente'])
             ->find($matriculaId);
         
-        $periodos = Periodo::with('anioAcademico')
-            ->orderBy('orden')
-            ->get();
+        $periodosQuery = Periodo::with('anioAcademico')
+            ->orderBy('orden');
+
+        if ($periodoId) {
+            $periodosQuery->where('id', $periodoId);
+        }
+
+        $periodos = $periodosQuery->get();
         
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
@@ -143,9 +227,14 @@ class LibretaController extends Controller
                 ->find($aulaId);
         }
         
-        $periodos = Periodo::with('anioAcademico')
-            ->orderBy('orden')
-            ->get();
+        $periodosQuery = Periodo::with('anioAcademico')
+            ->orderBy('orden');
+
+        if ($matriculaId && $periodoId) {
+            $periodosQuery->where('id', $periodoId);
+        }
+
+        $periodos = $periodosQuery->get();
         
         $matriculas = null;
         if ($aulaId && !$matriculaId) {

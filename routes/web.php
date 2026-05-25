@@ -487,6 +487,12 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/libretas/orden-merito/reporte', [OrdenMeritoExportController::class, 'index'])->name('libretas.orden-merito.index');
             Route::post('/libretas/orden-merito/reporte/exportar', [OrdenMeritoExportController::class, 'exportar'])->name('libretas.orden-merito-reporte.exportar');
         });
+
+        // Módulo: exportar-por-alumno
+        Route::middleware(['modulo:exportar-por-alumno'])->group(function () {
+            Route::get('/libretas/exportar-por-alumno', [LibretaController::class, 'indexAlumno'])->name('libretas.exportar-por-alumno.index');
+            Route::get('/libretas/exportar-por-alumno/buscar', [LibretaController::class, 'buscarAlumnos'])->name('libretas.alumno.buscar');
+        });
         
         // ==================== MÓDULOS PARA PERMISOS (solo admin) ====================
         
