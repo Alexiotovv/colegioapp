@@ -123,6 +123,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="avance-cuadros-tab" data-bs-toggle="tab" data-bs-target="#avance-cuadros" type="button" role="tab">
+                    <i class="fas fa-layer-group me-2"></i>Avance Cuadros
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="caracteres-tab" data-bs-toggle="tab" data-bs-target="#caracteres" type="button" role="tab">
                     <i class="fas fa-keyboard me-2"></i>Límite de Caracteres
                 </button>
@@ -501,6 +506,71 @@
                                                 <label class="form-check-label" for="{{ $nivel->id }}_{{ $key }}">{{ $label }}</label>
                                             </div>
                                         @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    @endforeach
+                </form>
+            </div>
+
+            <div class="tab-pane fade" id="avance-cuadros" role="tabpanel">
+                <form method="POST" action="{{ route('admin.configuracion.save-avance-cuadros') }}">
+                    @csrf
+
+                    @php
+                        $availableAvanceCuadros = [
+                            'cursos_competencias' => 'Cursos y Competencias',
+                            'competencias_transversales' => 'Competencias Transversales',
+                            'apreciaciones_tutor' => 'Apreciaciones del Tutor',
+                            'evaluacion_padre' => 'Evaluación al Padre de Familia',
+                            'evaluaciones_actitudinales' => 'Evaluaciones Actitudinales',
+                            'inasistencias' => 'Inasistencias',
+                            'otras_evaluaciones' => 'Comportamiento y Otras Evaluaciones',
+                            'orden_merito' => 'Orden de Mérito',
+                            'cuadros_dinamicos' => 'Cuadros Dinámicos',
+                        ];
+                    @endphp
+
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <p class="text-muted">Seleccione qué cuadros se deben mostrar para el avance de notas por cada nivel.</p>
+                        </div>
+                    </div>
+
+                    @foreach($niveles as $nivel)
+                        @php
+                            $selectedAvance = $avanceCuadrosPorNivel[$nivel->id] ?? null;
+                            $mostrarConclusionAvance = $mostrarConclusionAvancePorNivel[$nivel->id] ?? true;
+                        @endphp
+                        <form method="POST" action="{{ route('admin.configuracion.save-avance-cuadros') }}">
+                            @csrf
+                            <input type="hidden" name="nivel_id" value="{{ $nivel->id }}">
+                            <div class="config-card mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">{{ $nivel->nombre }}</h5>
+                                    <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        @foreach($availableAvanceCuadros as $key => $label)
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="checkbox" name="cuadros[]" id="avance_{{ $nivel->id }}_{{ $key }}" value="{{ $key }}" {{ is_array($selectedAvance) && in_array($key, $selectedAvance) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="avance_{{ $nivel->id }}_{{ $key }}">{{ $label }}</label>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <input type="hidden" name="mostrar_conclusion_descriptiva" value="0">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="mostrar_conclusion_descriptiva" id="avance_{{ $nivel->id }}_mostrar_conclusion_descriptiva" value="1" {{ $mostrarConclusionAvance ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="avance_{{ $nivel->id }}_mostrar_conclusion_descriptiva">
+                                                Mostrar registro de conclusión descriptiva en Registro de Avance de Notas
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -12,6 +12,21 @@
         margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+
+    /* Ajuste suave de tamaño para filtros */
+    #aula_id,
+    #periodo_id {
+        font-size: 0.88rem;
+        padding-top: 0.3rem;
+        padding-bottom: 0.3rem;
+        min-height: calc(1.4em + 0.65rem + 2px);
+    }
+
+    #aula_id option,
+    #periodo_id option {
+        font-size: 0.88rem;
+        padding: 4px 8px;
+    }
     
     .table-container {
         background: white;
@@ -294,10 +309,10 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4>
+        <h6>
             <i class="fas fa-comment-dots me-2" style="color: var(--primary-color);"></i>
             Registro de Apreciaciones del Tutor
-        </h4>
+        </h6>
     </div>
     
     <!-- Filtros -->
@@ -345,10 +360,10 @@
     <!-- Tabla de Apreciaciones -->
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">
+            <h6 class="mb-0">
                 <i class="fas fa-comment-dots me-2"></i>
                 Apreciaciones del Tutor
-            </h5>
+            </h6>
             <div class="d-flex align-items-center gap-3">
                 <small class="text-muted">
                     <i class="fas fa-info-circle me-1"></i>

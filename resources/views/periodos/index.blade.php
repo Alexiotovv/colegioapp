@@ -28,6 +28,7 @@
                         <th>Avance</th>
                         <th>Estado</th>
                         <th>Activo</th>
+                        <th>Avance Activo</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -77,6 +78,13 @@
                             @endif
                         </td>
                         <td>
+                            @if($periodo->avance_activo)
+                                <span class="badge bg-success">Activo</span>
+                            @else
+                                <span class="badge bg-secondary">Inactivo</span>
+                            @endif
+                        </td>
+                        <td>
                             <a href="{{ route('admin.periodos.edit', $periodo) }}" class="btn btn-sm btn-warning">
                                 <i class="fas fa-edit"></i>
                             </a>
@@ -85,6 +93,13 @@
                                 @method('PATCH')
                                 <button type="submit" class="btn btn-sm btn-{{ $periodo->activo ? 'secondary' : 'success' }}">
                                     <i class="fas fa-{{ $periodo->activo ? 'ban' : 'check' }}"></i>
+                                </button>
+                            </form>
+                            <form action="{{ route('admin.periodos.toggle-avance-active', $periodo) }}" method="POST" class="d-inline">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="btn btn-sm btn-{{ $periodo->avance_activo ? 'secondary' : 'success' }}" title="Alternar Avance Activo">
+                                    <i class="fas fa-{{ $periodo->avance_activo ? 'ban' : 'chart-line' }}"></i>
                                 </button>
                             </form>
                             <form action="{{ route('admin.periodos.destroy', $periodo) }}" method="POST" class="d-inline" id="deleteForm{{ $periodo->id }}">
@@ -98,7 +113,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="text-center">No hay periodos académicos registrados</td>
+                        <td colspan="10" class="text-center">No hay periodos académicos registrados</td>
                     </tr>
                     @endforelse
                 </tbody>

@@ -64,6 +64,10 @@
                         <input class="form-check-input" type="checkbox" name="activo" id="activo" value="1" {{ old('activo', $periodo->activo) ? 'checked' : '' }}>
                         <label class="form-check-label" for="activo">Activar este periodo</label>
                     </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="avance_activo" id="avance_activo" value="1" {{ old('avance_activo', $periodo->avance_activo) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="avance_activo">Activar Registro de Avance de Notas</label>
+                    </div>
                 </div>
             </div>
             

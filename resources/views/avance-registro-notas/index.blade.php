@@ -1,7 +1,7 @@
 {{-- resources/views/notas/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Registro de Notas')
+@section('title', 'Registro de Avance de Notas')
 
 @section('css')
 <style>
@@ -407,7 +407,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h5>
             <i class="fas fa-edit me-2" style="color: var(--primary-color);"></i>
-            Registro de Notas
+            Registro de Avance de Notas
         </h5>
     </div>
     
@@ -437,9 +437,10 @@
                 <select class="form-select" id="periodo_id" required disabled>
                     <option value="">Seleccionar periodo</option>
                     @foreach($periodos as $periodo)
-                        <option value="{{ $periodo->id }}" data-activo="{{ $periodo->activo ? '1' : '0' }}">
+                        @php($periodoHabilitado = (bool)($periodosHabilitados[$periodo->id] ?? false))
+                        <option value="{{ $periodo->id }}" data-activo="{{ $periodoHabilitado ? '1' : '0' }}">
                             {{ $periodo->nombre }} - {{ $periodo->anioAcademico->anio ?? '' }}
-                            @if($periodo->activo)
+                            @if($periodoHabilitado)
                                 <span class="badge-habilitado ms-2">Habilitado</span>
                             @else
                                 <span class="badge-deshabilitado ms-2">Deshabilitado</span>
@@ -461,7 +462,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
                 <i class="fas fa-chalkboard-teacher me-2"></i>
-                Registro de Notas
+                Registro de Avance de Notas
             </h5>
             @if(auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin'))
             <div class="form-check form-switch">
@@ -497,11 +498,11 @@
     <div class="fab-menu" id="fabMenu">
         <button class="fab-menu-item" id="btnGuardarTodas">
             <i class="fas fa-save"></i>
-            <span>Guardar todas las notas</span>
+            <span>Guardar todo el avance</span>
         </button>
         <button class="fab-menu-item" id="btnImprimirTodo">
             <i class="fas fa-file-excel"></i>
-            <span>Descargar notas</span>
+            <span>Descargar avance</span>
         </button>
     </div>
 </div>
@@ -563,6 +564,7 @@ $(document).ready(function() {
     let requiereConclusionBSecundaria = false;
     let aulaEsPrimaria = false;
     let aulaEsSecundaria = false;
+    let mostrarConclusionDescriptiva = true;
     let conclusionesPendientes = {};
     window.requerirConclusionBCPrimaria = false;
     window.requerirConclusionBSecundaria = false;
@@ -571,7 +573,7 @@ $(document).ready(function() {
     
     // ==================== CONFIGURACIÓN DE CARACTERES ====================
     let conclusionesCaracteresMax = 500; // Valor por defecto
-    const CSRF_BACKUP_KEY = 'colegioapp:notas:ultimo-intento-guardado';
+    const CSRF_BACKUP_KEY = 'colegioapp:avance-registro-notas:ultimo-intento-guardado';
 
     function getCsrfToken() {
         return $('meta[name="csrf-token"]').attr('content') || '';
@@ -623,7 +625,7 @@ $(document).ready(function() {
     // ==================== CARGAR OPCIONES DE NOTAS ====================
     function cargarOpcionesNotas() {
         return $.ajax({
-            url: '{{ route("admin.notas.opciones") }}',
+            url: '{{ route("admin.avance-registro-notas.opciones") }}',
             method: 'GET',
             async: true,  // ← Cambiado a true (recomendado)
             success: function(response) {
@@ -718,6 +720,7 @@ $(document).ready(function() {
         aulaEsSecundaria = false;
         requiereConclusionBCPrimaria = false;
         requiereConclusionBSecundaria = false;
+        mostrarConclusionDescriptiva = true;
         window.requerirConclusionBCPrimaria = false;
         window.requerirConclusionBSecundaria = false;
         window.aulaEsPrimaria = false;
@@ -749,6 +752,7 @@ $(document).ready(function() {
         aulaEsSecundaria = false;
         requiereConclusionBCPrimaria = false;
         requiereConclusionBSecundaria = false;
+        mostrarConclusionDescriptiva = true;
         window.requerirConclusionBCPrimaria = false;
         window.requerirConclusionBSecundaria = false;
         window.aulaEsPrimaria = false;
@@ -780,7 +784,7 @@ $(document).ready(function() {
         }
 
         $.ajax({
-            url: '{{ route("admin.notas.get-data") }}',
+            url: '{{ route("admin.avance-registro-notas.get-data") }}',
             method: 'GET',
             data: {
                 aula_id: aulaId,
@@ -796,6 +800,7 @@ $(document).ready(function() {
                 aulaEsSecundaria = response.aula_es_secundaria || false;
                 requiereConclusionBCPrimaria = response.requerir_conclusion_bc_primaria || false;
                 requiereConclusionBSecundaria = response.requerir_conclusion_b_secundaria || false;
+                mostrarConclusionDescriptiva = response.mostrar_conclusion_descriptiva !== false;
                 window.requerirConclusionBCPrimaria = requiereConclusionBCPrimaria;
                 window.requerirConclusionBSecundaria = requiereConclusionBSecundaria;
                 window.aulaEsPrimaria = aulaEsPrimaria;
@@ -810,7 +815,7 @@ $(document).ready(function() {
                 let periodoNombre = periodoSelect.text();
                 $('#infoPeriodoText').html(`<strong>Periodo:</strong> ${periodoNombre} - <strong>Estado:</strong> ${notasHabilitadas ? '<span class="badge-habilitado">HABILITADO</span>' : '<span class="badge-deshabilitado">DESHABILITADO</span>'}`);
                 $('#infoPeriodo').show();
-                if ((aulaEsPrimaria && requiereConclusionBCPrimaria) || (aulaEsSecundaria && requiereConclusionBSecundaria)) {
+                if (mostrarConclusionDescriptiva && ((aulaEsPrimaria && requiereConclusionBCPrimaria) || (aulaEsSecundaria && requiereConclusionBSecundaria))) {
                     $('#infoConclusionRegla').show();
                 } else {
                     $('#infoConclusionRegla').hide();
@@ -842,7 +847,7 @@ $(document).ready(function() {
             cursoSelect.prop('disabled', true);
             
             $.ajax({
-                url: '{{ route("admin.notas.cursos-by-aula") }}',
+                url: '{{ route("admin.avance-registro-notas.cursos-by-aula") }}',
                 method: 'GET',
                 data: { aula_id: aulaId },
                 success: function(response) {
@@ -959,6 +964,19 @@ $(document).ready(function() {
                 let requerirConclusion = (requiereConclusionBCPrimaria && aulaEsPrimaria && ['B', 'C'].includes(notaValue)) ||
                                          (requiereConclusionBSecundaria && aulaEsSecundaria && notaValue === 'C');
                 let commentColor = tieneConclusion ? '#28a745' : (requerirConclusion ? '#dc3545' : '#6c757d');
+                let botonConclusionHtml = '';
+                if (mostrarConclusionDescriptiva) {
+                    botonConclusionHtml = `<button class="btn-message" 
+                            data-matricula="${matricula.id}"
+                            data-competencia-id="${competencia.id}"
+                                data-nota-id="${notaId}"
+                                data-alumno="${matricula.alumno.nombre_completo}"
+                                data-competencia="${competencia.nombre}"
+                                data-nota="${notaValue}"
+                                style="background: none; border: none; cursor: pointer; margin-left: 5px;">
+                            <i class="fas fa-comment-dots" style="font-size: 16px; color: ${commentColor};"></i>
+                        </button>`;
+                }
                 
                 bodyHtml += `
                     <td style="text-align: center; vertical-align: middle;">
@@ -977,16 +995,7 @@ $(document).ready(function() {
                                    style="width: 110px; margin: 0 auto; display: inline-block; text-transform: uppercase;">
                         </div>
                         <input type="hidden" class="nota-valor" data-matricula="${matricula.id}" data-competencia="${competencia.id}" data-nota-id="${notaId}" value="${notaValue}">
-                        <button class="btn-message" 
-                            data-matricula="${matricula.id}"
-                            data-competencia-id="${competencia.id}"
-                                data-nota-id="${notaId}"
-                                data-alumno="${matricula.alumno.nombre_completo}"
-                                data-competencia="${competencia.nombre}"
-                                data-nota="${notaValue}"
-                                style="background: none; border: none; cursor: pointer; margin-left: 5px;">
-                            <i class="fas fa-comment-dots" style="font-size: 16px; color: ${commentColor};"></i>
-                        </button>
+                        ${botonConclusionHtml}
                      </td>
                 `;
             }
@@ -1197,7 +1206,7 @@ $(document).ready(function() {
     // ==================== GUARDAR NOTAS ====================
     function guardarTodasLasNotas() {
         if (!notasHabilitadas) {
-            Swal.fire('Error', 'El registro de notas no está habilitado', 'error');
+            Swal.fire('Error', 'El registro de avance de notas no está habilitado', 'error');
             return;
         }
         
@@ -1218,17 +1227,21 @@ $(document).ready(function() {
         });
 
         let conclusiones = [];
-        for (let key in conclusionesPendientes) {
-            let [matriculaId, competenciaId] = key.split('_');
-            conclusiones.push({
-                matricula_id: matriculaId,
-                competencia_id: competenciaId,
-                conclusion: conclusionesPendientes[key]
-            });
+        if (mostrarConclusionDescriptiva) {
+            for (let key in conclusionesPendientes) {
+                let [matriculaId, competenciaId] = key.split('_');
+                conclusiones.push({
+                    matricula_id: matriculaId,
+                    competencia_id: competenciaId,
+                    conclusion: conclusionesPendientes[key]
+                });
+            }
+        } else {
+            conclusionesPendientes = {};
         }
         
         if (notas.length === 0) {
-            Swal.fire('Advertencia', 'No hay notas para guardar', 'warning');
+            Swal.fire('Advertencia', 'No hay avance de notas para guardar', 'warning');
             return;
         }
         
@@ -1248,7 +1261,7 @@ $(document).ready(function() {
         btn.html('<span class="loading-spinner me-2"></span> Guardando...');
 
         function enviarGuardado(reintentado) {
-            const saveUrl = `{{ route("admin.notas.save") }}?aula_id=${encodeURIComponent(payload.aula_id || '')}&periodo_id=${encodeURIComponent(payload.periodo_id || '')}`;
+            const saveUrl = `{{ route("admin.avance-registro-notas.save") }}?aula_id=${encodeURIComponent(payload.aula_id || '')}&periodo_id=${encodeURIComponent(payload.periodo_id || '')}`;
             $.ajax({
                 url: saveUrl,
                 method: 'POST',
@@ -1288,7 +1301,7 @@ $(document).ready(function() {
                         return;
                     }
 
-                    Swal.fire('Error', xhr.responseJSON?.message || 'Error al guardar notas', 'error');
+                    Swal.fire('Error', xhr.responseJSON?.message || 'Error al guardar el avance de notas', 'error');
                 },
                 complete: function() {
                     if (!esperandoReintento || reintentado) {
@@ -1314,7 +1327,7 @@ $(document).ready(function() {
         }
         const form = $('<form>', {
             method: 'POST',
-            action: '/admin/notas/export-excel',
+            action: '{{ route("admin.avance-registro-notas.export-excel") }}',
             style: 'display:none',
         });
         form.append($('<input>', {type: 'hidden', name: 'aula_id', value: aulaId}));
@@ -1330,6 +1343,11 @@ $(document).ready(function() {
     
     // ==================== MODAL CONCLUSIÓN ====================
     function abrirModalConclusion(notaId, alumnoNombre, competenciaNombre, notaValor, matriculaId, competenciaId) {
+        if (!mostrarConclusionDescriptiva) {
+            Swal.fire('Información', 'La conclusión descriptiva está deshabilitada para este nivel.', 'info');
+            return;
+        }
+
         $('#modalConclusionLabel').text(`Conclusión Descriptiva`);
         $('#conclusion_info').html(`
             <strong>Alumno:</strong> ${alumnoNombre}<br>
@@ -1352,7 +1370,7 @@ $(document).ready(function() {
             $('#conclusion_char_count').text(conclusionesPendientes[pendingKey].length);
         } else if (notaId) {
             $.ajax({
-                url: '/admin/notas/conclusion/' + notaId,
+                url: '/admin/avance-registro-notas/conclusion/' + notaId,
                 method: 'GET',
                 success: function(response) {
                     if (response.success && response.conclusion) {
@@ -1372,6 +1390,12 @@ $(document).ready(function() {
     
     // ==================== GUARDAR CONCLUSIÓN ====================
     $('#btnGuardarConclusion').on('click', function() {
+        if (!mostrarConclusionDescriptiva) {
+            Swal.fire('Información', 'La conclusión descriptiva está deshabilitada para este nivel.', 'info');
+            $('#modalConclusion').modal('hide');
+            return;
+        }
+
         let notaId = $('#conclusion_nota_id').val();
         let conclusion = $('#conclusion_texto').val();
         let matriculaId = $('#conclusion_matricula_id').val();
@@ -1393,7 +1417,7 @@ $(document).ready(function() {
         }
         
         $.ajax({
-            url: '{{ route("admin.notas.save-conclusion") }}',
+            url: '{{ route("admin.avance-registro-notas.save-conclusion") }}',
             method: 'POST',
             data: {
                 nota_id: notaId,
@@ -1433,7 +1457,7 @@ $(document).ready(function() {
         if (!periodoId) return;
         
         $.ajax({
-            url: '{{ route("admin.notas.toggle-habilitacion") }}',
+            url: '{{ route("admin.avance-registro-notas.toggle-habilitacion") }}',
             method: 'POST',
             data: {
                 periodo_id: periodoId,

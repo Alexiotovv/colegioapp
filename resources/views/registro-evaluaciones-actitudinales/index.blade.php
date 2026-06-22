@@ -12,6 +12,21 @@
         margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+
+    /* Ajuste suave de tamaño para filtros */
+    #aula_id,
+    #periodo_id {
+        font-size: 0.88rem;
+        padding-top: 0.3rem;
+        padding-bottom: 0.3rem;
+        min-height: calc(1.4em + 0.65rem + 2px);
+    }
+
+    #aula_id option,
+    #periodo_id option {
+        font-size: 0.88rem;
+        padding: 4px 8px;
+    }
     
     .table-container {
         background: white;
@@ -19,6 +34,12 @@
         padding: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         overflow-x: auto;
+    }
+
+    .table-evaluaciones {
+        font-size: 13px;
+        width: 100%;
+        border-collapse: collapse;
     }
     
     .table-evaluaciones th, .table-evaluaciones td {
@@ -47,12 +68,106 @@
     }
     
     .valoracion-select {
-        width: 130px;
-        padding: 6px;
+        width: 120px;
+        padding: 0.3rem 0.45rem;
+        font-size: 0.88rem;
         border-radius: 6px;
         border: 1px solid #ced4da;
         background-color: white;
         cursor: pointer;
+    }
+
+    /* Progress Bar - compacto */
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 10px 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: none;
+    }
+
+    .progress-header {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        column-gap: 12px;
+        margin-bottom: 8px;
+        font-size: 11px;
+        color: #555;
+    }
+
+    .progress-title {
+        font-weight: 500;
+        justify-self: start;
+        white-space: nowrap;
+    }
+
+    .progress-percentage {
+        font-weight: 600;
+        color: var(--primary-color);
+        justify-self: center;
+        font-size: 12px;
+        line-height: 1;
+    }
+
+    .progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 6px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        background-color: var(--primary-color);
+        width: 0%;
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 0;
+        font-size: 10px;
+        color: #888;
+        justify-self: end;
+        white-space: nowrap;
+    }
+
+    .progress-stats span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .progress-stats i {
+        font-size: 10px;
+    }
+
+    .progress-stats .completed {
+        color: #28a745;
+    }
+
+    .progress-stats .pending {
+        color: #dc3545;
+    }
+
+    @media (max-width: 992px) {
+        .progress-header {
+            grid-template-columns: 1fr auto;
+            row-gap: 6px;
+        }
+
+        .progress-stats {
+            grid-column: 1 / -1;
+            justify-self: start;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            white-space: normal;
+        }
     }
 
     .select-wrapper {
@@ -277,6 +392,29 @@
         </div>
         
     </div>
+
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-header">
+            <span class="progress-title">
+                <i class="fas fa-chart-line me-1"></i> Avance de registro
+            </span>
+            <span class="progress-percentage" id="progressPercentage">0%</span>
+            <div class="progress-stats">
+                <span class="completed">
+                    <i class="fas fa-check-circle"></i> Completadas: <span id="completedCount">0</span>
+                </span>
+                <span class="pending">
+                    <i class="fas fa-circle"></i> Pendientes: <span id="pendingCount">0</span>
+                </span>
+                <span>
+                    <i class="fas fa-tasks"></i> Total: <span id="totalCount">0</span>
+                </span>
+            </div>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+        </div>
+    </div>
     
     <!-- Tabla -->
     <div class="table-container" id="tablaContainer" style="display: none;">
@@ -363,6 +501,7 @@ $(document).ready(function() {
         $('#tablaHeader').empty();
         $('#tablaBody').empty();
         $('#tablaContainer').hide();
+        $('#progressContainer').hide();
         $('#infoPeriodo').hide();
         $('#toggleHabilitacion').prop('checked', false);
         $('#habilitacionLabel').text('Habilitar registro');
@@ -412,6 +551,7 @@ $(document).ready(function() {
                 
                 renderTabla();
                 $('#tablaContainer').show();
+                $('#progressContainer').show();
                 actualizarEstadoBotonGuardar();
             },
             error: function(xhr) {
@@ -463,18 +603,17 @@ $(document).ready(function() {
                 bodyHtml += `
                     <td style="text-align: center;">
                         <div class="select-wrapper">
-                            <select class="form-select valoracion-select ${guardada}" 
-                                    data-matricula="${matricula.id}" 
-                                    data-evaluacion="${evaluacion.id}"
-                                    ${!registroHabilitado ? 'disabled' : ''}>
-                                <option value="">Seleccionar</option>
-                                ${opcionesValoracion.map(opcion => {
-                                    const value = opcion.codigo || opcion;
-                                    const label = opcion.codigo || (typeof opcion === 'string' ? (opcion.charAt(0) + opcion.slice(1).toLowerCase()) : value);
-                                    const selected = valor === value ? 'selected' : '';
-                                    return `<option value="${value}" ${selected}>${label}</option>`;
-                                }).join('')}
-                            </select>
+                            <input type="text"
+                                   class="form-control form-control-sm valoracion-select valoracion-input ${guardada}"
+                                   data-matricula="${matricula.id}"
+                                   data-evaluacion="${evaluacion.id}"
+                                   data-original-value="${valor || ''}"
+                                   data-prev-value="${valor || ''}"
+                                   value="${valor || ''}"
+                                   maxlength="12"
+                                   autocomplete="off"
+                                   ${!registroHabilitado ? 'disabled' : ''}
+                                   style="width: 130px; margin: 0 auto; display: inline-block; text-transform: uppercase;">
                         </div>
                     </td>
                 `;
@@ -494,20 +633,105 @@ $(document).ready(function() {
             }
         });
 
-        $('.valoracion-select').on('change', function() {
-            if ($(this).val()) {
-                $(this).addClass('valoracion-guardada');
+        function normalizarValoracion(valor) {
+            return (valor || '').toString().trim().toUpperCase();
+        }
+
+        function opcionesValoracionNormalizadas() {
+            return (opcionesValoracion || []).map(function(opcion) {
+                return normalizarValoracion(opcion.codigo || opcion);
+            });
+        }
+
+        function esValoracionExactaPermitida(valor) {
+            let normalizada = normalizarValoracion(valor);
+            if (!normalizada) return false;
+            return opcionesValoracionNormalizadas().includes(normalizada);
+        }
+
+        function esPrefijoValoracionPermitido(valor) {
+            let normalizada = normalizarValoracion(valor);
+            if (normalizada === '') return true;
+            return opcionesValoracionNormalizadas().some(function(op) {
+                return op.startsWith(normalizada);
+            });
+        }
+
+        function enfocarSiguienteInputValoracion(inputActual) {
+            let $inputs = $('.valoracion-input:enabled');
+            let index = $inputs.index(inputActual);
+            if (index === -1) return;
+
+            let $siguiente = $inputs.eq(index + 1);
+            if ($siguiente.length) {
+                $siguiente.focus().select();
             } else {
-                $(this).removeClass('valoracion-guardada');
+                $(inputActual).blur();
             }
-            let wrapper = $(this).closest('.select-wrapper');
-            let inicial = $(this).data('initial') || '';
-            if ($(this).val() !== inicial) {
+        }
+
+        function actualizarEstadoValoracionDesdeInput($input, valor, esExacta) {
+            let valorNormalizado = normalizarValoracion(valor);
+            let original = normalizarValoracion($input.attr('data-original-value') || '');
+            let cambioReal = esExacta && valorNormalizado !== original;
+
+            $input.val(valorNormalizado);
+
+            if (esExacta) {
+                $input.addClass('valoracion-guardada');
+                $input.attr('data-prev-value', valorNormalizado);
+                $input.data('prev-value', valorNormalizado);
+            } else {
+                $input.removeClass('valoracion-guardada');
+            }
+
+            let wrapper = $input.closest('.select-wrapper');
+            if (cambioReal) {
                 wrapper.addClass('modified');
             } else {
                 wrapper.removeClass('modified');
             }
+
             progressBar.update();
+        }
+
+        $('.valoracion-input').off('input').on('input', function() {
+            let $input = $(this);
+            let valor = normalizarValoracion($input.val());
+
+            if (!esPrefijoValoracionPermitido(valor)) {
+                let previo = normalizarValoracion($input.data('prev-value') || '');
+                $input.val(previo);
+                valor = previo;
+            }
+
+            actualizarEstadoValoracionDesdeInput($input, valor, esValoracionExactaPermitida(valor));
+        });
+
+        $('.valoracion-input').off('blur').on('blur', function() {
+            let $input = $(this);
+            let valor = normalizarValoracion($input.val());
+
+            if (!esValoracionExactaPermitida(valor)) {
+                valor = '';
+            }
+
+            actualizarEstadoValoracionDesdeInput($input, valor, esValoracionExactaPermitida(valor));
+        });
+
+        $('.valoracion-input').off('focus').on('focus', function() {
+            this.select();
+        });
+
+        $('.valoracion-input').off('click').on('click', function() {
+            this.select();
+        });
+
+        $('.valoracion-input').off('keydown').on('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                enfocarSiguienteInputValoracion(this);
+            }
         });
         
         progressBar.update();
@@ -553,7 +777,7 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success) {
                     Swal.fire('Éxito', response.message, 'success');
-                    $('#btnCargarEvaluaciones').click();
+                    cargarEvaluacionesAutomaticamente();
                 }
             },
             error: function(xhr) {

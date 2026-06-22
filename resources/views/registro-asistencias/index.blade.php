@@ -12,6 +12,21 @@
         margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
+
+    /* Ajuste suave de tamaño para filtros */
+    #aula_id,
+    #periodo_id {
+        font-size: 0.88rem;
+        padding-top: 0.3rem;
+        padding-bottom: 0.3rem;
+        min-height: calc(1.4em + 0.65rem + 2px);
+    }
+
+    #aula_id option,
+    #periodo_id option {
+        font-size: 0.88rem;
+        padding: 4px 8px;
+    }
     
     .table-container {
         background: white;
@@ -81,8 +96,9 @@
     
     /* Inputs de cantidad */
     .cantidad-input {
-        width: 70px;
-        padding: 6px;
+        width: 64px;
+        padding: 4px 6px;
+        font-size: 0.88rem;
         text-align: center;
         border-radius: 6px;
         border: 1px solid #ced4da;
@@ -298,10 +314,10 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4>
+        <h6>
             <i class="fas fa-calendar-check me-2" style="color: var(--primary-color);"></i>
             Registro de Asistencias e Inasistencias
-        </h4>
+        </h6>
     </div>
     
     <div class="filter-card">
@@ -348,10 +364,10 @@
 
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">
+            <h6 class="mb-0">
                 <i class="fas fa-calendar-check me-2"></i>
                 Registro de Asistencias e Inasistencias
-            </h5>
+            </h6>
             @if(auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin'))
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="toggleHabilitacion" style="width: 50px; height: 25px;">
@@ -572,7 +588,7 @@ $(document).ready(function() {
                 bodyHtml += `
                     <td>
                         <div class="input-wrapper">
-                            <input type="number" class="form-control cantidad-input" data-matricula="${matricula.id}" data-tipo="${tipo.id}" value="${cantidadValue}" min="0" ${!registrosHabilitados ? 'disabled' : ''} style="width: 80px; margin: 0 auto; text-align: center;">
+                            <input type="number" class="form-control cantidad-input" data-matricula="${matricula.id}" data-tipo="${tipo.id}" value="${cantidadValue}" min="0" ${!registrosHabilitados ? 'disabled' : ''} style="width: 64px; margin: 0 auto; text-align: center;">
                         </div>
                     </td>
                 `;
@@ -625,7 +641,7 @@ $(document).ready(function() {
         });
         
         // Eventos
-        $('.cantidad-input').on('input', function() {
+        $('.cantidad-input').off('input').on('input', function() {
             let $input = $(this);
             let $wrapper = $input.closest('.input-wrapper');
             let valor = $input.val() || '';
@@ -641,6 +657,33 @@ $(document).ready(function() {
                 $wrapper.addClass('modified');
             } else {
                 $wrapper.removeClass('modified');
+            }
+        });
+
+        // UX: al enfocar/click, seleccionar todo el valor del input
+        $('.cantidad-input').off('focus').on('focus', function() {
+            this.select();
+        });
+
+        $('.cantidad-input').off('click').on('click', function() {
+            this.select();
+        });
+
+        // Navegación con Enter al siguiente input habilitado
+        $('.cantidad-input').off('keydown').on('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+
+            e.preventDefault();
+            let $inputs = $('.cantidad-input:enabled');
+            let index = $inputs.index(this);
+
+            if (index === -1) return;
+
+            let $siguiente = $inputs.eq(index + 1);
+            if ($siguiente.length) {
+                $siguiente.focus().select();
+            } else {
+                $(this).blur();
             }
         });
         

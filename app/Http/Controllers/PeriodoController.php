@@ -51,6 +51,7 @@ class PeriodoController extends Controller
             'fecha_inicio' => $request->fecha_inicio,
             'fecha_fin' => $request->fecha_fin,
             'activo' => $request->activo ?? false,
+            'avance_activo' => $request->avance_activo ?? false,
         ]);
         
         return redirect()->route('admin.periodos.index')
@@ -91,6 +92,7 @@ class PeriodoController extends Controller
             'fecha_inicio' => $request->fecha_inicio,
             'fecha_fin' => $request->fecha_fin,
             'activo' => $request->activo ?? false,
+            'avance_activo' => $request->avance_activo ?? false,
         ]);
         
         return redirect()->route('admin.periodos.index')
@@ -114,5 +116,11 @@ class PeriodoController extends Controller
     {
         $periodo->update(['activo' => !$periodo->activo]);
         return back()->with('success', 'Estado del periodo actualizado');
+    }
+
+    public function toggleAvanceActive(Periodo $periodo)
+    {
+        $periodo->update(['avance_activo' => !$periodo->avance_activo]);
+        return back()->with('success', 'Estado de avance del periodo actualizado');
     }
 }

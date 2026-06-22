@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ConfiguracionInstitucion;
 use App\Models\ConfiguracionLibreta;
+use App\Models\ConfiguracionAvanceCuadro;
 use App\Models\ConfiguracionLibretaCuadro;
 use App\Models\Nivel;
 use App\Models\CompetenciaTransversal;
@@ -21,6 +22,11 @@ class ConfiguracionController extends Controller
         $configLibreta = ConfiguracionLibreta::getConfig();
         $niveles = Nivel::orderBy('orden')->get();
         $cuadrosPorNivel = ConfiguracionLibretaCuadro::all()->pluck('cuadros', 'nivel_id')->toArray();
+        $avanceCuadrosPorNivel = ConfiguracionAvanceCuadro::all()->pluck('cuadros', 'nivel_id')->toArray();
+        $mostrarConclusionAvancePorNivel = [];
+        foreach ($niveles as $nivel) {
+            $mostrarConclusionAvancePorNivel[$nivel->id] = ConfiguracionAvanceCuadro::isConclusionVisibleForNivel($nivel->id);
+        }
         
         // Obtener competencias transversales con asignaciones
         $competenciasTransversales = CompetenciaTransversal::with(['nivel', 'usuariosAsignados'])
@@ -40,7 +46,7 @@ class ConfiguracionController extends Controller
             'apreciaciones_caracteres_max' => \App\Models\Configuracion::getValor('apreciaciones_caracteres_max', 500),
         ];
         
-        return view('configuracion.index', compact('configInstitucion', 'configLibreta', 'niveles', 'cuadrosPorNivel', 'competenciasTransversales', 'profesores', 'caracteresConfig'));
+        return view('configuracion.index', compact('configInstitucion', 'configLibreta', 'niveles', 'cuadrosPorNivel', 'avanceCuadrosPorNivel', 'mostrarConclusionAvancePorNivel', 'competenciasTransversales', 'profesores', 'caracteresConfig'));
     }
     
     public function updateInstitucion(Request $request)
@@ -213,6 +219,36 @@ class ConfiguracionController extends Controller
         ConfiguracionLibretaCuadro::setCuadrosForNivel($nivelId, $cuadros);
 
         return redirect()->route('admin.configuracion.index')->with('success', 'Cuadros de libreta guardados');
+    }
+
+    public function saveAvanceCuadros(Request $request)
+    {
+        $data = $request->validate([
+            'nivel_id' => 'required|integer|exists:niveles,id',
+            'cuadros' => 'nullable|array',
+            'cuadros.*' => 'string',
+            'mostrar_conclusion_descriptiva' => 'nullable|boolean',
+        ]);
+
+        $cuadros = $data['cuadros'] ?? [];
+        $mostrarConclusion = $request->boolean('mostrar_conclusion_descriptiva', true);
+
+        if ($mostrarConclusion) {
+            if (!in_array(ConfiguracionAvanceCuadro::CONCLUSION_VISIBLE_KEY, $cuadros, true)) {
+                $cuadros[] = ConfiguracionAvanceCuadro::CONCLUSION_VISIBLE_KEY;
+            }
+        } else {
+            $cuadros = array_values(array_filter($cuadros, function ($item) {
+                return $item !== ConfiguracionAvanceCuadro::CONCLUSION_VISIBLE_KEY;
+            }));
+        }
+
+        ConfiguracionAvanceCuadro::setCuadrosForNivel(
+            $data['nivel_id'],
+            $cuadros
+        );
+
+        return redirect()->route('admin.configuracion.index')->with('success', 'Avance cuadros guardados');
     }
 
 

@@ -19,7 +19,8 @@ class Periodo extends Model
         'orden',
         'fecha_inicio',
         'fecha_fin',
-        'activo'
+        'activo',
+        'avance_activo'
     ];
     
     protected $casts = [
@@ -28,6 +29,7 @@ class Periodo extends Model
         'fecha_inicio' => 'date',
         'fecha_fin' => 'date',
         'activo' => 'boolean',
+        'avance_activo' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -139,5 +141,20 @@ class Periodo extends Model
     public function desactivar(): void
     {
         $this->update(['activo' => false]);
+    }
+
+    public function isAvanceActivo(): bool
+    {
+        return (bool) $this->avance_activo;
+    }
+
+    public function activarAvance(): void
+    {
+        $this->update(['avance_activo' => true]);
+    }
+
+    public function desactivarAvance(): void
+    {
+        $this->update(['avance_activo' => false]);
     }
 }

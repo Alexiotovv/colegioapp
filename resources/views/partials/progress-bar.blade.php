@@ -149,19 +149,19 @@ window.progressBar = new ProgressBar();
             <i class="fas fa-chart-line me-1"></i> Avance de registro
         </span>
         <span class="progress-percentage" id="progressPercentage">0%</span>
+        <div class="progress-stats">
+            <span class="completed">
+                <i class="fas fa-check-circle"></i> Completadas: <span id="completedCount">0</span>
+            </span>
+            <span class="pending">
+                <i class="fas fa-circle"></i> Pendientes: <span id="pendingCount">0</span>
+            </span>
+            <span>
+                <i class="fas fa-tasks"></i> Total: <span id="totalCount">0</span>
+            </span>
+        </div>
     </div>
     <div class="progress-bar-container">
         <div class="progress-bar-fill" id="progressBarFill"></div>
-    </div>
-    <div class="progress-stats">
-        <span class="completed">
-            <i class="fas fa-check-circle"></i> Completadas: <span id="completedCount">0</span>
-        </span>
-        <span class="pending">
-            <i class="fas fa-circle"></i> Pendientes: <span id="pendingCount">0</span>
-        </span>
-        <span>
-            <i class="fas fa-tasks"></i> Total: <span id="totalCount">0</span>
-        </span>
     </div>
 </div>

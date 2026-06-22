@@ -246,10 +246,10 @@
 @include('partials.toast')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4>
+        <h5>
             <i class="fas fa-award me-2" style="color: var(--primary-color);"></i>
             Registro de Orden de Méritos
-        </h4>
+        </h5>
     </div>
 
     <div class="filter-card">
@@ -308,10 +308,10 @@
 
     <div class="table-container" id="tablaContainer" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">
+            <h6 class="mb-0">
                 <i class="fas fa-award me-2"></i>
                 Registro de Orden de Méritos
-            </h5>
+            </h6>
             @if(auth()->user()->rol === 'admin' || (auth()->user()->role && auth()->user()->role->nombre === 'admin'))
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="toggleHabilitacion" style="width: 50px; height: 25px;">

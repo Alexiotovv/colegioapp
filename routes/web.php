@@ -36,6 +36,7 @@ use App\Http\Controllers\TipoOtraEvaluacionJerarquicoController;
 use App\Http\Controllers\RegistroOtraEvaluacionController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\LibretaController;
+use App\Http\Controllers\AvanceLibretaController;
 use App\Http\Controllers\CompetenciaTransversalJerarquicoController;
 use App\Http\Controllers\RegistroCompetenciaTransversalController;
 use App\Http\Controllers\ConfiguracionNotasController;
@@ -45,6 +46,8 @@ use App\Http\Controllers\NivelController;
 use App\Http\Controllers\GradoController;
 use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\AvanceNotasController;
+use App\Http\Controllers\AvanceRegistroNotaController;
+use App\Http\Controllers\AvanceRegistroNotaExportController;
 use App\Http\Controllers\CuadroNotaController;
 use App\Http\Controllers\RegistroEvaluacionActitudinalController;
 use App\Http\Controllers\EvaluacionActitudinalJerarquicoController;
@@ -110,6 +113,7 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware(['modulo:periodos'])->group(function () {
             Route::resource('periodos', PeriodoController::class);
             Route::patch('/periodos/{periodo}/toggle-active', [PeriodoController::class, 'toggleActive'])->name('periodos.toggle-active');
+            Route::patch('/periodos/{periodo}/toggle-avance-active', [PeriodoController::class, 'toggleAvanceActive'])->name('periodos.toggle-avance-active');
         });
         
         // Módulo: alumnos
@@ -236,6 +240,21 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/notas/conclusion', [NotaController::class, 'saveConclusion'])->name('notas.save-conclusion');
             Route::get('/notas/opciones', [NotaController::class, 'getOpcionesNotas'])->name('notas.opciones');
             Route::post('/notas/export-excel', [\App\Http\Controllers\NotaExportController::class, 'exportExcel'])->name('notas.export-excel');
+        });
+
+        Route::middleware(['modulo:avance-registro-notas'])->group(function () {
+            Route::get('/avance-registro-notas', [AvanceRegistroNotaController::class, 'index'])->name('avance-registro-notas.index');
+            Route::get('/avance-registro-notas/cursos-by-aula', [AvanceRegistroNotaController::class, 'getCursosByAula'])->name('avance-registro-notas.cursos-by-aula');
+            Route::get('/avance-registro-notas/get-data', [AvanceRegistroNotaController::class, 'getDataForNotas'])->name('avance-registro-notas.get-data');
+            Route::post('/avance-registro-notas/save', [AvanceRegistroNotaController::class, 'saveNotas'])->name('avance-registro-notas.save');
+            Route::get('/avance-registro-notas/conclusion/{notaAvance}', [AvanceRegistroNotaController::class, 'getConclusion'])->name('avance-registro-notas.get-conclusion');
+            Route::post('/avance-registro-notas/conclusion', [AvanceRegistroNotaController::class, 'saveConclusion'])->name('avance-registro-notas.save-conclusion');
+            Route::get('/avance-registro-notas/opciones', [AvanceRegistroNotaController::class, 'getOpcionesNotas'])->name('avance-registro-notas.opciones');
+            Route::post('/avance-registro-notas/export-excel', [AvanceRegistroNotaExportController::class, 'exportExcel'])->name('avance-registro-notas.export-excel');
+        });
+
+        Route::middleware(['modulo:avance-registro-notas-habilitar'])->group(function () {
+            Route::post('/avance-registro-notas/toggle-habilitacion', [AvanceRegistroNotaController::class, 'toggleHabilitacion'])->name('avance-registro-notas.toggle-habilitacion');
         });
 
         Route::middleware(['modulo:pagos'])->group(function () {
@@ -437,6 +456,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/configuracion/asignar-competencias-transversales', [ConfiguracionController::class, 'asignarCompetenciasTransversales'])->name('configuracion.asignar-competencias-transversales');
             Route::post('/configuracion/eliminar-asignacion-competencia-transversal', [ConfiguracionController::class, 'eliminarAsignacionCompetenciaTransversal'])->name('configuracion.eliminar-asignacion-competencia-transversal');
             Route::post('/configuracion/libreta-cuadros', [ConfiguracionController::class, 'saveLibretaCuadros'])->name('configuracion.save-libreta-cuadros');
+            Route::post('/configuracion/avance-cuadros', [ConfiguracionController::class, 'saveAvanceCuadros'])->name('configuracion.save-avance-cuadros');
             Route::post('/configuracion/delete-logo', [ConfiguracionController::class, 'deleteLogo'])->name('configuracion.delete-logo');
             Route::post('/configuracion/delete-libreta-image', [ConfiguracionController::class, 'deleteLibretaImage'])->name('configuracion.delete-libreta-image');
         });
@@ -492,6 +512,22 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware(['modulo:exportar-por-alumno'])->group(function () {
             Route::get('/libretas/exportar-por-alumno', [LibretaController::class, 'indexAlumno'])->name('libretas.exportar-por-alumno.index');
             Route::get('/libretas/exportar-por-alumno/buscar', [LibretaController::class, 'buscarAlumnos'])->name('libretas.alumno.buscar');
+        });
+
+        // Módulo: avance-libretas
+        Route::middleware(['modulo:avance-libretas'])->group(function () {
+            Route::get('/avance-libretas', [AvanceLibretaController::class, 'index'])->name('avance-libretas.index');
+            Route::get('/avance-libretas/alumnos-by-aula', [AvanceLibretaController::class, 'getAlumnosByAula'])->name('avance-libretas.alumnos-by-aula');
+            Route::post('/avance-libretas/exportar-aula', [AvanceLibretaController::class, 'exportarAula'])->name('avance-libretas.exportar-aula');
+            Route::post('/avance-libretas/exportar-alumno', [AvanceLibretaController::class, 'exportarAlumno'])->name('avance-libretas.exportar-alumno');
+            Route::get('/avance-libretas/previsualizar', [AvanceLibretaController::class, 'previsualizar'])->name('avance-libretas.previsualizar');
+            Route::get('/avance-libretas/previsualizar-aula', [AvanceLibretaController::class, 'previsualizarAula'])->name('avance-libretas.previsualizar-aula');
+        });
+
+        // Módulo: avance-exportar-por-alumno
+        Route::middleware(['modulo:avance-exportar-por-alumno'])->group(function () {
+            Route::get('/avance-libretas/exportar-por-alumno', [AvanceLibretaController::class, 'indexAlumno'])->name('avance-libretas.exportar-por-alumno.index');
+            Route::get('/avance-libretas/exportar-por-alumno/buscar', [AvanceLibretaController::class, 'buscarAlumnos'])->name('avance-libretas.alumno.buscar');
         });
         
         // ==================== MÓDULOS PARA PERMISOS (solo admin) ====================
