@@ -136,6 +136,8 @@
 @php
     // Obtener configuración de cuadros por nivel (si existe). Si es null => mostrar todos por defecto
     $cuadrosForNivel = \App\Models\ConfiguracionAvanceCuadro::getCuadrosForNivel($nivelId);
+    $mostrarConclusionesAvance = \App\Models\ConfiguracionAvanceCuadro::isConclusionVisibleForNivel($nivelId);
+    $anchoColumnaNl = '1.8ch';
     if (!function_exists('__cuadro_enabled')) {
         function __cuadro_enabled($key, $cuadrosForNivel) {
             if ($cuadrosForNivel === null) return true; // no hay configuración -> mostrar todo
@@ -154,16 +156,20 @@
     <thead>
         <tr>
             <th rowspan="2" style="width: 10%;">Área curricular</th>
-            <th rowspan="2" style="width: 35%;">Competencias</th>
+            <th rowspan="2" style="{{ $mostrarConclusionesAvance ? 'width: 45%;' : 'width: 55%;' }}">Competencias</th>
             @foreach($periodos as $periodo)
-                <th colspan="2" style="text-align: center;">{{ $periodo->nombre }}</th>
+                <th colspan="{{ $mostrarConclusionesAvance ? 2 : 1 }}" style="text-align: center; {{ $mostrarConclusionesAvance ? '' : "width: {$anchoColumnaNl}; min-width: {$anchoColumnaNl}; max-width: {$anchoColumnaNl}; white-space: nowrap;" }}">{{ $periodo->nombre }}</th>
             @endforeach
-            <th rowspan="2" style="width: 38px; min-width: 38px; max-width: 38px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; font-size: 6px; line-height: 1.05; padding: 2px 1px; text-align: center;">NL alcanzado</th>
+            <th rowspan="2" style="width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap; text-align: center;">
+                <span style="display: block; white-space: normal; overflow-wrap: anywhere; word-break: break-word; font-size: 6px; line-height: 1.05; padding: 2px 1px;">NL alcanzado</span>
+            </th>
         </tr>
         <tr>
             @foreach($periodos as $periodo)
-                <th style="width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">NL</th>
-                <th style="width: 20%;">Conclusión descriptiva</th>
+                <th style="width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">NL</th>
+                @if($mostrarConclusionesAvance)
+                    <th style="width: 20%;">Conclusión descriptiva</th>
+                @endif
             @endforeach
         </tr>
     </thead>
@@ -204,12 +210,14 @@
                             }
                         @endphp
 
-                        <td style="text-align: center; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">
+                        <td style="text-align: center; width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">
                             <strong>{{ $valor }}</strong>
                         </td>
-                        <td style="text-align: left; font-size: 9px;">
-                            {{ $conclusion }}
-                        </td>
+                        @if($mostrarConclusionesAvance)
+                            <td style="text-align: left; font-size: 9px;">
+                                {{ $conclusion }}
+                            </td>
+                        @endif
                     @endforeach
 
                     @php
@@ -223,7 +231,7 @@
                         }
                     @endphp
 
-                    <td style="text-align: center; width: 34px; min-width: 34px; max-width: 34px; white-space: nowrap;">
+                    <td style="text-align: center; width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">
                         {{ $nivelLogro }}
                     </td>
                 </tr>
@@ -269,13 +277,15 @@
         <tr>
             <th rowspan="2" style="width: 35%;">Competencias Transversales</th>
             @foreach($periodos as $periodo)
-                <th colspan="2" style="text-align: center;">{{ $periodo->nombre }}</th>
+                <th colspan="{{ $mostrarConclusionesAvance ? 2 : 1 }}" style="text-align: center;">{{ $periodo->nombre }}</th>
             @endforeach
         </tr>
         <tr>
             @foreach($periodos as $periodo)
                 <th style="width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">NL</th>
-                <th style="width: 20%;">Conclusión Descriptiva</th>
+                @if($mostrarConclusionesAvance)
+                    <th style="width: 20%;">Conclusión Descriptiva</th>
+                @endif
             @endforeach
         </tr>
     </thead>
@@ -297,9 +307,11 @@
                     <td style="text-align: center; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">
                         <strong>{{ $nota }}</strong>
                     </td>
-                    <td style="text-align: left; font-size: 9px;">
-                        {{ $conclusion }}
-                    </td>
+                    @if($mostrarConclusionesAvance)
+                        <td style="text-align: left; font-size: 9px;">
+                            {{ $conclusion }}
+                        </td>
+                    @endif
                 @endforeach
             </tr>
         @endforeach
