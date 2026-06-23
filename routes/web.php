@@ -47,6 +47,7 @@ use App\Http\Controllers\GradoController;
 use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\AvanceNotasController;
 use App\Http\Controllers\AvanceRegistroNotaController;
+use App\Http\Controllers\AvanceRegistroNotasController;
 use App\Http\Controllers\AvanceRegistroNotaExportController;
 use App\Http\Controllers\CuadroNotaController;
 use App\Http\Controllers\RegistroEvaluacionActitudinalController;
@@ -251,6 +252,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/avance-registro-notas/conclusion', [AvanceRegistroNotaController::class, 'saveConclusion'])->name('avance-registro-notas.save-conclusion');
             Route::get('/avance-registro-notas/opciones', [AvanceRegistroNotaController::class, 'getOpcionesNotas'])->name('avance-registro-notas.opciones');
             Route::post('/avance-registro-notas/export-excel', [AvanceRegistroNotaExportController::class, 'exportExcel'])->name('avance-registro-notas.export-excel');
+        });
+
+        Route::middleware(['modulo:progreso-avance-registro-notas'])->group(function () {
+            Route::get('/progreso-avance-registro-notas', [AvanceRegistroNotasController::class, 'index'])->name('progreso-avance-registro-notas.index');
+            Route::get('/progreso-avance-registro-notas/resumen-aulas', [AvanceRegistroNotasController::class, 'getResumenAulas'])->name('progreso-avance-registro-notas.resumen-aulas');
+            Route::get('/progreso-avance-registro-notas/avance-aula', [AvanceRegistroNotasController::class, 'getAvanceByAula'])->name('progreso-avance-registro-notas.avance-aula');
         });
 
         Route::middleware(['modulo:avance-registro-notas-habilitar'])->group(function () {

@@ -1,7 +1,7 @@
-{{-- resources/views/avance-notas/index.blade.php --}}
+{{-- resources/views/progreso-avance-registro-notas/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Avance de Registro de Notas')
+@section('title', 'Progreso de Avance de Registro de Notas')
 
 @section('css')
 <style>
@@ -198,7 +198,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4>
             <i class="fas fa-chart-line me-2" style="color: var(--primary-color);"></i>
-            Progreso de Registro de Notas
+            Progreso de Avance de Registro de Notas
         </h4>
     </div>
     
@@ -276,7 +276,7 @@
                             Progreso de notas completas por aula
                         </h6>
                         <small class="text-muted d-block mb-3" id="completitudResumen">
-                            Visualiza el porcentaje de cursos completos por aula para validar el cálculo de orden de mérito.
+                            Visualiza el porcentaje de cursos completos por aula considerando solo los cuadros habilitados en la configuración de Avance Cuadros.
                         </small>
                         <div id="completitudChart"></div>
                     </div>
@@ -417,7 +417,7 @@ $(document).ready(function() {
         mostrarLoading(true);
         
         $.ajax({
-            url: '{{ route("admin.avance-notas.resumen-aulas") }}',
+            url: '{{ route("admin.progreso-avance-registro-notas.resumen-aulas") }}',
             method: 'GET',
             data: {
                 periodo_id: periodoId,
@@ -513,7 +513,7 @@ $(document).ready(function() {
                           sinEstudiantes ? '<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ' + estadoTexto + '</span>' :
                           `<div class="d-flex justify-content-between align-items-center">
                             <span><i class="fas fa-check-circle text-success"></i> Notas: ${item.total_registrado || 0}/${item.total_esperado || 0}</span>
-                            <span class="libreta-badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}">Otras Evaluaciones ${item.libreta_porcentaje || 0}%</span>
+                            <span class="libreta-badge" style="background:${getColorByPct(item.libreta_porcentaje || 0)}">Avance ${item.libreta_porcentaje || 0}%</span>
                           </div>
                           ${renderCuadrosMini(item.cuadros_avance || {})}`}
                     </div>
@@ -554,7 +554,7 @@ $(document).ready(function() {
 
         const aulasCompletas = data.filter(item => Number(item.porcentaje || 0) >= 100).length;
         $('#completitudResumen').text(
-            `Aulas al 100%: ${aulasCompletas} de ${data.length}. Este indicador valida que estén todas las notas por curso para cada aula.`
+            `Aulas al 100%: ${aulasCompletas} de ${data.length}. Este indicador valida que estén todas las notas registradas considerando los cuadros habilitados.`
         );
 
         if (completitudChart) {
@@ -652,7 +652,7 @@ $(document).ready(function() {
         $('#modalDetalleAula').modal('show');
         
         $.ajax({
-            url: '{{ route("admin.avance-notas.avance-aula") }}',
+            url: '{{ route("admin.progreso-avance-registro-notas.avance-aula") }}',
             method: 'GET',
             data: {
                 periodo_id: periodoId,
@@ -719,7 +719,6 @@ $(document).ready(function() {
             </div>
         `;
 
-        // Cuadros de libreta
         const cuadros = resumen.cuadros_avance || {};
         const cuadrosEntries = Object.entries(cuadros);
         if (cuadrosEntries.length > 0) {
@@ -777,7 +776,7 @@ $(document).ready(function() {
         
         $('#modalDetalleBody').html(html);
     }
-    
+
     function mostrarLoading(mostrar) {
         if (mostrar) {
             $('#loadingOverlay').fadeIn(200);
