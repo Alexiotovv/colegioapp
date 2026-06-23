@@ -227,11 +227,28 @@ class ConfiguracionController extends Controller
             'nivel_id' => 'required|integer|exists:niveles,id',
             'cuadros' => 'nullable|array',
             'cuadros.*' => 'string',
+            'modo_bimestres' => 'nullable|string|in:bimestres_all,bimestres_single',
+            'mostrar_nl_alcanzado' => 'nullable|boolean',
             'mostrar_conclusion_descriptiva' => 'nullable|boolean',
         ]);
 
         $cuadros = $data['cuadros'] ?? [];
         $mostrarConclusion = $request->boolean('mostrar_conclusion_descriptiva', true);
+        $mostrarNlAlcanzado = $request->boolean('mostrar_nl_alcanzado', false);
+        $modoBimestres = $data['modo_bimestres'] ?? 'bimestres_all';
+
+        // Eliminar marcadores previos
+        $cuadros = array_values(array_filter($cuadros, function ($item) {
+            return $item !== '_modo_bimestres_single' && $item !== '_modo_bimestres_all' && $item !== '_mostrar_nl_alcanzado';
+        }));
+
+        // Agregar marcador del modo bimestres actual (siempre)
+        $cuadros[] = ($modoBimestres === 'bimestres_single') ? '_modo_bimestres_single' : '_modo_bimestres_all';
+
+        // Agregar marcador de mostrar NL alcanzado si está habilitado
+        if ($mostrarNlAlcanzado) {
+            $cuadros[] = '_mostrar_nl_alcanzado';
+        }
 
         if ($mostrarConclusion) {
             if (!in_array(ConfiguracionAvanceCuadro::CONCLUSION_VISIBLE_KEY, $cuadros, true)) {
@@ -245,7 +262,7 @@ class ConfiguracionController extends Controller
 
         ConfiguracionAvanceCuadro::setCuadrosForNivel(
             $data['nivel_id'],
-            $cuadros
+            array_values($cuadros)
         );
 
         return redirect()->route('admin.configuracion.index')->with('success', 'Avance cuadros guardados');

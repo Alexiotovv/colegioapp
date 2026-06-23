@@ -4,6 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Previsualizar Libreta</title>
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Previsualizar Libreta</title>
 
     <style>
         * {
@@ -94,7 +100,7 @@
         .label {
             background: #c9c9c9;
             font-weight: bold;
-            width: 27%;
+            width: 23%;
         }
 
         /* TABLAS */
@@ -409,10 +415,14 @@
 
                             <tr>
                                 <td class="label">Apellidos y nombres del estudiante:</td>
-                                <td colspan="3">
+                                <td >
                                     {{ $matricula->alumno->apellido_paterno }}
                                     {{ $matricula->alumno->apellido_materno }},
                                     {{ $matricula->alumno->nombres }}
+                                </td>
+                                <td class="label">Periodo:</td>
+                                <td >
+                                    {{ $nombrePeriodoSeleccionado ?? 'No seleccionado' }}
                                 </td>
                             </tr>
 

@@ -242,7 +242,10 @@ class LibretaController extends Controller
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
         
-        return view('libretas.previsualizar', compact('aula', 'matricula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta'));
+        $periodoSeleccionado = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $nombrePeriodoSeleccionado = $periodoSeleccionado ? ($periodoSeleccionado->nombre_completo ?? $periodoSeleccionado->nombre) : null;
+        
+        return view('libretas.previsualizar', compact('aula', 'matricula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta', 'periodoSeleccionado', 'nombrePeriodoSeleccionado'));
     }
 
     public function previsualizarAula(Request $request)
@@ -282,7 +285,10 @@ class LibretaController extends Controller
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
         
-        return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta'));
+        $periodoSeleccionado = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $nombrePeriodoSeleccionado = $periodoSeleccionado ? ($periodoSeleccionado->nombre_completo ?? $periodoSeleccionado->nombre) : null;
+
+        return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'periodoSeleccionado', 'configInstitucion', 'configLibreta', 'nombrePeriodoSeleccionado'));
     }
     
     /**

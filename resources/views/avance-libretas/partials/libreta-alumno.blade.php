@@ -144,6 +144,44 @@
             return is_array($cuadrosForNivel) && in_array($key, $cuadrosForNivel);
         }
     }
+
+    if (!function_exists('__debe_mostrar_nl_alcanzado')) {
+        function __debe_mostrar_nl_alcanzado($cuadrosForNivel) {
+            if ($cuadrosForNivel === null) return false;
+            if (is_array($cuadrosForNivel)) {
+                return in_array('_mostrar_nl_alcanzado', $cuadrosForNivel);
+            }
+            return false;
+        }
+    }
+
+    if (!function_exists('__bimestre_mode')) {
+        function __bimestre_mode($cuadrosForNivel) {
+            if ($cuadrosForNivel === null) return 'all';
+            if (is_array($cuadrosForNivel)) {
+                if (in_array('_modo_bimestres_single', $cuadrosForNivel)) return 'single';
+                if (in_array('_modo_bimestres_all', $cuadrosForNivel)) return 'all';
+            }
+            return 'all';
+        }
+    }
+
+    // Filtrar periodos visibles según modo configurado para el nivel
+    $modeBimestres = __bimestre_mode($cuadrosForNivel);
+    if ($modeBimestres === 'all') {
+        $periodosVisible = collect($periodos)->values();
+    } else {
+        // modo 'single' -> mostrar solo el periodo seleccionado al imprimir
+        if (isset($periodoSeleccionado) && $periodoSeleccionado) {
+            $periodosVisible = collect($periodos)->filter(function($p) use ($periodoSeleccionado) {
+                return isset($p->id) && $p->id == $periodoSeleccionado->id;
+            })->values();
+        } else {
+            // sin periodo seleccionado en modo single, mostrar solo el primer período
+            $firstPeriodo = collect($periodos)->first();
+            $periodosVisible = $firstPeriodo ? collect([$firstPeriodo])->values() : collect();
+        }
+    }
 @endphp
 
     
@@ -157,20 +195,22 @@
         <tr>
             <th rowspan="2" style="width: 10%;">Área curricular</th>
             <th rowspan="2" style="{{ $mostrarConclusionesAvance ? 'width: 45%;' : 'width: 55%;' }}">Competencias</th>
-            @foreach($periodos as $periodo)
+            @foreach($periodosVisible as $periodo)
                 <th colspan="{{ $mostrarConclusionesAvance ? 2 : 1 }}" style="text-align: center; {{ $mostrarConclusionesAvance ? '' : "width: {$anchoColumnaNl}; min-width: {$anchoColumnaNl}; max-width: {$anchoColumnaNl}; white-space: nowrap;" }}">{{ $periodo->nombre }}</th>
             @endforeach
+            @if(__debe_mostrar_nl_alcanzado($cuadrosForNivel))
             <th rowspan="2" style="width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap; text-align: center;">
                 <span style="display: block; white-space: normal; overflow-wrap: anywhere; word-break: break-word; font-size: 6px; line-height: 1.05; padding: 2px 1px;">NL alcanzado</span>
             </th>
+            @endif
         </tr>
         <tr>
-            @foreach($periodos as $periodo)
-                <th style="width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">NL</th>
-                @if($mostrarConclusionesAvance)
-                    <th style="width: 20%;">Conclusión descriptiva</th>
-                @endif
-            @endforeach
+            @foreach($periodosVisible as $periodo)
+                    <th style="width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">NL</th>
+                    @if($mostrarConclusionesAvance)
+                        <th style="width: 20%">Conclusión descriptiva</th>
+                    @endif
+                @endforeach
         </tr>
     </thead>
     <tbody>
@@ -196,7 +236,7 @@
                         {{ $competencia->nombre }}
                     </td>
 
-                    @foreach($periodos as $periodo)
+                    @foreach($periodosVisible as $periodo)
                         @php
                             $nota = $notasPorPeriodo[$periodo->id][$competencia->id] ?? null;
                             $valor = $nota ? $nota->nota : '-';
@@ -231,9 +271,11 @@
                         }
                     @endphp
 
+                    @if(__debe_mostrar_nl_alcanzado($cuadrosForNivel))
                     <td style="text-align: center; width: {{ $anchoColumnaNl }}; min-width: {{ $anchoColumnaNl }}; max-width: {{ $anchoColumnaNl }}; white-space: nowrap;">
                         {{ $nivelLogro }}
                     </td>
+                    @endif
                 </tr>
             @endforeach
         @endforeach
@@ -276,12 +318,12 @@
     <thead>
         <tr>
             <th rowspan="2" style="width: 35%;">Competencias Transversales</th>
-            @foreach($periodos as $periodo)
+            @foreach($periodosVisible as $periodo)
                 <th colspan="{{ $mostrarConclusionesAvance ? 2 : 1 }}" style="text-align: center;">{{ $periodo->nombre }}</th>
             @endforeach
         </tr>
         <tr>
-            @foreach($periodos as $periodo)
+            @foreach($periodosVisible as $periodo)
                 <th style="width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap;">NL</th>
                 @if($mostrarConclusionesAvance)
                     <th style="width: 20%;">Conclusión Descriptiva</th>
@@ -298,7 +340,7 @@
                         <br><small style="font-size: 8px;">{{ $ct->descripcion }}</small>
                     @endif
                 </td>
-                @foreach($periodos as $periodo)
+                @foreach($periodosVisible as $periodo)
                     @php
                         $registro = $registrosCT[$periodo->id][$ct->id] ?? null;
                         $nota = $registro ? $registro->nota : '-';
@@ -330,7 +372,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach($periodos as $periodo)
+        @foreach($periodosVisible as $periodo)
             <tr>
                 <td width="15%"><strong>{{ $periodo->nombre }}</strong></td>
                 <td>{{ $apreciaciones[$periodo->id]->apreciacion ?? '' }}</td>
@@ -345,10 +387,10 @@
 @if(__cuadro_enabled('evaluacion_padre', $cuadrosForNivel) && $evaluacionesPadre && $evaluacionesPadre->count() > 0)
 <table class="tabla-evaluacion-padres">
     <thead>
-        <tr><th colspan="{{ 1 + $periodos->count() }}">EVALUACIÓN AL PADRE DE FAMILIA</th></tr>
+        <tr><th colspan="{{ 1 + $periodosVisible->count() }}">EVALUACIÓN AL PADRE DE FAMILIA</th></tr>
         <tr>
             <th>DESCRIPCIÓN</th>
-            @foreach($periodos as $periodo)
+            @foreach($periodosVisible as $periodo)
                 <th>{{ $periodo->nombre }}</th>
             @endforeach
         </tr>
@@ -357,7 +399,7 @@
         @foreach($evaluacionesPadre as $evaluacion)
             <tr>
                 <td style="text-align: left;">{{ $evaluacion->nombre }}</td>
-                @foreach($periodos as $periodo)
+                @foreach($periodosVisible as $periodo)
                     @php
                         $registro = $registrosEvaluacionesPadre[$periodo->id][$evaluacion->id] ?? null;
                         $valor = $registro ? $registro->valoracion : '';
@@ -409,7 +451,7 @@
                                 <tr><th colspan="5">EVALUACIÓN ACTITUDINAL</th></tr>
                                 <tr>
                                     <th>DESCRIPCIÓN</th>
-                                    @foreach($periodos as $periodo)
+                                    @foreach($periodosVisible as $periodo)
                                         <th>{{ $periodo->nombre }}</th>
                                     @endforeach
                                 </tr>
@@ -418,7 +460,7 @@
                                 @foreach($evaluacionesActitudinales as $evaluacion)
                                     <tr>
                                         <td style="text-align: left;">{{ $evaluacion->nombre }}@if($evaluacion->descripcion)<br><small>{{ $evaluacion->descripcion }}</small>@endif</td>
-                                        @foreach($periodos as $periodo)
+                                        @foreach($periodosVisible as $periodo)
                                             @php
                                                 $registro = $registrosEvaluacionesActitudinales[$periodo->id][$evaluacion->id] ?? null;
                                                 $valor = $registro ? $registro->valoracion : '';
@@ -435,7 +477,7 @@
                                 <tr><th colspan="5">ASISTENCIAS</th></tr>
                                 <tr>
                                     <th>DESCRIPCIÓN</th>
-                                    @foreach($periodos as $periodo)
+                                    @foreach($periodosVisible as $periodo)
                                         <th>{{ $periodo->nombre }}</th>
                                     @endforeach
                                 </tr>
@@ -444,7 +486,7 @@
                                 @foreach($tiposInasistencia as $tipo)
                                     <tr>
                                         <td style="text-align: left;">{{ $tipo->nombre }}</td>
-                                        @foreach($periodos as $periodo)
+                                        @foreach($periodosVisible as $periodo)
                                             @php
                                                 $inasistencia = $inasistencias[$periodo->id][$tipo->id] ?? null;
                                                 $valor = $inasistencia ? $inasistencia->cantidad : '';
@@ -461,7 +503,7 @@
                                 <tr><th colspan="5">COMPORTAMIENTO</th></tr>
                                 <tr>
                                     <th>DESCRIPCIÓN</th>
-                                    @foreach($periodos as $periodo)
+                                    @foreach($periodosVisible as $periodo)
                                         <th>{{ $periodo->nombre }}</th>
                                     @endforeach
                                 </tr>
@@ -470,7 +512,7 @@
                                 @foreach($otrasEvaluaciones as $tipo)
                                     <tr>
                                         <td style="text-align: left;">{{ $tipo->nombre }}</td>
-                                        @foreach($periodos as $periodo)
+                                        @foreach($periodosVisible as $periodo)
                                             @php
                                                 $registro = $registrosOtras[$periodo->id][$tipo->id] ?? null;
                                                 $valor = $registro ? $registro->valor : '';
@@ -531,7 +573,7 @@
                                     @if($cuadro->tipo === 'tabla_periodos')
                                         <table class="tabla-evaluacion-padres" style="width:100%;">
                                             <thead><tr><th>DESCRIPCIÓN</th>
-                                                @foreach($periodos as $periodo)
+                                                @foreach($periodosVisible as $periodo)
                                                     <th>{{ $periodo->nombre }}</th>
                                                 @endforeach
                                             </tr></thead>
@@ -540,7 +582,7 @@
                                                     @foreach($descripciones as $d)
                                                         <tr>
                                                             <td style="text-align:left;">{{ $d->texto }}</td>
-                                                            @foreach($periodos as $periodo)
+                                                            @foreach($periodosVisible as $periodo)
                                                                 <td style="text-align:center;">&nbsp;</td>
                                                             @endforeach
                                                         </tr>
@@ -548,7 +590,7 @@
                                                 @else
                                                     <tr>
                                                         <td style="text-align:left;">&nbsp;</td>
-                                                        @foreach($periodos as $periodo)
+                                                        @foreach($periodosVisible as $periodo)
                                                             <td style="text-align:center;">&nbsp;</td>
                                                         @endforeach
                                                     </tr>

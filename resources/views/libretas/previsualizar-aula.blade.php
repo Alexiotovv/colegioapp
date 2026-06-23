@@ -411,10 +411,14 @@
 
                         <tr>
                             <td class="label">Apellidos y nombres del estudiante:</td>
-                            <td colspan="3">
+                            <td>
                                 {{ $matricula->alumno->apellido_paterno }}
                                 {{ $matricula->alumno->apellido_materno }},
                                 {{ $matricula->alumno->nombres }}
+                            </td>
+                            <td class="label">Periodo:</td>
+                            <td >
+                                {{ $nombrePeriodoSeleccionado ?? 'No seleccionado' }}
                             </td>
                         </tr>
 

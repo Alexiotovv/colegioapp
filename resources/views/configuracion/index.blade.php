@@ -561,6 +561,38 @@
                                         @endforeach
                                     </div>
                                 </div>
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                                <label class="form-label">Modo bimestres</label>
+                                                @php
+                                                    // Determinar el modo actual guardado
+                                                    $selectedMode = 'bimestres_all'; // Por defecto
+                                                    if (is_array($selectedAvance)) {
+                                                        if (in_array('_modo_bimestres_single', $selectedAvance)) {
+                                                            $selectedMode = 'bimestres_single';
+                                                        } elseif (in_array('_modo_bimestres_all', $selectedAvance)) {
+                                                            $selectedMode = 'bimestres_all';
+                                                        }
+                                                    }
+                                                @endphp
+                                                <select name="modo_bimestres" class="form-select">
+                                                    <option value="bimestres_all" {{ $selectedMode === 'bimestres_all' ? 'selected' : '' }}>Mostrar las 4 bimestres</option>
+                                                    <option value="bimestres_single" {{ $selectedMode === 'bimestres_single' ? 'selected' : '' }}>Solo la columna del bimestre seleccionado al imprimir</option>
+                                                </select>
+                                            </div>
+                                    </div>
+                                <hr>
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <input type="hidden" name="mostrar_nl_alcanzado" value="0">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="mostrar_nl_alcanzado" id="avance_{{ $nivel->id }}_mostrar_nl_alcanzado" value="1" {{ (is_array($selectedAvance) && in_array('_mostrar_nl_alcanzado', $selectedAvance)) ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="avance_{{ $nivel->id }}_mostrar_nl_alcanzado">
+                                                Mostrar columna "NL alcanzado" en las libretas
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
                                 <hr>
                                 <div class="row mt-2">
                                     <div class="col-12">
