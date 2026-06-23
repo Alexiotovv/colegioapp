@@ -29,7 +29,7 @@ class AvanceRegistroNotasController extends Controller
         }
 
         $periodos = Periodo::where('anio_academico_id', $anioActivo->id)
-            ->where('activo', true)
+            // ->where('activo', true)
             ->orderBy('orden')
             ->get();
 
