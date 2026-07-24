@@ -1131,7 +1131,7 @@ class ReporteNotasController extends Controller
             ->orderBy('orden')
             ->get();
 
-        $totalCols = 3 + $competencias->count();
+        $totalCols = 3 + ($competencias->count() * 2);
         $lastCol   = $totalCols > 0 ? Coordinate::stringFromColumnIndex($totalCols) : 'D';
 
         $sheet = $spreadsheet->createSheet();
@@ -1162,12 +1162,19 @@ class ReporteNotasController extends Controller
         $sheet->setCellValue('C4', 'Apellidos y Nombres');
 
         foreach ($competencias as $i => $ct) {
-            $col = Coordinate::stringFromColumnIndex(4 + $i);
-            $sheet->setCellValue("{$col}4", $ct->nombre);
-            $sheet->getStyle("{$col}4")->getAlignment()->setWrapText(true);
+            $colInicio = Coordinate::stringFromColumnIndex(4 + ($i * 2));
+            $colFin = Coordinate::stringFromColumnIndex(4 + ($i * 2) + 1);
+            $sheet->mergeCells("{$colInicio}4:{$colFin}4");
+            $sheet->setCellValue("{$colInicio}4", $ct->nombre);
+            $sheet->setCellValue("{$colInicio}5", 'NL');
+            $sheet->setCellValue("{$colFin}5", 'Conclusión descriptiva de la competencia');
+            $sheet->getStyle("{$colInicio}4:{$colFin}4")->getAlignment()->setWrapText(true);
         }
 
-        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle("A4:{$lastCol}5")->applyFromArray($this->headerStyle('#065f46'));
+        $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("A4:{$lastCol}5")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A4:' . $lastCol . '5')->getAlignment()->setWrapText(true);
 
         // Bulk load registros
         $matriculaIds = $alumnos->pluck('id')->filter()->values()->toArray();
@@ -1176,7 +1183,7 @@ class ReporteNotasController extends Controller
             ->get()
             ->groupBy('matricula_id');
 
-        $row = 5;
+        $row = 6;
         foreach ($alumnos as $index => $matricula) {
             $alumno     = $matricula->alumno;
             $regsAlumno = $registros->get($matricula->id, collect())->keyBy('competencia_transversal_id');
@@ -1186,10 +1193,13 @@ class ReporteNotasController extends Controller
             $sheet->setCellValue("C{$row}", $this->nombreCompletoAlumno($alumno));
 
             foreach ($competencias as $i => $ct) {
-                $col = Coordinate::stringFromColumnIndex(4 + $i);
+                $colInicio = Coordinate::stringFromColumnIndex(4 + ($i * 2));
+                $colFin = Coordinate::stringFromColumnIndex(4 + ($i * 2) + 1);
                 $reg = $regsAlumno->get($ct->id);
-                $sheet->setCellValue("{$col}{$row}", $reg?->nota ?? '—');
-                $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->setCellValue("{$colInicio}{$row}", $reg?->nota ?? '—');
+                $sheet->setCellValueExplicit("{$colFin}{$row}", $reg?->conclusion ?? '', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $sheet->getStyle("{$colInicio}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("{$colFin}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             }
 
             $row++;
@@ -1201,8 +1211,10 @@ class ReporteNotasController extends Controller
         $sheet->getColumnDimension('C')->setWidth(30);
 
         foreach ($competencias as $i => $ct) {
-            $col = Coordinate::stringFromColumnIndex(4 + $i);
-            $sheet->getColumnDimension($col)->setWidth(18);
+            $colInicio = Coordinate::stringFromColumnIndex(4 + ($i * 2));
+            $colFin = Coordinate::stringFromColumnIndex(4 + ($i * 2) + 1);
+            $sheet->getColumnDimension($colInicio)->setWidth(18);
+            $sheet->getColumnDimension($colFin)->setWidth(32);
         }
     }
 
