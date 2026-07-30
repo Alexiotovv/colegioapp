@@ -257,6 +257,8 @@
                 @include('libretas.partials.libreta-alumno', [
                     'matricula' => $matricula, 
                     'periodos' => $periodos, 
+                    'periodosVisible' => $periodosVisible ?? $periodos,
+                    'periodoSeleccionado' => $periodoSeleccionado ?? null,
                     'configLibreta' => $configLibreta, 
                     'configInstitucion' => $configInstitucion
                 ])
@@ -268,6 +270,8 @@
             @include('libretas.partials.libreta-alumno', [
                 'matricula' => $matricula, 
                 'periodos' => $periodos, 
+                'periodosVisible' => $periodosVisible ?? $periodos,
+                'periodoSeleccionado' => $periodoSeleccionado ?? null,
                 'configLibreta' => $configLibreta, 
                 'configInstitucion' => $configInstitucion
             ])

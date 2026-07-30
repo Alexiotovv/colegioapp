@@ -17,6 +17,7 @@ use App\Models\AnioAcademico;
 use App\Models\PagoImportado;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class LibretaController extends Controller
 {
@@ -135,6 +136,26 @@ class LibretaController extends Controller
         return response()->json($resultado);
     }
     
+    protected function obtenerPeriodosVisibles($periodos, $periodoSeleccionado)
+    {
+        $periodosCollection = $periodos instanceof Collection ? $periodos : collect($periodos);
+
+        if (!$periodoSeleccionado) {
+            return $periodosCollection->values();
+        }
+
+        $ordenSeleccionado = $periodoSeleccionado->orden ?? null;
+        if ($ordenSeleccionado === null) {
+            return $periodosCollection->values();
+        }
+
+        return $periodosCollection
+            ->filter(function ($periodo) use ($ordenSeleccionado) {
+                return isset($periodo->orden) && (int) $periodo->orden <= (int) $ordenSeleccionado;
+            })
+            ->values();
+    }
+
     public function exportarAula(Request $request)
     {
         $aulaId = $request->aula_id;
@@ -146,6 +167,8 @@ class LibretaController extends Controller
         $periodos = Periodo::with('anioAcademico')
             ->orderBy('orden')
             ->get();
+        $periodoSeleccionado = $periodoId ? Periodo::find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         
         $matriculas = Matricula::with(['alumno'])
             ->select('matriculas.*')
@@ -163,6 +186,8 @@ class LibretaController extends Controller
         $data = [
             'aula' => $aula,
             'periodos' => $periodos,
+            'periodosVisible' => $periodosVisible,
+            'periodoSeleccionado' => $periodoSeleccionado,
             'matriculas' => $matriculas,
             'configInstitucion' => $configInstitucion,
             'configLibreta' => $configLibreta,
@@ -186,6 +211,8 @@ class LibretaController extends Controller
         $periodos = Periodo::with('anioAcademico')
             ->orderBy('orden')
             ->get();
+        $periodoSeleccionado = $periodoId ? Periodo::find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         
         $configInstitucion = ConfiguracionInstitucion::getConfig();
         $configLibreta = ConfiguracionLibreta::getConfig();
@@ -193,6 +220,8 @@ class LibretaController extends Controller
         $data = [
             'matricula' => $matricula,
             'periodos' => $periodos,
+            'periodosVisible' => $periodosVisible,
+            'periodoSeleccionado' => $periodoSeleccionado,
             'configInstitucion' => $configInstitucion,
             'configLibreta' => $configLibreta,
             'tipo' => 'alumno'
@@ -225,6 +254,8 @@ class LibretaController extends Controller
         $periodos = Periodo::with('anioAcademico')
             ->orderBy('orden')
             ->get();
+        $periodoSeleccionado = $periodoId ? Periodo::find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         
         $matriculas = null;
         if ($aulaId && !$matriculaId) {
@@ -243,9 +274,10 @@ class LibretaController extends Controller
         $configLibreta = ConfiguracionLibreta::getConfig();
         
         $periodoSeleccionado = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         $nombrePeriodoSeleccionado = $periodoSeleccionado ? ($periodoSeleccionado->nombre_completo ?? $periodoSeleccionado->nombre) : null;
         
-        return view('libretas.previsualizar', compact('aula', 'matricula', 'matriculas', 'periodos', 'configInstitucion', 'configLibreta', 'periodoSeleccionado', 'nombrePeriodoSeleccionado'));
+        return view('libretas.previsualizar', compact('aula', 'matricula', 'matriculas', 'periodos', 'periodosVisible', 'configInstitucion', 'configLibreta', 'periodoSeleccionado', 'nombrePeriodoSeleccionado'));
     }
 
     public function previsualizarAula(Request $request)
@@ -261,6 +293,8 @@ class LibretaController extends Controller
         $periodos = Periodo::with('anioAcademico')
             ->orderBy('orden')
             ->get();
+        $periodoSeleccionado = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         
         $matriculas = Matricula::with(['alumno'])
             ->select('matriculas.*')
@@ -286,9 +320,10 @@ class LibretaController extends Controller
         $configLibreta = ConfiguracionLibreta::getConfig();
         
         $periodoSeleccionado = $periodoId ? Periodo::with('anioAcademico')->find($periodoId) : null;
+        $periodosVisible = $this->obtenerPeriodosVisibles($periodos, $periodoSeleccionado);
         $nombrePeriodoSeleccionado = $periodoSeleccionado ? ($periodoSeleccionado->nombre_completo ?? $periodoSeleccionado->nombre) : null;
 
-        return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'periodoSeleccionado', 'configInstitucion', 'configLibreta', 'nombrePeriodoSeleccionado'));
+        return view('libretas.previsualizar-aula', compact('aula', 'matriculas', 'periodos', 'periodosVisible', 'periodoSeleccionado', 'configInstitucion', 'configLibreta', 'nombrePeriodoSeleccionado'));
     }
     
     /**
