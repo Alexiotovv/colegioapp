@@ -23,6 +23,41 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class RegistroCompetenciaTransversalController extends Controller
 {
+    private function aulasAccesiblesNoPrivilegiadoQuery(int $docenteId)
+    {
+        return Aula::query()
+            ->where('activo', true)
+            ->where(function ($q) use ($docenteId) {
+                $q->where('docente_id', $docenteId)
+                    ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                        $q2->where('docente_id', $docenteId)
+                            ->where('estado', 'activo')
+                            ->whereNull('deleted_at');
+                    });
+            });
+    }
+
+    private function docenteConAccesoAula(int $docenteId, int $aulaId): bool
+    {
+        $query = $this->aulasAccesiblesNoPrivilegiadoQuery($docenteId);
+
+        // Mantener la regla vigente del módulo:
+        // si el docente atiende Primaria, en este flujo solo se consideran aulas de Primaria.
+        $tieneAulasPrimaria = (clone $query)
+            ->whereHas('grado.nivel', function ($q) {
+                $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
+            })
+            ->exists();
+
+        if ($tieneAulasPrimaria) {
+            $query->whereHas('grado.nivel', function ($q) {
+                $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
+            });
+        }
+
+        return $query->where('id', $aulaId)->exists();
+    }
+
     private function esUsuarioPrivilegiado($user): bool
     {
         $rol = strtolower(trim((string) ($user->role->nombre ?? $user->rol ?? '')));
@@ -41,15 +76,21 @@ class RegistroCompetenciaTransversalController extends Controller
             ->where('activo', true);
 
         if (!$esUsuarioPrivilegiado) {
-            // Para usuarios no privilegiados (no admin/director/subdirector):
-            // solo mostrar el aula donde es tutor asignado.
-            $aulasQuery->where('docente_id', $docenteId);
+            // Para usuarios no privilegiados:
+            // mostrar aulas donde es tutor o donde tiene carga horaria activa.
+            $aulasQuery->where(function ($q) use ($docenteId) {
+                $q->where('docente_id', $docenteId)
+                    ->orWhereHas('cargaHoraria', function ($q2) use ($docenteId) {
+                        $q2->where('docente_id', $docenteId)
+                            ->where('estado', 'activo')
+                            ->whereNull('deleted_at');
+                    });
+            });
 
             // Regla adicional:
             // si el usuario (cualquier rol no-admin) tiene aulas de Primaria asignadas,
             // en el registro solo deben mostrarse las de Primaria (nada más).
-            $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                ->where('docente_id', $docenteId)
+            $tieneAulasPrimariaAsignadas = $this->aulasAccesiblesNoPrivilegiadoQuery($docenteId)
                 ->whereHas('grado.nivel', function ($q) {
                     $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
                 })
@@ -112,33 +153,7 @@ class RegistroCompetenciaTransversalController extends Controller
         
         // Verificar permisos
         if (!$esUsuarioPrivilegiado) {
-            // Regla adicional:
-            // si el usuario tiene aulas de Primaria asignadas,
-            // no se permite seleccionar aulas de Secundaria en este módulo.
-            $tieneAulasPrimariaAsignadas = Aula::where('activo', true)
-                ->where('docente_id', $docenteId)
-                ->whereHas('grado.nivel', function ($q) {
-                    $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
-                })
-                ->exists();
-
-            if ($tieneAulasPrimariaAsignadas) {
-                $aulaEsPrimaria = Aula::where('id', $aulaId)
-                    ->where('activo', true)
-                    ->whereHas('grado.nivel', function ($q) {
-                        $q->whereRaw('LOWER(nombre) like ?', ['%primaria%']);
-                    })
-                    ->exists();
-
-                if (!$aulaEsPrimaria) {
-                    return response()->json(['error' => 'No tienes acceso a este aula'], 403);
-                }
-            }
-
-            $tieneAcceso = Aula::where('id', $aulaId)
-                ->where('activo', true)
-                ->where('docente_id', $docenteId)
-                ->exists();
+            $tieneAcceso = $this->docenteConAccesoAula((int) $docenteId, (int) $aulaId);
             
             if (!$tieneAcceso) {
                 return response()->json(['error' => 'No tienes acceso a este aula'], 403);
@@ -267,10 +282,7 @@ class RegistroCompetenciaTransversalController extends Controller
         
         // Verificar acceso al aula
         if (!$esUsuarioPrivilegiado) {
-            $tieneAcceso = Aula::where('id', $request->aula_id)
-                ->where('activo', true)
-                ->where('docente_id', $docenteId)
-                ->exists();
+            $tieneAcceso = $this->docenteConAccesoAula((int) $docenteId, (int) $request->aula_id);
             
             if (!$tieneAcceso) {
                 return response()->json(['error' => 'No tienes acceso a este aula'], 403);
@@ -471,10 +483,7 @@ class RegistroCompetenciaTransversalController extends Controller
                 return response()->json(['error' => 'Matrícula no encontrada'], 404);
             }
             
-            $tieneAcceso = Aula::where('id', $matricula->aula_id)
-                ->where('activo', true)
-                ->where('docente_id', $docenteId)
-                ->exists();
+            $tieneAcceso = $this->docenteConAccesoAula((int) $docenteId, (int) $matricula->aula_id);
             
             if (!$tieneAcceso) {
                 return response()->json(['error' => 'No tienes acceso a este aula'], 403);
@@ -565,10 +574,7 @@ class RegistroCompetenciaTransversalController extends Controller
         $docenteId = auth()->id();
 
         if (!$esUsuarioPrivilegiado) {
-            $tieneAcceso = Aula::where('id', $aulaId)
-                ->where('activo', true)
-                ->where('docente_id', $docenteId)
-                ->exists();
+            $tieneAcceso = $this->docenteConAccesoAula((int) $docenteId, (int) $aulaId);
 
             abort_if(!$tieneAcceso, 403, 'No tienes acceso a este aula.');
         }
