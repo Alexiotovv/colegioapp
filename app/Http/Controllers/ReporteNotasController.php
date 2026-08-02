@@ -760,7 +760,7 @@ class ReporteNotasController extends Controller
             foreach ($item['competencias'] as $idx => $comp) {
                 $code    = str_pad((string) ($comp->orden ?: ($idx + 1)), 2, '0', STR_PAD_LEFT);
                 $nlCol   = Coordinate::stringFromColumnIndex($subCol);
-                $sheet->setCellValue("{$nlCol}5", $code . ' NL');
+                $sheet->setCellValue("{$nlCol}5", $code . ' NL - ' . ($comp->nombre ?? ''));
                 $subCol += 1;
             }
             if ($item['competencias']->isEmpty()) {
