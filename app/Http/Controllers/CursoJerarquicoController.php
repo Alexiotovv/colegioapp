@@ -10,6 +10,7 @@ use App\Models\Curso;
 use App\Models\Competencia;
 use App\Models\Capacidad;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CursoJerarquicoController extends Controller
 {
@@ -262,6 +263,47 @@ class CursoJerarquicoController extends Controller
     public function getCapacidad(Capacidad $capacidad)
     {
         return response()->json($capacidad);
+    }
+
+    public function reordenarCompetencias(Request $request)
+    {
+        $data = $request->validate([
+            'curso_id' => 'required|integer|exists:cursos,id',
+            'competencias' => 'required|array|min:1',
+            'competencias.*' => 'integer|exists:competencias,id',
+        ]);
+
+        $cursoId = (int) $data['curso_id'];
+        $competenciasIds = array_values(array_unique(array_map('intval', $data['competencias'])));
+
+        $totalCompetenciasCurso = Competencia::where('curso_id', $cursoId)
+            ->where('activo', true)
+            ->count();
+
+        $pertenecenAlCurso = Competencia::where('curso_id', $cursoId)
+            ->where('activo', true)
+            ->whereIn('id', $competenciasIds)
+            ->count();
+
+        if ($pertenecenAlCurso !== count($competenciasIds) || $totalCompetenciasCurso !== count($competenciasIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo validar el orden enviado para este curso.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($competenciasIds) {
+            foreach ($competenciasIds as $index => $competenciaId) {
+                Competencia::where('id', $competenciaId)->update([
+                    'orden' => $index + 1,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Orden de competencias actualizado correctamente.',
+        ]);
     }
 
     private function syncAulasExcluidas(Curso $curso, Request $request): void

@@ -28,6 +28,9 @@
                                     <span class="badge badge-curso">{{ $curso->codigo }}</span>
                                     <span class="badge bg-info">{{ $curso->horas_semanales }} h/sem</span>
                                     <span class="badge bg-secondary">{{ $curso->competencias ? $curso->competencias->count() : 0 }} competencias</span>
+                                    <span class="competencia-order-spinner d-none" data-curso-spinner="{{ $curso->id }}">
+                                        <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                                    </span>
                                 </div>
                                 <div class="action-buttons">
                                     <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); showCursoModal({{ $curso->id }}, {{ $nivel->id }})">
@@ -43,59 +46,65 @@
                             </div>
                             <div class="tree-children">
                                 @if($curso->competencias && $curso->competencias->count() > 0)
-                                    @foreach($curso->competencias as $competencia)
-                                    <div class="tree-level-3" data-competencia-id="{{ $competencia->id }}">
-                                        <div class="tree-item">
-                                            <div class="tree-header" onclick="toggleChildren(this)">
-                                                <div class="tree-title">
-                                                    <span class="toggle-icon">▶</span>
-                                                    <i class="fas fa-star" style="color: #3498db;"></i>
-                                                    <strong>{{ $competencia->nombre }}</strong>
-                                                    <span class="badge badge-competencia">{{ $competencia->ponderacion }}%</span>
-                                                    <span class="badge bg-secondary">{{ $competencia->capacidades ? $competencia->capacidades->count() : 0 }} capacidades</span>
+                                    <div class="competencias-sortable" data-curso-id="{{ $curso->id }}">
+                                        @foreach($curso->competencias as $competencia)
+                                        <div class="tree-level-3" data-competencia-id="{{ $competencia->id }}" data-orden="{{ (int) ($competencia->orden ?? 0) }}">
+                                            <div class="tree-item">
+                                                <div class="tree-header" onclick="toggleChildren(this)">
+                                                    <div class="tree-title">
+                                                        <span class="drag-handle" onclick="event.stopPropagation();" title="Arrastra para ordenar">
+                                                            <i class="fas fa-grip-vertical"></i>
+                                                        </span>
+                                                        <span class="toggle-icon">▶</span>
+                                                        <i class="fas fa-star" style="color: #3498db;"></i>
+                                                        <span class="badge bg-light text-dark competencia-order-number">{{ (int) ($competencia->orden ?? 0) }}</span>
+                                                        <strong>{{ $competencia->nombre }}</strong>
+                                                        <span class="badge badge-competencia">{{ $competencia->ponderacion }}%</span>
+                                                        <span class="badge bg-secondary">{{ $competencia->capacidades ? $competencia->capacidades->count() : 0 }} capacidades</span>
+                                                    </div>
+                                                    <div class="action-buttons">
+                                                        <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); showCompetenciaModal({{ $competencia->id }}, {{ $curso->id }})">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); showCapacidadModal(null, {{ $competencia->id }})">
+                                                            <i class="fas fa-plus"></i> Capacidad
+                                                        </button>
+                                                        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCompetencia({{ $competencia->id }})">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div class="action-buttons">
-                                                    <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); showCompetenciaModal({{ $competencia->id }}, {{ $curso->id }})">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); showCapacidadModal(null, {{ $competencia->id }})">
-                                                        <i class="fas fa-plus"></i> Capacidad
-                                                    </button>
-                                                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCompetencia({{ $competencia->id }})">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="tree-children">
-                                                @if($competencia->capacidades && $competencia->capacidades->count() > 0)
-                                                    @foreach($competencia->capacidades as $capacidad)
-                                                    <div class="tree-level-3" style="margin-left: 30px;" data-capacidad-id="{{ $capacidad->id }}">
-                                                        <div class="tree-item" style="background: #e8f0fe;">
-                                                            <div class="tree-header">
-                                                                <div class="tree-title">
-                                                                    <i class="fas fa-tasks" style="color: #2c5031;"></i>
-                                                                    <span>{{ $capacidad->nombre }}</span>
-                                                                    <span class="badge badge-capacidad">{{ $capacidad->ponderacion }}%</span>
-                                                                </div>
-                                                                <div class="action-buttons">
-                                                                    <button class="btn btn-sm btn-warning" onclick="showCapacidadModal({{ $capacidad->id }}, {{ $competencia->id }})">
-                                                                        <i class="fas fa-edit"></i>
-                                                                    </button>
-                                                                    <button class="btn btn-sm btn-danger" onclick="deleteCapacidad({{ $capacidad->id }})">
-                                                                        <i class="fas fa-trash"></i>
-                                                                    </button>
+                                                <div class="tree-children">
+                                                    @if($competencia->capacidades && $competencia->capacidades->count() > 0)
+                                                        @foreach($competencia->capacidades as $capacidad)
+                                                        <div class="tree-level-3" style="margin-left: 30px;" data-capacidad-id="{{ $capacidad->id }}">
+                                                            <div class="tree-item" style="background: #e8f0fe;">
+                                                                <div class="tree-header">
+                                                                    <div class="tree-title">
+                                                                        <i class="fas fa-tasks" style="color: #2c5031;"></i>
+                                                                        <span>{{ $capacidad->nombre }}</span>
+                                                                        <span class="badge badge-capacidad">{{ $capacidad->ponderacion }}%</span>
+                                                                    </div>
+                                                                    <div class="action-buttons">
+                                                                        <button class="btn btn-sm btn-warning" onclick="showCapacidadModal({{ $capacidad->id }}, {{ $competencia->id }})">
+                                                                            <i class="fas fa-edit"></i>
+                                                                        </button>
+                                                                        <button class="btn btn-sm btn-danger" onclick="deleteCapacidad({{ $capacidad->id }})">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    @endforeach
-                                                @else
-                                                    <div class="empty-message">No hay capacidades registradas</div>
-                                                @endif
+                                                        @endforeach
+                                                    @else
+                                                        <div class="empty-message">No hay capacidades registradas</div>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </div>
+                                        @endforeach
                                     </div>
-                                    @endforeach
                                 @else
                                     <div class="empty-message">No hay competencias registradas</div>
                                 @endif

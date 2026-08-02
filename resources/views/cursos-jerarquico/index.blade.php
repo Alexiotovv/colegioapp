@@ -133,6 +133,26 @@
         color: var(--danger-color);
         margin-left: 4px;
     }
+
+    .drag-handle {
+        cursor: grab;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .competencia-order-spinner {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .sortable-ghost {
+        opacity: 0.45;
+    }
 </style>
 @endsection
 
@@ -194,6 +214,7 @@
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 // Variables globales
 let currentAnioId = {{ $anioActivo ? $anioActivo->id : 'null' }};
@@ -208,6 +229,108 @@ $(document).ready(function() {
         children.toggleClass('show');
         icon.toggleClass('rotated');
     };
+
+    const endpointReordenarCompetencias = '{{ route("admin.cursos-jerarquico.reordenar-competencias") }}';
+
+    function toggleCursoSpinner(cursoId, visible) {
+        const spinner = $(`[data-curso-spinner="${cursoId}"]`);
+        spinner.toggleClass('d-none', !visible);
+    }
+
+    function persistirOrdenCompetencias(cursoId, competenciaIds, onSuccess, onFail) {
+        toggleCursoSpinner(cursoId, true);
+        $.ajax({
+            url: endpointReordenarCompetencias,
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                curso_id: cursoId,
+                competencias: competenciaIds,
+            },
+            success: function(response) {
+                if (response.success) {
+                    if (typeof onSuccess === 'function') onSuccess();
+                } else {
+                    if (typeof onFail === 'function') onFail();
+                    Swal.fire('Error', response.message || 'No se pudo actualizar el orden de competencias.', 'error');
+                }
+            },
+            error: function(xhr) {
+                if (typeof onFail === 'function') onFail();
+                Swal.fire('Error', xhr.responseJSON?.message || 'No se pudo actualizar el orden de competencias.', 'error');
+            },
+            complete: function() {
+                toggleCursoSpinner(cursoId, false);
+            }
+        });
+    }
+
+    function refreshCompetenciaOrderLabels(container) {
+        const competencias = Array.from(container.children)
+            .filter(el => el.matches('.tree-level-3[data-competencia-id]'));
+
+        competencias.forEach(function(item) {
+            const label = item.querySelector('.competencia-order-number');
+            if (label) {
+                label.textContent = String(Number(item.dataset.orden || 0));
+            }
+        });
+    }
+
+    function applySequentialOrdenValues(container) {
+        const competencias = Array.from(container.children)
+            .filter(el => el.matches('.tree-level-3[data-competencia-id]'));
+
+        competencias.forEach(function(item, index) {
+            item.dataset.orden = String(index + 1);
+        });
+
+        refreshCompetenciaOrderLabels(container);
+    }
+
+    function setupCompetenciasSortable() {
+        $('.competencias-sortable').each(function() {
+            const container = this;
+            const cursoId = Number(container.dataset.cursoId || 0);
+            if (!cursoId || container._sortableAttached) return;
+
+            refreshCompetenciaOrderLabels(container);
+
+            container._sortableAttached = true;
+            Sortable.create(container, {
+                animation: 150,
+                handle: '.drag-handle',
+                draggable: '.tree-level-3[data-competencia-id]',
+                ghostClass: 'sortable-ghost',
+                onEnd: function(evt) {
+                    if (evt.oldIndex === evt.newIndex) return;
+
+                    const competenciaIds = Array.from(container.children)
+                        .filter(el => el.matches('.tree-level-3[data-competencia-id]'))
+                        .map(el => Number(el.dataset.competenciaId))
+                        .filter(Boolean);
+
+                    persistirOrdenCompetencias(
+                        cursoId,
+                        competenciaIds,
+                        function() {
+                            applySequentialOrdenValues(container);
+                        },
+                        function() {
+                            const siblings = Array.from(container.children).filter(el => el.matches('.tree-level-3[data-competencia-id]'));
+                            if (evt.oldIndex == null) return;
+                            if (evt.oldIndex >= siblings.length) {
+                                container.appendChild(evt.item);
+                            } else {
+                                container.insertBefore(evt.item, siblings[evt.oldIndex]);
+                            }
+                            refreshCompetenciaOrderLabels(container);
+                        }
+                    );
+                }
+            });
+        });
+    }
     
     // ========== FUNCIONES PARA CURSOS ==========
     window.showCursoModal = function(cursoId, nivelId) {
@@ -550,6 +673,7 @@ $(document).ready(function() {
                     renderTreeFromData(response.data);
                 }
                 bindTreeEvents();
+                setupCompetenciasSortable();
             },
             error: function(xhr) {
                 console.error(xhr);
@@ -626,6 +750,9 @@ $(document).ready(function() {
                             <span class="badge badge-curso">${escapeHtml(curso.codigo)}</span>
                             <span class="badge bg-info">${curso.horas_semanales} h/sem</span>
                             <span class="badge bg-secondary">${curso.competencias ? curso.competencias.length : 0} competencias</span>
+                            <span class="competencia-order-spinner d-none" data-curso-spinner="${curso.id}">
+                                <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                            </span>
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-sm btn-warning" onclick="event.stopPropagation(); showCursoModal(${curso.id}, ${curso.nivel_id})">
@@ -640,7 +767,9 @@ $(document).ready(function() {
                         </div>
                     </div>
                     <div class="tree-children">
-                        ${competenciasHtml}
+                        <div class="competencias-sortable" data-curso-id="${curso.id}">
+                            ${competenciasHtml}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -658,12 +787,16 @@ $(document).ready(function() {
         }
         
         return `
-            <div class="tree-level-3" data-competencia-id="${competencia.id}">
+            <div class="tree-level-3" data-competencia-id="${competencia.id}" data-orden="${Number(competencia.orden || 0)}">
                 <div class="tree-item">
                     <div class="tree-header" onclick="toggleChildren(this)">
                         <div class="tree-title">
+                            <span class="drag-handle" onclick="event.stopPropagation();" title="Arrastra para ordenar">
+                                <i class="fas fa-grip-vertical"></i>
+                            </span>
                             <span class="toggle-icon">▶</span>
                             <i class="fas fa-star" style="color: #3498db;"></i>
+                            <span class="badge bg-light text-dark competencia-order-number">${Number(competencia.orden || 0)}</span>
                             <strong>${escapeHtml(competencia.nombre)}</strong>
                             <span class="badge badge-competencia">${competencia.ponderacion}%</span>
                             <span class="badge bg-secondary">${competencia.capacidades ? competencia.capacidades.length : 0} capacidades</span>
@@ -729,6 +862,7 @@ $(document).ready(function() {
     
     // Inicializar eventos
     bindTreeEvents();
+    setupCompetenciasSortable();
 });
 </script>
 @endsection
