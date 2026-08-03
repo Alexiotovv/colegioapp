@@ -440,7 +440,7 @@ class ReporteNotasController extends Controller
                 $colInicio = Coordinate::stringFromColumnIndex($col);
                 $colFin = Coordinate::stringFromColumnIndex($col + 1);
                 $sheet->mergeCells("{$colInicio}4:{$colFin}4");
-                $sheet->setCellValue("{$colInicio}4", $codigoComp);
+                $sheet->setCellValue("{$colInicio}4", $codigoComp . ' - ' . ($competencia->nombre ?? ''));
                 $sheet->setCellValue("{$colInicio}5", 'NL');
                 $sheet->setCellValue("{$colFin}5", 'Conclusión descriptiva de la competencia');
                 $col += 2;
