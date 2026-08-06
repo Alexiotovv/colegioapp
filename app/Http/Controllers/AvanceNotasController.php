@@ -33,7 +33,6 @@ class AvanceNotasController extends Controller
         
         // Obtener todos los periodos del año activo
         $periodos = Periodo::where('anio_academico_id', $anioActivo->id)
-            ->where('activo', true)
             ->orderBy('orden')
             ->get();
         
